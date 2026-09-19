@@ -13,7 +13,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from ..models import Attempt, Campaign, Claim, Evidence, Idea, IdeaParent, Relation
+from ..models import Attempt, Campaign, Claim, Evidence, Idea, IdeaParent, Relation, utcnow
 from .artifacts import store_artifact
 from .events import emit
 from .lean_checker import LeanChecker, normalize
@@ -353,6 +353,20 @@ class Ingestor:
             record_id=evidence.id,
             payload={"campaign_id": campaign.id, "certified": False},
         )
+
+        if problem_id is not None and check_type == "literature_check" and result == "refutes":
+            problem = campaign.problem
+            if problem.status in {"reported_open", "unreviewed", "unknown"}:
+                problem.status = "resolution_claimed"
+                problem.status_checked_at = utcnow().date().isoformat()
+                emit(
+                    db,
+                    "problem.status_flagged",
+                    record_type="problem",
+                    record_id=problem.id,
+                    payload={"attempt_id": attempt.id, "evidence_id": evidence.id},
+                    visibility="public",
+                )
 
         if idea is not None:
             proposed = WORKER_STATUS_MAP.get((check_type, result))

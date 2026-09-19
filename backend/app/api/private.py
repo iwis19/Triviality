@@ -25,8 +25,15 @@ from ..models import (
     Relation,
     Source,
     SourceAssertion,
+    utcnow,
 )
-from ..seed import load_seed
+from ..seed import load_atlas_document, load_seed
+from ..services.atlas_import import (
+    DEFAULT_PAGE,
+    fetch_wikitext,
+    parse_unsolved_list,
+    to_atlas_document,
+)
 from ..services.devin_client import DEVIN_MODES
 from ..services.events import emit
 from ..services.publication import withdraw
@@ -83,9 +90,29 @@ class AssignmentIn(BaseModel):
     comparison_group: str = ""
 
 
+class WikipediaImportIn(BaseModel):
+    page: str = DEFAULT_PAGE
+    dry_run: bool = False
+    limit: int | None = Field(default=None, ge=1)
+    wikitext: str | None = Field(
+        default=None, description="pre-fetched page source; skips the network fetch"
+    )
+
+
 class ReviewIn(BaseModel):
     result: str  # confirmed | confirmed_refutation | disputed
     note: str = ""
+
+
+PROBLEM_REVIEW_STATUSES = {"reported_open", "resolution_claimed", "resolved", "disputed", "unknown"}
+
+
+class ProblemReviewIn(BaseModel):
+    status: str
+    note: str = ""
+    assertion_ids: list[str] = Field(
+        default_factory=list, description="assertions checked; empty means all of the problem's"
+    )
 
 
 class CollaboratorIn(BaseModel):
@@ -102,6 +129,44 @@ class WithdrawIn(BaseModel):
 @router.post("/seed")
 def seed(db: Session = Depends(get_db)) -> dict:
     counts = load_seed(db)
+    counts["published"] = get_scheduler().publisher.process_outbox(db)
+    return counts
+
+
+@router.post("/atlas/import")
+def import_atlas_document(body: dict, db: Session = Depends(get_db)) -> dict:
+    """Bulk-load a document in the seed format (areas, problems with sources)."""
+    if "problems" not in body or "retrieved_date" not in body:
+        raise HTTPException(422, "document needs retrieved_date and problems")
+    body.setdefault("areas", [])
+    body.setdefault("origin", "bulk_import")
+    counts = load_atlas_document(db, body)
+    counts["published"] = get_scheduler().publisher.process_outbox(db)
+    return counts
+
+
+@router.post("/atlas/import/wikipedia")
+def import_wikipedia_list(body: WikipediaImportIn, db: Session = Depends(get_db)) -> dict:
+    """Import the reported-open entries of a Wikipedia list page, one unreviewed source
+    assertion per listing plus the linked article. Entries whose article is already asserted
+    for an existing problem are skipped as duplicates."""
+    try:
+        wikitext = body.wikitext if body.wikitext is not None else fetch_wikitext(body.page)
+    except Exception as exc:
+        raise HTTPException(502, f"could not fetch {body.page}: {exc}") from exc
+    listed = parse_unsolved_list(wikitext)
+    if body.limit:
+        listed = listed[: body.limit]
+    document = to_atlas_document(listed, page=body.page)
+    if body.dry_run:
+        return {
+            "dry_run": True,
+            "parsed": len(listed),
+            "sample": document["problems"][:5],
+            "areas": document["areas"],
+        }
+    counts = load_atlas_document(db, document)
+    counts["parsed"] = len(listed)
     counts["published"] = get_scheduler().publisher.process_outbox(db)
     return counts
 
@@ -161,6 +226,55 @@ def create_problem(body: ProblemIn, db: Session = Depends(get_db)) -> dict:
     db.commit()
     get_scheduler().publisher.process_outbox(db)
     return {"id": problem.id}
+
+
+@router.post("/problems/{problem_id}/review")
+def review_problem_status(
+    problem_id: str,
+    body: ProblemReviewIn,
+    db: Session = Depends(get_db),
+    collaborator: Collaborator = Depends(require_collaborator),
+) -> dict:
+    """Human review of a problem's reported status. Workers (status_researcher) can only flag
+    `resolution_claimed`; moving to `resolved`/`disputed`/back to `reported_open` is a
+    collaborator decision recorded here with the assertions that were checked."""
+    if body.status not in PROBLEM_REVIEW_STATUSES:
+        raise HTTPException(422, f"status must be one of {sorted(PROBLEM_REVIEW_STATUSES)}")
+    problem = db.get(Problem, problem_id)
+    if problem is None:
+        raise HTTPException(404, "problem not found")
+    checked = [
+        a for a in problem.assertions if not body.assertion_ids or a.id in body.assertion_ids
+    ]
+    for assertion in checked:
+        assertion.review_state = "reviewed"
+    today = utcnow().date().isoformat()
+    previous = problem.status
+    problem.status = body.status
+    problem.status_checked_at = today
+    reviews = list(problem.coverage.get("status_reviews", []))
+    reviews.append(
+        {
+            "reviewer": collaborator.name,
+            "date": today,
+            "from": previous,
+            "to": body.status,
+            "note": body.note,
+            "assertion_ids": [a.id for a in checked],
+        }
+    )
+    problem.coverage = {**problem.coverage, "status_reviews": reviews}
+    emit(
+        db,
+        "problem.status_reviewed",
+        record_type="problem",
+        record_id=problem.id,
+        payload={"from": previous, "to": body.status, "reviewer": collaborator.name},
+        visibility="public",
+    )
+    db.commit()
+    get_scheduler().publisher.process_outbox(db)
+    return {"id": problem.id, "status": problem.status, "assertions_reviewed": len(checked)}
 
 
 # -- portfolios & campaigns ----------------------------------------------------------------------

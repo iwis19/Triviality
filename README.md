@@ -75,6 +75,27 @@ curl -s localhost:8000/public/graph | jq '.links | group_by(.layer) | map({(.[0]
 
 Or with Docker: `docker compose up --build` (backend on :8000, frontend on :5173).
 
+### Growing the atlas
+
+The seed is 27 hand-checked problems. `POST /private/atlas/import/wikipedia` bulk-imports the
+`== Unsolved problems ==` sections of Wikipedia's *List of unsolved problems in mathematics*
+(~500 entries; pass `{"dry_run": true}` to preview, `limit` to cap). Each entry becomes a
+`reported_open` problem with `origin="bulk_import"` and two *unreviewed* source assertions:
+the list page (with the section path it was listed under) and the linked article. Being
+listed is a dated claim, not a verified status; the `status_researcher` role and
+`POST /private/problems/{id}/review` exist to check it. Entries whose article URL is already
+asserted for an existing problem are skipped as duplicates, so re-running is idempotent and
+the hand-checked seed records win. `POST /private/atlas/import` accepts any document in the
+seed JSON format for other sources (Open Problem Garden, Erdős problems, …).
+
+Status review is two-tier. A `status_researcher` session that returns a problem-level
+`literature_check` with `result: "refutes"` only *flags* the problem as `resolution_claimed`;
+the scheduler then pauses auto-planned campaigns on it so no more sessions are spent. Moving a
+problem to `resolved`, `disputed`, or back to `reported_open` is a collaborator decision via
+`POST /private/problems/{id}/review` (`status`, `note`, optional `assertion_ids`), which marks
+the checked source assertions `reviewed` and appends a dated, attributed entry to the
+publicly visible `status_reviews` history.
+
 ## Turning on real Devin sessions
 
 Set these (environment or `backend/.env`, see `backend/.env.example`; never commit the key):
@@ -159,7 +180,8 @@ Phase 0–1 of the plan: atlas + research loop + Lean checker (Mathlib) + formal
 automatic publication + 3D explorer, validated against the deterministic mock provider, one
 live Devin API smoke session and the matched Fusion vs Ultra pilot on the lonely runner
 conjecture (all ingested and auto-published with empirical/untested labels; no open conjecture
-has been solved and nothing is labelled verified without the checker). Not yet done: bulk
-atlas ingestion from external lists, source review workflow UI, an MCP tool server (the
+has been solved and nothing is labelled verified without the checker). The atlas grows via
+the Wikipedia bulk import above (~480 problems, 30+ subareas). Not yet done: more import
+sources, source review workflow UI, an MCP tool server (the
 HTTP worker routes cover callbacks today), durable public hosting, PostgreSQL deployment
 manifests, and the adapters for external evolution engines listed in the plan.

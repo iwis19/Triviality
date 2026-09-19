@@ -131,7 +131,7 @@ class Publisher:
         problem = db.get(Problem, problem_id)
         if problem is None:
             return None
-        if problem.origin == "literature" and not problem.assertions:
+        if problem.origin != "generated" and not problem.assertions:
             return None  # never publish an unsourced literature problem (docs/plan.md §3.2)
         payload = {
             "id": problem.id,
@@ -158,6 +158,10 @@ class Publisher:
                     "review_state": a.review_state,
                 }
                 for a in problem.assertions
+            ],
+            "status_reviews": [
+                {k: r.get(k) for k in ("reviewer", "date", "from", "to", "note")}
+                for r in problem.coverage.get("status_reviews", [])
             ],
         }
         return payload, PROBLEM_STATUS_LABELS.get(problem.status, "Status unknown")

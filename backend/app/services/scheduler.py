@@ -166,6 +166,18 @@ class Scheduler:
         policy = policy_of(campaign)
         if not policy["auto_plan"]:
             return 0
+        if campaign.problem.status in {"resolution_claimed", "resolved"}:
+            if not self._open_attempts(db, campaign):
+                campaign.state = "paused"
+                emit(
+                    db,
+                    "campaign.paused",
+                    record_type="campaign",
+                    record_id=campaign.id,
+                    payload={"reason": f"problem status {campaign.problem.status}"},
+                    visibility="public",
+                )
+            return 0
         if campaign.sessions_used >= campaign.session_budget:
             open_attempts = self._open_attempts(db, campaign)
             if not open_attempts:
