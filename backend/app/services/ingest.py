@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from ..models import Attempt, Campaign, Claim, Evidence, Idea, IdeaParent, Relation
 from .artifacts import store_artifact
 from .events import emit
-from .lean_checker import LeanChecker
+from .lean_checker import LeanChecker, normalize
 
 WORKER_STATUS_MAP: dict[tuple[str, str], str] = {
     ("counterexample_search", "supports"): "counterexample_checked",
@@ -387,10 +387,10 @@ class Ingestor:
         source: str,
         artifact_id: str,
     ) -> int:
-        target_decl = _declaration_name(claim.lean_declaration)
+        target_decl = declaration_name(claim.lean_declaration)
         if not target_decl:
             return 0
-        approved = _declaration_signature(claim.lean_declaration)
+        approved = declaration_signature(claim.lean_declaration)
         outcome = self.lean_checker.check(source, target_decl, approved)
         verified = outcome.status == "verified"
         result = (
@@ -410,7 +410,16 @@ class Ingestor:
             verifier="lab-lean-checker",
             verifier_version=outcome.toolchain,
             certified=verified,
-            details=outcome.as_details(),
+            details={
+                **outcome.as_details(),
+                "approved_target": claim.lean_declaration,
+                "target_origin": (
+                    "problem_formal_target"
+                    if normalize(claim.lean_declaration)
+                    == normalize(attempt.campaign.problem.formal_target or "")
+                    else "worker_proposed"
+                ),
+            },
             artifact_id=artifact_id,
             produced_by_attempt_id=attempt.id,
         )
@@ -451,17 +460,13 @@ class Ingestor:
         return 1
 
 
-def _declaration_name(lean_declaration: str) -> str:
-    import re
-
+def declaration_name(lean_declaration: str) -> str:
     match = re.match(r"\s*(?:theorem|lemma)\s+([A-Za-z_][\w.']*)", lean_declaration)
     return match.group(1) if match else ""
 
 
-def _declaration_signature(lean_declaration: str) -> str:
+def declaration_signature(lean_declaration: str) -> str:
     """Return everything between the declaration name and `:=` (binders and statement)."""
-    import re
-
     match = re.match(
         r"\s*(?:theorem|lemma)\s+[A-Za-z_][\w.']*\s*(.*?)\s*(?::=.*)?$", lean_declaration, re.S
     )

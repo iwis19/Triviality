@@ -3,7 +3,10 @@ Workers can read their assignment context and submit partial output; they cannot
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..auth import require_worker_attempt
@@ -11,6 +14,7 @@ from ..db import get_db
 from ..deps import get_scheduler
 from ..models import Attempt
 from ..services.devin_client import RESEARCH_OUTPUT_SCHEMA
+from ..services.ingest import declaration_name, declaration_signature
 from ..services.prompts import describe_idea
 
 router = APIRouter(prefix="/worker", tags=["worker"])
@@ -36,7 +40,45 @@ def context(attempt: Attempt = Depends(require_worker_attempt)) -> dict:
             if i.scheduling_status in {"active", "promoted"}
         ],
         "output_schema": RESEARCH_OUTPUT_SCHEMA,
+        "lean": _lean_environment(),
     }
+
+
+def _lean_environment() -> dict:
+    checker = get_scheduler().ingestor.lean_checker
+    root = checker.project_dir
+    if root is None or not checker.available():
+        return {"available": False}
+
+    def read(path: Path) -> str:
+        return path.read_text() if path.exists() else ""
+
+    return {
+        "available": True,
+        "toolchain": read(root / "lean-toolchain").strip(),
+        "lakefile": read(root / "lakefile.toml"),
+        "MathLab/Basic.lean": read(root / "MathLab" / "Basic.lean"),
+        "allowed_axioms": sorted(checker.allowed_axioms),
+    }
+
+
+class LeanCheckRequest(BaseModel):
+    source: str = Field(max_length=200_000)
+    declaration: str = Field(max_length=4000, description="approved `theorem name binders : stmt`")
+
+
+@router.post("/attempts/{attempt_id}/lean-check")
+def lean_check(body: LeanCheckRequest, attempt: Attempt = Depends(require_worker_attempt)) -> dict:
+    """Dry-run the lab's Lean checker on a candidate file so a formalization session can
+    iterate. Nothing is recorded; certification only happens when the final structured output
+    carries the file as a `lean_attempt` artifact targeting a claim with that declaration."""
+    name = declaration_name(body.declaration)
+    if not name:
+        raise HTTPException(422, "declaration must start with `theorem <name>` or `lemma <name>`")
+    outcome = get_scheduler().ingestor.lean_checker.check(
+        body.source, name, declaration_signature(body.declaration)
+    )
+    return {"attempt_id": attempt.id, **outcome.as_details()}
 
 
 @router.post("/attempts/{attempt_id}/submit")

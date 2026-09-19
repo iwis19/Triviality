@@ -38,10 +38,13 @@ from .publication import Publisher
 from .selection import Candidate, select_generation
 
 RUNNING = {"queued", "dispatching", "running", "blocked"}
+NOT_FORMALIZABLE = {"refuted", "unresolved_conflict", "lean_verified"}
 DEFAULT_POLICY = {
     "default_mode": "ultra",
     # per-role overrides; see docs/pilot-fusion-vs-ultra.md for why tool-heavy roles get fusion
     "role_modes": {"experimenter": "fusion", "status_researcher": "fusion"},
+    # Lean iteration is slow; formalizers get more headroom than the deployment default cap
+    "role_acu_limits": {"prover_formalizer": 15},
     "ideas_per_generation": 3,
     "keep_total": 6,
     "keep_per_cluster": 2,
@@ -186,6 +189,30 @@ class Scheduler:
         ]
         if not active:
             parents = [i for i in campaign.ideas if i.scheduling_status == "promoted"]
+            if not parents:
+                # Nothing earned promotion: refine the best surviving (unrefuted) ideas rather
+                # than restarting from scratch, so lineage never breaks.
+                survivors = [
+                    i
+                    for i in campaign.ideas
+                    if i.scheduling_status == "active" and i.evidence_status != "refuted"
+                ]
+                parents = sorted(survivors, key=lambda i: (i.pinned is False, -i.score))[
+                    : policy["promote_top"]
+                ]
+            # Survivors of a cull are deepened first: a formalizer tries to land a Lean-verified
+            # piece of each promoted idea before the next generation branches from them.
+            for idea in sorted(parents, key=lambda i: (i.pinned is False, -i.score)):
+                if self._wants_formalizer(idea):
+                    self.enqueue(
+                        db,
+                        campaign,
+                        role="prover_formalizer",
+                        idea=idea,
+                        parents=[],
+                        mode=mode_for_role(policy, "prover_formalizer"),
+                    )
+                    return 1
             self.enqueue(
                 db,
                 campaign,
@@ -236,6 +263,16 @@ class Scheduler:
             return "prover_formalizer"
         return None
 
+    @staticmethod
+    def _wants_formalizer(idea: Idea) -> bool:
+        """Promoted ideas without a Lean attempt whose critique did not refute them get one
+        formalization pass; the worker picks the strongest provable sub-statement."""
+        if not idea.claims or any(e.check_type == "lean_attempt" for e in idea.evidence):
+            return False
+        if any(e.check_type == "critique" and e.result == "refutes" for e in idea.evidence):
+            return False
+        return idea.evidence_status not in NOT_FORMALIZABLE
+
     def _open_attempts(self, db: Session, campaign: Campaign) -> list[Attempt]:
         return list(
             db.scalars(
@@ -279,6 +316,7 @@ class Scheduler:
             active_ideas=active[:12],
             parents=parents[:6],
             worker_api_base=self.settings.public_base_url,
+            idea=idea,
         )
         attempt.prompt_hash = hashlib.sha256(attempt.prompt.encode()).hexdigest()
         emit(
@@ -326,6 +364,15 @@ class Scheduler:
         db.commit()
         return dispatched
 
+    def _acu_limit(self, campaign: Campaign, role: str) -> int | None:
+        """Per-session ACU cap: policy `role_acu_limits[role]`, else policy `max_acu_limit`,
+        else the deployment default. `None` means the provider's own limit applies."""
+        policy = policy_of(campaign)
+        for value in ((policy.get("role_acu_limits") or {}).get(role), policy.get("max_acu_limit")):
+            if isinstance(value, int) and value > 0:
+                return value
+        return self.settings.devin_max_acu_limit
+
     def _dispatch_one(self, db: Session, attempt: Attempt, campaign: Campaign) -> bool:
         # Reserve before the network call so a crash cannot double-create a session.
         attempt.status = "dispatching"
@@ -346,7 +393,7 @@ class Scheduler:
                 ],
                 title=f"[mathlab] {attempt.role} — {campaign.problem.title[:60]}",
                 session_secrets={"LAB_WORKER_TOKEN": worker_token},
-                max_acu_limit=self.settings.devin_max_acu_limit,
+                max_acu_limit=self._acu_limit(campaign, attempt.role),
             )
         except Exception as exc:
             attempt.retries += 1

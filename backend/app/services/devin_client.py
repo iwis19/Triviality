@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import random
+import re
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -232,6 +233,9 @@ class DevinApiClient:
         response.raise_for_status()
 
 
+_RECORD_ID = re.compile(r"\b[0-9a-f]{32}\b")
+
+
 class MockDevinClient:
     """Deterministic stand-in. Sessions finish on the second poll with plausible structured
     output derived from the prompt hash, so scheduler/ingestion/publication can be exercised
@@ -254,11 +258,15 @@ class MockDevinClient:
     ) -> SessionInfo:
         digest = hashlib.sha256(prompt.encode()).hexdigest()
         session_id = f"mock-{digest[:16]}"
+        # Output depends on the assignment, not on the random record ids inside the prompt, so
+        # a given campaign replays identically across runs.
+        stable = hashlib.sha256(_RECORD_ID.sub("<id>", prompt).encode()).hexdigest()
         self._sessions[session_id] = {
             "polls": 0,
             "mode": devin_mode,
             "prompt": prompt,
-            "seed": int(digest[:8], 16),
+            "seed": int(stable[:8], 16),
+            "worker_token": session_secrets.get("LAB_WORKER_TOKEN", ""),
         }
         return SessionInfo(
             session_id=session_id, url=f"mock://{session_id}", status="new", devin_mode=devin_mode
@@ -320,17 +328,57 @@ class MockDevinClient:
                 for name, tags in families[:3]
             ]
             return {"ideas": ideas, "evidence": [], "gaps": ["mock provider: no real research"]}
-        result = rng.choice(["supports", "inconclusive", "refutes"])
+        if role == "prover_formalizer":
+            return {
+                "ideas": [
+                    {
+                        "local_id": "L1",
+                        "title": "Formalizable sub-lemma of the assigned idea",
+                        "approach": "Prove the smallest faithful piece in Lean.",
+                        "mechanism": "Mock: restricts the key lemma to a finite case.",
+                        "next_experiment": "",
+                        "method_tags": ["formalization", "lean"],
+                        "parent_idea_ids": [],
+                        "novelty_rationale": "Mock output; novelty unchecked.",
+                        "claims": [
+                            {
+                                "local_id": "C1",
+                                "statement": "[mock] 1 + 1 = 2",
+                                "lean_declaration": "theorem mock_lemma : 1 + 1 = 2",
+                            }
+                        ],
+                    }
+                ],
+                "evidence": [
+                    {
+                        "target": "C1",
+                        "check_type": "lean_attempt",
+                        "result": "inconclusive",
+                        "summary": "[mock] candidate Lean file; the lab's checker decides",
+                        "coverage": "mock coverage",
+                        "assumptions": [],
+                        "artifact": {
+                            "filename": "result.lean",
+                            "content": "import MathLab.Basic\n"
+                            "theorem mock_lemma : 1 + 1 = 2 := rfl\n",
+                        },
+                    }
+                ],
+                "gaps": ["mock provider: no real research"],
+            }
+        # Verdict follows the idea family so a campaign always ends with a mix of supported,
+        # inconclusive and refuted branches regardless of which families were drawn.
+        assigned = prompt.split("ASSIGNED IDEA", 1)[-1]
+        result = "supports"
+        if "Probabilistic construction" in assigned:
+            result = "refutes"
+        elif "Spectral/Fourier" in assigned:
+            result = "inconclusive"
         check_type = {
             "experimenter": "numerical_experiment",
             "critic": "critique",
-            "prover_formalizer": "lean_attempt",
         }[role]
-        content = (
-            "theorem mock_lemma : 1 + 1 = 2 := by norm_num\n"
-            if check_type == "lean_attempt"
-            else json.dumps({"checked_range": 1000, "result": result})
-        )
+        content = json.dumps({"checked_range": 1000, "result": result})
         return {
             "ideas": [],
             "evidence": [
@@ -341,12 +389,7 @@ class MockDevinClient:
                     "summary": f"[mock] {check_type} finished with result {result}",
                     "coverage": "mock coverage",
                     "assumptions": [],
-                    "artifact": {
-                        "filename": "result.lean"
-                        if check_type == "lean_attempt"
-                        else "result.json",
-                        "content": content,
-                    },
+                    "artifact": {"filename": "result.json", "content": content},
                 }
             ],
             "gaps": ["mock provider: no real research"],

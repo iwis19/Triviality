@@ -11,6 +11,9 @@ os.environ["MATHLAB_ARTIFACT_DIR"] = str(_TMP / "artifacts")
 os.environ["MATHLAB_OWNER_API_KEY"] = "test-owner-key"
 os.environ["MATHLAB_DEVIN_PROVIDER"] = "mock"
 os.environ["MATHLAB_SCHEDULER_ENABLED"] = "false"
+# API/loop tests exercise the checker's static gate only; real `lake` runs live in
+# test_lean_checker.py, which builds its own LeanChecker against the lab project.
+os.environ["MATHLAB_LEAN_PROJECT_DIR"] = ""
 
 from fastapi.testclient import TestClient  # noqa: E402
 

@@ -1,9 +1,12 @@
 name = "mathlab"
 defaultTargets = ["MathLab"]
 
-# Mathlib is the intended long-term dependency. It is not pinned here yet because the
-# first checked artifacts only need core Lean; add it with `lake update` once the pinned
-# revision is chosen and recorded in docs/plan.md.
+# Mathlib is pinned to the tag matching lean-toolchain. After changing the rev run
+# `lake update mathlib && lake exe cache get` and record the change in docs/plan.md.
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.24.0"
 
 [[lean_lib]]
 name = "MathLab"

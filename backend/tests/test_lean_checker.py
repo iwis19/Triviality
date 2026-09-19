@@ -58,3 +58,17 @@ def test_real_lean_verifies_and_rejects() -> None:
         ": MathLab.IsEven 4",
     )
     assert shared.status == "verified", shared.reasons + [shared.log[-500:]]
+
+
+@pytest.mark.skipif(not lean_available, reason="lake/lean not installed")
+def test_real_lean_accepts_mathlib_proofs_with_classical_axioms() -> None:
+    checker = LeanChecker(LEAN_DIR, timeout_seconds=900)
+    src = (
+        "import Mathlib\n"
+        "theorem primes_unbounded (n : ℕ) : ∃ p, n < p ∧ Nat.Prime p := by\n"
+        "  obtain ⟨p, hp, hprime⟩ := Nat.exists_infinite_primes (n + 1)\n"
+        "  exact ⟨p, by omega, hprime⟩\n"
+    )
+    ok = checker.check(src, "primes_unbounded", "(n : ℕ) : ∃ p, n < p ∧ Nat.Prime p")
+    assert ok.status == "verified", ok.reasons + [ok.log[-800:]]
+    assert set(ok.axioms) <= {"propext", "Classical.choice", "Quot.sound"}

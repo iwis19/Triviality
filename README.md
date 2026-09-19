@@ -85,23 +85,33 @@ Set these (environment or `backend/.env`, see `backend/.env.example`; never comm
 | `MATHLAB_DEVIN_API_KEY` | organization service-user API key |
 | `MATHLAB_DEVIN_ORG_ID` | organization id used in `POST /v3/organizations/{org}/sessions` |
 | `MATHLAB_DEVIN_CREATE_AS_USER_ID` | optional; attributes sessions to that user's plan |
-| `MATHLAB_DEVIN_MAX_ACU_LIMIT` | optional per-session ACU cap |
-| `MATHLAB_PUBLIC_BASE_URL` | URL Devin sessions can reach to call `/worker/*` back |
+| `MATHLAB_DEVIN_MAX_ACU_LIMIT` | default per-session ACU cap; campaign policy `max_acu_limit` / `role_acu_limits` override it (formalizers default to 15) |
+| `MATHLAB_PUBLIC_BASE_URL` | URL Devin sessions can reach to call `/worker/*` back. `localhost` only works for the mock provider; for cloud sessions expose the backend (e.g. `cloudflared tunnel --url http://localhost:8000` gives a temporary URL — fine for pilots, not production hosting). Without reachability sessions still work via structured output only. |
 | `MATHLAB_SCHEDULER_ENABLED=true` | run the scheduler loop in-process every `MATHLAB_SCHEDULER_INTERVAL_SECONDS` |
 | `MATHLAB_OWNER_API_KEY` | **change from the default before exposing the API** |
 
 Modes (`normal`, `fast`, `lite`, `ultra`, `fusion`) are passed through verbatim as `devin_mode`
 and stored as `requested_mode`; whatever the API reports back is stored separately as
 `reported_mode`. Nothing is silently downgraded. Per-assignment mode choice and a
-`comparison_group` tag support the Fusion-vs-Ultra pilot from the plan (§6.4).
+`comparison_group` tag support the Fusion-vs-Ultra pilot from the plan (§6.4); the first
+matched pair is recorded in `docs/pilot-fusion-vs-ultra.md` and motivates the default
+`role_modes` policy (Ultra for generation/critique/formalization, Fusion for tool-heavy
+experimenter and status-research roles).
+
+Worker output is accepted with worker-local ids (`I1`, `C1`, …) and resolved to lab records;
+evidence that resolves to nothing is kept in `attempt.result["unattached_evidence"]` along
+with the raw output, and `target: "problem"` attaches literature/status evidence to the
+problem itself. `POST /private/attempts/{id}/reingest` replays a stored result idempotently
+after a resolver fix.
 
 With a live provider every scheduler tick may create sessions billed to the attributed account;
 the UI shows a warning when the provider is not `mock`.
 
 ## Lean checker
 
-`lean/` is a minimal Lake project (toolchain in `lean/lean-toolchain`). Install
-[elan](https://github.com/leanprover/elan), then `cd lean && lake build`. The checker:
+`lean/` is a Lake project pinned to `leanprover/lean4:v4.24.0` with Mathlib `v4.24.0` as a
+dependency. Install [elan](https://github.com/leanprover/elan), then
+`cd lean && lake exe cache get && lake build` (the Mathlib cache is ~6 GB). The checker:
 
 1. statically rejects `sorry`, `sorryAx`, `axiom`, `unsafe`, `implemented_by`, `extern`,
    `native_decide`, and any declaration whose name/signature differs from the approved target;
@@ -110,6 +120,19 @@ the UI shows a warning when the provider is not `mock`.
 
 If Lean is not installed the checker records a `checker_unavailable` blocker; it never
 pretends to verify. `MATHLAB_LEAN_PROJECT_DIR=""` disables it explicitly.
+
+### Formalization stage
+
+After each cull the scheduler gives every promoted (or best surviving unrefuted) idea one
+`prover_formalizer` pass before the next generation branches from it. The formalizer is told
+to prove the problem's approved formal target exactly if one exists, otherwise the strongest
+*smaller* faithful statement (a lemma, finite case, equivalence or reduction), and it can
+iterate against the lab's own checker with `POST /worker/attempts/{id}/lean-check` (a dry run;
+nothing is recorded). Only the final `lean_attempt` artifact is checked for real, and the
+public evidence carries `check_status`, `approved_target`, `target_origin`
+(`problem_formal_target` vs `worker_proposed`) and `toolchain` so readers can tell a verified
+sub-lemma from a verified solution of the stated problem. A worker never certifies its own
+work.
 
 ## Development
 
@@ -128,13 +151,15 @@ SQLite is the default database; set `MATHLAB_DATABASE_URL` to a PostgreSQL URL f
 | `GET /public/areas, /problems, /problems/{slug}, /ideas/{id}, /graph, /events, /labels` | none | published projection only |
 | `POST /private/seed, /problems, /portfolios, /campaigns, /campaigns/{id}/assignments, /scheduler/tick …` | `X-API-Key` | research controls (owner or collaborator) |
 | `POST /private/collaborators, /publications/{id}/withdraw` | owner key | account and retraction controls |
-| `GET /worker/attempts/{id}/context`, `POST /worker/attempts/{id}/submit` | `X-Worker-Token` | what a Devin session calls back into |
+| `GET /worker/attempts/{id}/context`, `POST /worker/attempts/{id}/lean-check`, `POST /worker/attempts/{id}/submit` | `X-Worker-Token` | what a Devin session calls back into (context incl. Lean environment, dry-run checker, final submission) |
 
 ## Status
 
-Phase 0–1 of the plan: atlas + research loop + Lean checker + automatic publication + 3D
-explorer, validated against the deterministic mock provider and one live Devin API smoke
-session (hypothesis generation on the lonely runner conjecture, ingested and auto-published
-with empirical/untested labels). Not yet done: the Fusion vs Ultra pilot comparison, MCP
-tool server for in-session callbacks, source review workflow UI, PostgreSQL
-deployment manifests, and the adapters for external evolution engines listed in the plan.
+Phase 0–1 of the plan: atlas + research loop + Lean checker (Mathlib) + formalization stage +
+automatic publication + 3D explorer, validated against the deterministic mock provider, one
+live Devin API smoke session and the matched Fusion vs Ultra pilot on the lonely runner
+conjecture (all ingested and auto-published with empirical/untested labels; no open conjecture
+has been solved and nothing is labelled verified without the checker). Not yet done: bulk
+atlas ingestion from external lists, source review workflow UI, an MCP tool server (the
+HTTP worker routes cover callbacks today), durable public hosting, PostgreSQL deployment
+manifests, and the adapters for external evolution engines listed in the plan.

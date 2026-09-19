@@ -23,11 +23,20 @@ ROLE_INSTRUCTIONS: dict[str, str] = {
         "source if so. Report `supports` only if you found no gap after a genuine attempt."
     ),
     "prover_formalizer": (
-        "Formalize the assigned claim in Lean 4 in the lab's project (import MathLab.Basic; no "
-        "Mathlib unless the environment provides it). The theorem name and statement must match "
-        "the approved target exactly. Do not use sorry, axiom, unsafe, native_decide, or "
-        "set_option. If you cannot finish, return the partial file plus a precise list of "
-        "remaining obligations. The lab's checker decides verification; do not report it yourself."
+        "Produce a Lean 4 proof the lab's checker accepts. The lab project pins the toolchain in "
+        "lean-toolchain and provides Mathlib (`import Mathlib`) plus `import MathLab.Basic`. "
+        "If the assigned idea has a claim with an approved Lean target, prove exactly that "
+        "declaration (same name, binders and statement). Otherwise pick the strongest "
+        "sub-statement of the idea you can genuinely prove (a lemma, a finite case, an "
+        "equivalence, a reduction) and return it as a new idea refining the assigned one with a "
+        "claim carrying `lean_declaration` = `theorem <name> <binders> : <statement>`; faithfully "
+        "formalizing a piece of the problem matters more than reaching the conjecture. Do not use "
+        "sorry, axiom, unsafe, native_decide, implemented_by, or set_option; proofs may depend "
+        "only on propext, Classical.choice and Quot.sound. Iterate against the lab's checker "
+        "(POST .../lean-check below) until it returns status `verified`, then attach the whole "
+        "file as a `lean_attempt` evidence artifact whose `target` is that claim's local_id. If "
+        "you cannot finish, return the partial file plus a precise list of remaining "
+        "obligations. The lab's checker decides verification; do not report it yourself."
     ),
     "status_researcher": (
         "Check whether the problem's reported open status still holds against later literature. "
@@ -63,6 +72,7 @@ def build_prompt(
     active_ideas: list[Idea],
     parents: list[Idea],
     worker_api_base: str,
+    idea: Idea | None = None,
 ) -> str:
     sources = (
         "\n".join(
@@ -72,7 +82,7 @@ def build_prompt(
         )
         or "- none recorded"
     )
-    areas = ", ".join(area.name for area in problem.areas) or "unclassified"
+    areas = ", ".join(sorted(area.name for area in problem.areas)) or "unclassified"
     sections = [
         "You are a research worker in a mathematics lab. Work only on the bounded assignment "
         "below and stop when the deliverable is complete.",
@@ -98,8 +108,11 @@ def build_prompt(
             "CURRENT ACTIVE IDEAS (avoid duplicates)\n"
             + "\n".join(map(describe_idea, active_ideas))
         )
-    if attempt.idea_id:
-        sections.append(f"ASSIGNED IDEA ID: {attempt.idea_id} (use target 'self' for its evidence)")
+    if idea is not None:
+        sections.append(
+            f"ASSIGNED IDEA (id {idea.id}; use target 'self' for its evidence)\n"
+            + describe_idea(idea)
+        )
     sections += [
         "RULES",
         "- State every assumption. Never describe anything as verified, proved, or solved; the "
@@ -113,9 +126,12 @@ def build_prompt(
         "Evidence that names nothing attachable is kept but cannot be published against an idea.",
         "DELIVERABLE",
         "Call provide_structured_output with the required schema (ideas, evidence, gaps).",
-        f"Optional progress reporting: POST {worker_api_base}/worker/attempts/{attempt.id}/submit "
-        "with header X-Worker-Token set to the LAB_WORKER_TOKEN session secret and the same JSON "
-        "shape; partial submissions are merged idempotently.",
+        f"Lab worker API (header X-Worker-Token = the LAB_WORKER_TOKEN session secret): "
+        f"GET {worker_api_base}/worker/attempts/{attempt.id}/context for the assignment; "
+        f"POST {worker_api_base}/worker/attempts/{attempt.id}/lean-check with JSON "
+        '{"source": <full .lean file>, "declaration": <theorem line>} to dry-run the checker; '
+        f"POST {worker_api_base}/worker/attempts/{attempt.id}/submit with the deliverable JSON "
+        "shape for optional partial progress (merged idempotently).",
         f"campaign: {campaign.id}; generation: {campaign.generation}; attempt: {attempt.id}",
     ]
     return "\n\n".join(section for section in sections if section)

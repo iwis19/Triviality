@@ -239,6 +239,10 @@ class Publisher:
             "assumptions": details.get("assumptions", []),
             "axioms": details.get("axioms", []),
             "reasons": details.get("reasons", []),
+            "check_status": details.get("status"),
+            "approved_target": details.get("approved_target"),
+            "target_origin": details.get("target_origin"),
+            "toolchain": details.get("toolchain"),
             "artifact_id": evidence.artifact_id,
             "created_at": evidence.created_at.isoformat(),
         }
