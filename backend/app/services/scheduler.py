@@ -101,8 +101,13 @@ class Scheduler:
                 continue
             try:
                 info = self.client.get_session(attempt.provider_session_id)
-            except Exception as exc:  # provider hiccup: keep lease, record, retry next tick
+            except Exception as exc:  # provider hiccup: record, retry until the lease ends
                 attempt.error = f"poll failed: {exc}"[:2000]
+                if attempt.lease_expires_at and attempt.lease_expires_at < utcnow():
+                    attempt.status = "timed_out"
+                    attempt.finished_at = utcnow()
+                    emit(db, "attempt.timed_out", record_type="attempt", record_id=attempt.id)
+                    count += 1
                 continue
             attempt.reported_mode = info.devin_mode
             attempt.status_detail = info.status_detail or info.status
