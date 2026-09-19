@@ -93,8 +93,9 @@
       "statement": "If A ⊆ {1, …, N} with |A| = n is such that the subset sums Σ_{a∈S} a are distinct for all S ⊆ A, then N ≫ 2^n (i.e., N ≥ c·2^n for an absolute constant c > 0).",
       "definitions": "The notation N ≫ 2^n means N ≥ c·2^n for some absolute constant c > 0.",
       "areas": ["number-theory", "additive-number-theory", "combinatorics"],
-      "attribution": "P. Erdős (1931); $500 prize problem",
-      "sources": [{"title": "Erdős Problems #1 (T. F. Bloom)", "url": "https://www.erdosproblems.com/1", "location": "problem page, last edited 06 April 2026", "asserted_status": "open"}]
+      "attribution": "P. Erdős (1931); $500 prize problem. Disproved 2026 (construction attributed to GPT-6 Astra, Lean-verified per erdosproblems.com); kept as a resolved record — the surviving question is the lower-bound constant.",
+      "status_override": "resolved",
+      "sources": [{"title": "Erdős Problems #1 (T. F. Bloom)", "url": "https://www.erdosproblems.com/1", "location": "problem page, status banner DISPROVED (LEAN), re-read 2026-09-19", "asserted_status": "disproved"}]
     },
     {
       "slug": "hadwiger-nelson-problem",
