@@ -127,6 +127,11 @@ class Scheduler:
         if output:
             self.ingestor.ingest(db, attempt, output)
             attempt.status = "completed"
+            if provider_status == "running" and attempt.provider_session_id:
+                try:
+                    self.client.terminate_session(attempt.provider_session_id)
+                except Exception as exc:  # already gone or provider hiccup; output is saved
+                    attempt.error = f"terminate after completion failed: {exc}"[:2000]
         elif provider_status == "error":
             attempt.status = "failed"
             attempt.error = attempt.error or "provider reported error"

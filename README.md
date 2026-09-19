@@ -133,6 +133,8 @@ SQLite is the default database; set `MATHLAB_DATABASE_URL` to a PostgreSQL URL f
 ## Status
 
 Phase 0–1 of the plan: atlas + research loop + Lean checker + automatic publication + 3D
-explorer, validated against the deterministic mock provider. Not yet done: live Devin pilot
-runs, MCP tool server for in-session callbacks, source review workflow UI, PostgreSQL
+explorer, validated against the deterministic mock provider and one live Devin API smoke
+session (hypothesis generation on the lonely runner conjecture, ingested and auto-published
+with empirical/untested labels). Not yet done: the Fusion vs Ultra pilot comparison, MCP
+tool server for in-session callbacks, source review workflow UI, PostgreSQL
 deployment manifests, and the adapters for external evolution engines listed in the plan.
