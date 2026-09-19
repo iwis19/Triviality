@@ -1,0 +1,41 @@
+// Diagnostics for Land's k=3 family n = 210t^2+391t+179 (forum claim, unverified):
+// for each t <= T, find primes p with c_p(n) < 2 v_p((n+1)(n+2)(n+3)) and tabulate failures by
+// (which linear form p divides, J = floor(log_p(2n)) = number of available digit positions, v_p).
+#include <stdio.h>
+#include <stdlib.h>
+typedef unsigned long long u64;
+static unsigned *spf;
+static int carries(u64 n, u64 p) { int c = 0; u64 pj = p; while (pj <= 2*n) { if (2*(n % pj) >= pj) c++; if (pj > (u64)4e18/p) break; pj *= p; } return c; }
+static int maxpos(u64 n, u64 p) { int c = 0; u64 pj = p; while (pj <= 2*n) { c++; if (pj > (u64)4e18/p) break; pj *= p; } return c; }
+static u64 ps[128]; static int vs[128], which[128]; static int np;
+static void addfactors(u64 m, int w) {
+    while (m > 1) { u64 p = spf[m]; int v = 0; while (m % p == 0) { m /= p; v++; }
+        int f = -1; for (int t = 0; t < np; t++) if (ps[t] == p) { f = t; break; }
+        if (f < 0) { ps[np] = p; vs[np] = v; which[np] = w; np++; } else { vs[f] += v; which[f] |= w; } }
+}
+const char *names[6] = {"6t+5", "35t+36", "t+1", "210t+181", "14t+13", "15t+14"};
+int main(int argc, char **argv) {
+    u64 T = strtoull(argv[1], 0, 10); u64 M = 210*T + 200;
+    spf = calloc(M + 1, sizeof(unsigned));
+    for (u64 i = 2; i <= M; i++) if (!spf[i]) for (u64 j = i; j <= M; j += i) if (!spf[j]) spf[j] = (unsigned)i;
+    // fail[form][J][v] counts (form = single-form index 0..5, 6 = several forms), J<=40, v<=8
+    static u64 fail[7][41][9]; u64 okcnt = 0, tfail1 = 0, tfailmulti = 0;
+    static u64 formfail[7];
+    for (u64 t = 1; t <= T; t++) {
+        u64 n = 210*t*t + 391*t + 179; np = 0;
+        addfactors(6*t+5, 1); addfactors(35*t+36, 2); addfactors(t+1, 4); addfactors(210*t+181, 8); addfactors(14*t+13, 16); addfactors(15*t+14, 32);
+        int nf = 0;
+        for (int i = 0; i < np; i++) if (carries(n, ps[i]) < 2*vs[i]) {
+            nf++; int w = which[i], fi = 6; for (int b = 0; b < 6; b++) if (w == (1<<b)) fi = b;
+            int J = maxpos(n, ps[i]); if (J > 40) J = 40; int v = vs[i]; if (v > 8) v = 8;
+            fail[fi][J][v]++; formfail[fi]++;
+        }
+        if (nf == 0) okcnt++; else if (nf == 1) tfail1++; else tfailmulti++;
+    }
+    printf("T=%llu: success=%llu (%.4f), exactly-one-failing-prime=%llu, several=%llu\n", T, okcnt, (double)okcnt/T, tfail1, tfailmulti);
+    for (int f = 0; f < 7; f++) printf("form %s: failures=%llu\n", f < 6 ? names[f] : "shared(p<=7)", formfail[f]);
+    printf("failures by (form, J=#digit positions, v=p-adic valuation):\n");
+    for (int f = 0; f < 7; f++) for (int J = 1; J <= 40; J++) for (int v = 1; v <= 8; v++) if (fail[f][J][v])
+        printf("  %-12s J=%2d v=%d : %llu\n", f < 6 ? names[f] : "shared", J, v, fail[f][J][v]);
+    return 0;
+}

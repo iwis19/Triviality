@@ -1,0 +1,39 @@
+// Count gap<=2 subsets S of [n1,N] (n1,N in S) with sum 1/n in [1/2,2], and how many
+// survive the full p-adic conditions v_p(sum)>=0 for p in {2}, {2,3}, {2,3,5}, ... {2..13}.
+// v_p(sum) >= 0  <=>  sum_{n in S} (L/n) ≡ 0 mod p^{v_p(L)},  L = lcm(1..N).
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+typedef unsigned __int128 u128;
+static const int P[6]={2,3,5,7,11,13};
+static uint64_t MOD[6];
+static uint64_t C[6][128]; // C[t][n] = (L/n) mod MOD[t]
+static double inv[128];
+static int N;
+static long long total=0, surv[7]; // surv[k] = survivors of conditions for first k primes (k=1..6)
+static uint64_t r[6];
+static u128 gcd128(u128 a,u128 b){while(b){u128 t=a%b;a=b;b=t;}return a;}
+static void rec(int i,double s){
+    if(i==N){
+        if(s<0.5||s>2.0) return;
+        total++;
+        for(int k=0;k<6;k++){ if(r[k]!=0) break; surv[k+1]++; }
+        return;
+    }
+    for(int g=1;g<=2;g++){ int n=i+g; if(n>N) break;
+        for(int t=0;t<6;t++) r[t]=(r[t]+C[t][n])%MOD[t];
+        rec(n,s+inv[n]);
+        for(int t=0;t<6;t++) r[t]=(r[t]+MOD[t]-C[t][n])%MOD[t];
+    }
+}
+int main(int argc,char**argv){
+    int n1=atoi(argv[1]); N=atoi(argv[2]);
+    u128 L=1; for(int m=2;m<=N;m++) L=L/gcd128(L,m)*m;
+    for(int t=0;t<6;t++){ uint64_t q=1; while(q*P[t]<=(uint64_t)N) q*=P[t]; MOD[t]=q; }
+    for(int n=1;n<=N;n++){ inv[n]=1.0/n; for(int t=0;t<6;t++) C[t][n]=(uint64_t)((L/n)%MOD[t]); }
+    for(int t=0;t<6;t++) r[t]=C[t][n1];
+    rec(n1,inv[n1]);
+    printf("[%d,%d] total=%lld  v2:%lld  v2v3:%lld  +5:%lld  +7:%lld  +11:%lld  +13:%lld\n",
+        n1,N,total,surv[1],surv[2],surv[3],surv[4],surv[5],surv[6]);
+    return 0;
+}

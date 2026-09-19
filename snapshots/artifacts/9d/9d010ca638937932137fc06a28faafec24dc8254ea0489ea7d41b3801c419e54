@@ -1,0 +1,75 @@
+"""Independent reproduction of claim 1431f53e: max-min angle over C_13-symmetric
+configurations {+-e5} U O1 U O2 U O3 in R^5, g = diag(R(2pi/13), R(2pi b/13), 1).
+Parameters: orbit j: (t_j, phi_j, alpha_j, beta_j), alpha_1 = beta_1 = 0 fixed (centraliser).
+"""
+import sys
+import numpy as np
+from scipy.optimize import minimize, differential_evolution
+
+p = 13
+K = np.arange(p)
+
+def unpack(x):
+    # x = [t1, phi1, t2, phi2, a2, b2, t3, phi3, a3, b3]
+    t = np.array([x[0], x[2], x[6]])
+    phi = np.array([x[1], x[3], x[7]])
+    al = np.array([0.0, x[4], x[8]])
+    be = np.array([0.0, x[5], x[9]])
+    rho = np.sqrt(np.clip(1 - t**2, 0, None))
+    r1 = rho * np.cos(phi)
+    r2 = rho * np.sin(phi)
+    return t, r1, r2, al, be
+
+def all_ips(x, b):
+    t, r1, r2, al, be = unpack(x)
+    ips = []
+    for i in range(3):
+        for j in range(i, 3):
+            ks = K[1:7] if i == j else K
+            v = (r1[i] * r1[j] * np.cos(al[i] - al[j] + 2 * np.pi * ks / p)
+                 + r2[i] * r2[j] * np.cos(be[i] - be[j] + 2 * np.pi * b * ks / p)
+                 + t[i] * t[j])
+            ips.append(v)
+    ips.append(np.abs(t))  # inner products with +-e5
+    return np.concatenate(ips)
+
+def maxip(x, b):
+    return all_ips(x, b).max()
+
+bounds = [(-1, 1), (0, np.pi / 2), (-1, 1), (0, np.pi / 2), (-np.pi, np.pi), (-np.pi, np.pi),
+          (-1, 1), (0, np.pi / 2), (-np.pi, np.pi), (-np.pi, np.pi)]
+
+def slsqp_epigraph(x0, b):
+    # variables: x (10) + z ; minimize z s.t. z - ip_k(x) >= 0
+    def obj(y):
+        return y[-1]
+    def cons(y):
+        return y[-1] - all_ips(y[:-1], b)
+    y0 = np.append(x0, maxip(x0, b))
+    res = minimize(obj, y0, method="SLSQP", constraints=[{"type": "ineq", "fun": cons}],
+                   bounds=bounds + [(-1, 1)], options={"maxiter": 500, "ftol": 1e-12})
+    x = res.x[:-1]
+    return maxip(x, b), x
+
+def run(b, nrest, seed):
+    rng = np.random.default_rng(seed)
+    best = (2.0, None)
+    for _ in range(nrest):
+        x0 = np.array([rng.uniform(lo, hi) for lo, hi in bounds])
+        val, x = slsqp_epigraph(x0, b)
+        if val < best[0]:
+            best = (val, x)
+    return best
+
+if __name__ == "__main__":
+    nrest = int(sys.argv[1]) if len(sys.argv) > 1 else 300
+    bs = [int(a) for a in sys.argv[2:]] if len(sys.argv) > 2 else range(1, 13)
+    for b in bs:
+        val, x = run(b, nrest, seed=b)
+        print(f"b={b:2d}: best max-cos = {val:.6f}  min angle = {np.degrees(np.arccos(val)):.4f} deg", flush=True)
+        if b in (3, 5):
+            de = differential_evolution(lambda y: maxip(y, b), bounds, seed=b, maxiter=2000, tol=1e-10,
+                                        popsize=40, polish=False)
+            v2, x2 = slsqp_epigraph(de.x, b)
+            print(f"      DE+polish: {min(de.fun, v2):.6f} -> {np.degrees(np.arccos(min(de.fun, v2))):.4f} deg", flush=True)
+            np.save(f"/home/ubuntu/best_b{b}.npy", x if val < v2 else x2)

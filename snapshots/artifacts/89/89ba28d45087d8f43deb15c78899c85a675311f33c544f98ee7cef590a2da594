@@ -1,0 +1,34 @@
+// Statistics of r(n) = #{k>=1 : 2^k < n, n-2^k prime} vs L(n) = #{k>=1 : 2^k < n} for odd n <= 2^E.
+// Reports per dyadic block (2^L, 2^{L+1}]: number of n with deficiency d = L(n)-r(n) equal to 0,1,2,3,
+// the largest n with d<=1, and the record "prefix chain length" c(n) = max K with n-2^k prime for all 1<=k<=K.
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+#include <math.h>
+typedef uint64_t u64;
+static unsigned char *bits; // bit i => 2i+1 is prime
+static inline int isp(u64 n){ if(n<2) return 0; if(n==2) return 1; if(!(n&1)) return 0; return (bits[(n>>1)>>3]>>((n>>1)&7))&1; }
+int main(int argc,char**argv){
+  int E=atoi(argv[1]); u64 N=(u64)1<<E;
+  bits=malloc(N/16+1); memset(bits,0xff,N/16+1); bits[0]&=~1; // 1 not prime
+  for(u64 i=3;i*i<=N;i+=2) if(isp(i)) for(u64 j=i*i;j<=N;j+=2*i) bits[(j>>1)>>3]&=~(1<<((j>>1)&7));
+  u64 leastK[70]; for(int i=0;i<70;i++) leastK[i]=0;
+  for(int L=2;L<E;L++){
+    u64 lo=((u64)1<<L)+1, hi=((u64)1<<(L+1));
+    long cnt[4]={0,0,0,0}; u64 last01=0; int maxc=0; u64 argmaxc=0;
+    for(u64 n=lo|1;n<=hi;n+=2){
+      int Ln=L, r=0, c=0, cgo=1;
+      for(int k=1;k<=L;k++){ if(isp(n-((u64)1<<k))){ r++; if(cgo) c++; } else cgo=0; }
+      int d=Ln-r; if(d<4) cnt[d]++; if(d<=1) last01=n;
+      if(c>maxc){maxc=c;argmaxc=n;}
+      if(c<70 && leastK[c]==0) leastK[c]=n; // n has prefix chain exactly c (first occurrence)
+    }
+    printf("L=%2d  d0=%ld d1=%ld d2=%ld d3=%ld  last_n_with_d<=1=%llu  max_prefix_chain=%d at n=%llu\n",L,cnt[0],cnt[1],cnt[2],cnt[3],(unsigned long long)last01,maxc,(unsigned long long)argmaxc);
+    fflush(stdout);
+  }
+  // least n with n-2^k prime for all k=1..K (K-prefix), computed as min over n with c(n)>=K
+  printf("least n with n-2^k prime for all 1<=k<=K (searched odd n <= 2^%d):\n",E);
+  for(int K=1;K<70;K++){ u64 m=0; for(int c=K;c<70;c++) if(leastK[c] && (m==0||leastK[c]<m)) m=leastK[c]; if(m) printf("K=%d n=%llu log2(n)/K=%.3f\n",K,(unsigned long long)m, log2((double)m)/K); }
+  return 0;
+}

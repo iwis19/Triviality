@@ -1,0 +1,49 @@
+"""Demonstration of the unconditional 'CRT comb' lemma behind the reduction
+  Dickson's conjecture (existence form)  ==>  CPAP-k exists for every k.
+
+Lemma. Fix k>=3, let d be a multiple of k# (product of primes <= k), and let
+R = {1,...,(k-1)d-1} minus multiples of d.  Choose distinct primes q_r > (k-1)d (r in R),
+M = prod q_r, and a with a = -r (mod q_r) for all r, a = 1 (mod d).  Then for every
+n = a (mod M) with n > M... precisely n > (k-1)d + max q_r:
+   if n, n+d, ..., n+(k-1)d are all prime, they are k CONSECUTIVE primes.
+Proof: for r in R, q_r | n+r and n+r > q_r so n+r is composite; the forms n+jd are not
+divisible by q_r since 0 < |jd - r| < (k-1)d < q_r.  Admissibility of the system
+{Mt + a + jd : 0<=j<k} in t: for p = q_r none of the forms vanish mod p (as computed);
+for p | d all forms are = a = 1 (mod p); for p not dividing dM we have p > k (since k# | d)
+so k forms cannot cover all p residues.  Hence Dickson's conjecture supplies t with all
+forms prime, and the lemma makes them consecutive.
+
+This script instantiates the comb for k=4, d=6 and k=5, d=30 and finds the first n in the
+class with all n+jd prime, then verifies against a primality scan that the primes are
+consecutive (they must be, by the lemma).
+"""
+from sympy import isprime, nextprime, primerange
+from sympy.ntheory.modular import crt
+
+def comb(k, d):
+    R = [r for r in range(1, (k - 1) * d) if r % d]
+    qs, q = [], (k - 1) * d
+    for _ in R:
+        q = nextprime(q); qs.append(q)
+    mods = qs + [d]
+    res = [(-r) % q for r, q in zip(R, qs)] + [1]
+    a, M = crt(mods, res)
+    return int(a), int(M), R, qs
+
+def demo(k, d, tries=10**6):
+    a, M, R, qs = comb(k, d)
+    print(f"k={k} d={d}: |R|={len(R)}, M has {len(str(M))} digits, q_r in [{qs[0]},{qs[-1]}]")
+    n = a
+    while n <= (k - 1) * d + qs[-1]: n += M
+    for t in range(tries):
+        if all(isprime(n + j * d) for j in range(k)):
+            inter = [n + r for r in range(1, (k - 1) * d) if r % d and isprime(n + r)]
+            print(f"  found n={n} (t={t}); AP = {[n + j*d for j in range(k)]}; intermediate primes: {inter}")
+            assert not inter
+            return n
+        n += M
+    print("  none found in", tries, "steps")
+
+if __name__ == "__main__":
+    demo(4, 6)
+    demo(5, 30, tries=2 * 10**6)

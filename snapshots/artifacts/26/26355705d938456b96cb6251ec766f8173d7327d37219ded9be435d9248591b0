@@ -1,0 +1,10 @@
+j=0: |E_j∩S_j|=22958, not in W_2: 0;  |E_j∩(N≡-1 mod 36)|=380, not in W_2: 0
+j=1: |E_j∩S_j|=2179, not in W_4: 0;  |E_j∩(N≡-1 mod 1800)|=1, not in W_4: 0
+j=2: |E_j∩S_j|=210, not in W_6: 0;  |E_j∩(N≡-1 mod 88200)|=0, not in W_6: 0
+j=3: |E_j∩S_j|=17, not in W_8: 0;  |E_j∩(N≡-1 mod 529200)|=0, not in W_8: 0
+family N=x^2, m=1 (n=2): witnesses x<447: 7 (rate 0.016); first: [35, 105, 210, 330, 357, 360, 396]
+family N=x^2, m=2 (n=3): witnesses x<447: 9 (rate 0.020); first: [35, 60, 105, 168, 210, 330, 357, 360]
+family N=x^2, m=3 (n=4): witnesses x<447: 0 (rate 0.000); first: []
+family N=x^2, m=4 (n=5): witnesses x<447: 2 (rate 0.004); first: [2, 408]
+family N=x^2, m=5 (n=6): witnesses x<447: 0 (rate 0.000); first: []
+family N=x^2, m=6 (n=7): witnesses x<447: 0 (rate 0.000); first: []

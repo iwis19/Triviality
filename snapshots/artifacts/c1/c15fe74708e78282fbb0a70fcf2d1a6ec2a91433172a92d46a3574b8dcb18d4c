@@ -1,0 +1,151 @@
+#!/usr/bin/env python3
+"""Exact computations for the lonely runner conjecture (LRC), n = k-1 nonzero
+integer speeds, stationary runner at the origin.
+
+  ML(v)      = max_t min_i ||t v_i||          (maximum loneliness, exact rational)
+  IL(v, d)   = length of longest interval of t with min_i ||t v_i|| >= d
+  MEAS(v, d) = Lebesgue measure of {t in [0,1) : min_i ||t v_i|| >= d}
+
+ML is attained at a breakpoint t = a/q with q in {v_i+v_j, |v_i-v_j|, 2 v_i}
+(max of a min of piecewise-linear functions), so it is computed exactly with
+Fractions.  All experiments below enumerate speed sets {v_1<...<v_n} with
+gcd = 1 and v_n <= B (dilation invariance).
+"""
+from fractions import Fraction as F
+from itertools import combinations
+from math import gcd, pi, sin
+from functools import reduce
+import sys
+
+
+def dist(x):  # ||x|| for a Fraction x
+    r = x - (x.numerator // x.denominator)
+    return min(r, 1 - r)
+
+
+def ML(v):
+    qs = set()
+    for i in range(len(v)):
+        qs.add(2 * v[i])
+        for j in range(i + 1, len(v)):
+            qs.add(v[i] + v[j])
+            qs.add(abs(v[i] - v[j]))
+    qs.discard(0)
+    best, bt = F(0), F(0)
+    for q in qs:
+        for a in range(1, q):
+            m = min(F(min((a * vi) % q, q - (a * vi) % q), q) for vi in v)
+            if m > best:
+                best, bt = m, F(a, q)
+    return best, bt
+
+
+def good_intervals(v, d):
+    """Return list of (l, r) intervals in [0,1) where min_i ||t v_i|| >= d (closed)."""
+    ev = []  # bad open intervals
+    for vi in v:
+        for m in range(0, vi + 1):
+            l = F(m, vi) - d / vi
+            r = F(m, vi) + d / vi
+            ev.append((max(l, F(0)), min(r, F(1))))
+    ev.sort()
+    bad = []
+    cl, cr = ev[0]
+    for l, r in ev[1:]:
+        if l <= cr:
+            cr = max(cr, r)
+        else:
+            bad.append((cl, cr))
+            cl, cr = l, r
+    bad.append((cl, cr))
+    good = []
+    prev = F(0)
+    for l, r in bad:
+        if l > prev:
+            good.append((prev, l))
+        prev = max(prev, r)
+    if prev < 1:
+        good.append((prev, F(1)))
+    return good
+
+
+def IL(v, d):
+    g = good_intervals(v, d)
+    return max((r - l for l, r in g), default=F(0))
+
+
+def MEAS(v, d):
+    return sum((r - l for l, r in good_intervals(v, d)), F(0))
+
+
+def speed_sets(n, B):
+    for v in combinations(range(1, B + 1), n):
+        if reduce(gcd, v) == 1:
+            yield v
+
+
+def fourier_main_term(n):
+    return F(n - 1, n + 1) ** n
+
+
+if __name__ == "__main__":
+    mode = sys.argv[1]
+    n = int(sys.argv[2])
+    B = int(sys.argv[3])
+    if mode == "spectrum":
+        # Kravitz-type spectrum: all ML values below 1/n, with witnesses
+        vals = {}
+        cnt = 0
+        for v in speed_sets(n, B):
+            cnt += 1
+            m, t = ML(v)
+            assert m >= F(1, n + 1), (v, m)  # LRC check
+            if m < F(1, n):
+                vals.setdefault(m, []).append(v)
+        print(f"n={n} B={B} sets={cnt}; ML values in [1/(n+1),1/n):")
+        for m in sorted(vals):
+            ex = vals[m][:6]
+            print(f"  ML={m} (={float(m):.5f})  count={len(vals[m])}  e.g. {ex}")
+        print("  Kravitz values s/(ns+1):", [str(F(s, n * s + 1)) for s in range(1, 6)])
+    elif mode == "interval":
+        # Interval-loneliness hypothesis: IL(v, 1/(n+2)) * v_max >= 1/(n+2) ?
+        d = F(1, n + 2)
+        worst = None
+        for v in speed_sets(n, B):
+            val = IL(v, d) * v[-1]
+            if worst is None or val < worst[0]:
+                worst = (val, v)
+        print(f"n={n} B={B}: min over v of IL(v,1/(n+2))*v_max = {worst[0]} (={float(worst[0]):.5f}) at v={worst[1]}; hypothesis threshold 1/(n+2)={F(1,n+2)} (={1/(n+2):.5f}); trivial bound 2/((n+1)(n+2))={F(2,(n+1)*(n+2))}")
+    elif mode == "topratio":
+        # Direct test: v_n >= 2 v_{n-1} implies ML(v) >= 1/(n+1)?  Also min ML over such v.
+        d = F(1, n + 1)
+        worst = None
+        cnt = 0
+        for v in speed_sets(n, B):
+            if v[-1] < 2 * v[-2]:
+                continue
+            cnt += 1
+            m, t = ML(v)
+            if worst is None or m < worst[0]:
+                worst = (m, v)
+        print(f"n={n} B={B}: {cnt} sets with v_n>=2v_(n-1); min ML = {worst[0]} (={float(worst[0]):.5f}) at {worst[1]}; 1/(n+1)={float(d):.5f}, 1/n={1/n:.5f}")
+    elif mode == "measure":
+        # Fourier/relation-lattice view: measure of good set at d=1/(n+1) vs main term
+        d = F(1, n + 1)
+        main = fourier_main_term(n)
+        zero = []
+        mn = None
+        rows = []
+        for v in speed_sets(n, B):
+            mu = MEAS(v, d)
+            rows.append((mu, v))
+            if mu == 0:
+                zero.append(v)
+            if mn is None or (mu > 0 and mu < mn[0]):
+                mn = (mu, v)
+        rows.sort()
+        print(f"n={n} B={B}: main term ((n-1)/(n+1))^n = {float(main):.5f}")
+        print(f"  measure-zero (tight) instances: {zero}")
+        print(f"  smallest positive measure: {float(mn[0]):.5f} at {mn[1]}")
+        print("  10 smallest measures:", [(float(m), v) for m, v in rows[:10]])
+        print("  10 largest measures:", [(float(m), v) for m, v in rows[-10:]])

@@ -1,0 +1,60 @@
+import Mathlib
+
+open Nat
+
+/-- Prime-by-prime (Legendre/Kummer) criterion for Erdős #727:
+`(n+k)!^2 ∣ (2n)!` iff for every prime `p`, `2·v_p((n+k)!) ≤ v_p((2n)!)`. -/
+theorem erdos727_padic_criterion (n k : ℕ) :
+    (n + k).factorial ^ 2 ∣ (2 * n).factorial ↔
+      ∀ p : ℕ, p.Prime →
+        2 * padicValNat p (n + k).factorial ≤ padicValNat p (2 * n).factorial := by
+  rw [← Nat.factorization_le_iff_dvd (pow_ne_zero 2 (Nat.factorial_ne_zero _))
+        (Nat.factorial_ne_zero _), Finsupp.le_def]
+  constructor
+  · intro h p hp
+    have := h p
+    rw [Nat.factorization_pow, Finsupp.smul_apply, Nat.factorization_def _ hp,
+      Nat.factorization_def _ hp] at this
+    simpa using this
+  · intro h p
+    by_cases hp : p.Prime
+    · rw [Nat.factorization_pow, Finsupp.smul_apply, Nat.factorization_def _ hp,
+        Nat.factorization_def _ hp]
+      simpa using h p hp
+    · simp [Nat.factorization_eq_zero_of_non_prime _ hp]
+
+/-- Lower bound `v_p(n!) ≥ ⌊n/p⌋` (first term of Legendre's sum). -/
+theorem padicValNat_factorial_ge_div (p n : ℕ) [hp : Fact p.Prime] :
+    n / p ≤ padicValNat p n.factorial := by
+  have h := padicValNat_mul_div_factorial (p := p) n
+  rw [padicValNat_factorial_mul] at h
+  omega
+
+/-- Upper bound `v_p(n!) = ⌊n/p⌋` when `n < p^2`. -/
+theorem padicValNat_factorial_eq_div (p n : ℕ) [hp : Fact p.Prime] (h : n < p ^ 2) :
+    padicValNat p n.factorial = n / p := by
+  rcases Nat.eq_zero_or_pos n with rfl | hn
+  · simp
+  · rw [padicValNat_factorial (b := 2) (Nat.log_lt_of_lt_pow hn.ne' h)]
+    simp
+
+/-- Necessary condition ("√-smoothness of the window") for Erdős #727: if a prime `p` with
+`p^2 > 2n` divides some `n+i` with `1 ≤ i ≤ k`, then `(n+k)!^2 ∤ (2n)!`.
+Reason: writing `n+i = m p`, `v_p((2n)!) = ⌊2n/p⌋ ≤ 2m-1` while `v_p((n+k)!) ≥ ⌊(n+k)/p⌋ ≥ m`. -/
+theorem erdos727_large_prime_obstruction (n k p i : ℕ) (hp : p.Prime) (hi : 1 ≤ i) (hik : i ≤ k)
+    (hp2 : 2 * n < p ^ 2) (hdvd : p ∣ n + i) :
+    ¬ (n + k).factorial ^ 2 ∣ (2 * n).factorial := by
+  haveI : Fact p.Prime := ⟨hp⟩
+  intro hdiv
+  have hpos : 0 < p := hp.pos
+  have h1 : padicValNat p ((n + k).factorial ^ 2) ≤ padicValNat p (2 * n).factorial :=
+    (padicValNat_dvd_iff_le (factorial_ne_zero _)).mp
+      (dvd_trans pow_padicValNat_dvd hdiv)
+  rw [padicValNat.pow 2 (factorial_ne_zero _), padicValNat_factorial_eq_div p _ hp2] at h1
+  have h2 := padicValNat_factorial_ge_div p (n + k)
+  obtain ⟨m, hm⟩ := hdvd
+  have hm1 : m ≤ (n + k) / p := by
+    rw [Nat.le_div_iff_mul_le hpos]; nlinarith
+  have hm2 : 2 * n / p < 2 * m := by
+    rw [Nat.div_lt_iff_lt_mul hpos]; nlinarith
+  omega

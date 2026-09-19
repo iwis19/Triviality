@@ -1,0 +1,23 @@
+# Collect odd primes p < 2^63 with ord_p(2) <= MAXM by factoring 2^m - 1 (m <= MAXM) with sympy.
+# Output: smallorder.txt lines "p ord".  Any prime factor sympy fails to find is simply omitted
+# (omission only weakens the sieve filters; it never causes a solution to be missed).
+import sys, time
+from sympy import factorint, n_order
+MAXM = int(sys.argv[1]) if len(sys.argv) > 1 else 96
+primes = {}
+for m in range(2, MAXM + 1):
+    t = time.time()
+    try:
+        f = factorint(2**m - 1, limit=10**7, use_ecm=True)
+    except Exception as e:
+        print("m", m, "failed", e, file=sys.stderr); continue
+    for p, e in f.items():
+        if p > 2 and p < 2**63 and p not in primes:
+            from sympy import isprime
+            if isprime(p):
+                primes[p] = n_order(2, p)
+    print("m", m, "done in %.1fs" % (time.time() - t), file=sys.stderr)
+with open("smallorder.txt", "w") as fh:
+    for p in sorted(primes):
+        fh.write("%d %d\n" % (p, primes[p]))
+print(len(primes), "primes written")

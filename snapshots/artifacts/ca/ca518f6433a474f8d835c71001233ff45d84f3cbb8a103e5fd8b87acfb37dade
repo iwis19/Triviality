@@ -1,0 +1,66 @@
+"""Hardy-Littlewood (prime k-tuple) heuristic prediction for the number of CPAP-k
+(k consecutive primes in arithmetic progression) with common difference d and first
+term <= x, obtained by inclusion-exclusion over the intermediate offsets:
+
+  #CPAP_k(d; x) ~ sum_{S subset R, H u S admissible} (-1)^{|S|} S(H u S) * Li_{k+|S|}(x)
+
+where H = {0, d, ..., (k-1)d}, R = {1..(k-1)d-1} minus multiples of d, S(.) is the singular series
+and Li_m(x) = int_2^x dt/(log t)^m.  Compare with exact counts from cpap_count.c.
+Assumption: Hardy-Littlewood prime tuple conjecture (asymptotic form) for each tuple.
+"""
+import sys, math
+from itertools import combinations
+from sympy import primerange
+from scipy.integrate import quad
+
+SMALL = list(primerange(2, 2000))          # explicit factors (all offsets used are < 2000)
+TAILP = list(primerange(2000, 5_000_000))  # for p > max offset, nu_p(H) = |H|
+_tail = {}
+def tail(m):
+    if m not in _tail:
+        _tail[m] = math.exp(sum(math.log(1 - m / p) - m * math.log(1 - 1 / p) for p in TAILP))
+    return _tail[m]
+
+def singular_series(H):
+    m = len(H); val = 1.0
+    for p in SMALL:
+        nu = len(set(h % p for h in H))
+        if nu == p: return 0.0
+        val *= (1 - nu / p) / (1 - 1 / p) ** m
+    return val * tail(m)
+
+def admissible_small(H, bound=50):
+    for p in SMALL:
+        if p > bound: return True
+        if len(set(h % p for h in H)) == p: return False
+    return True
+
+def Li(m, x):
+    # substitute t = e^u
+    return quad(lambda u: math.exp(u) / u ** m, math.log(2), math.log(x), limit=500)[0]
+
+def predict(k, d, x):
+    H = [j * d for j in range(k)]
+    R = [r for r in range(1, (k - 1) * d) if r % d]
+    # candidates r for which H u {r} admissible
+    cand = [r for r in R if admissible_small(H + [r])]
+    total = 0.0; terms = []
+    # DFS over admissible subsets of cand
+    def rec(start, S):
+        nonlocal total
+        HS = H + S
+        ss = singular_series(HS)
+        if ss == 0: return
+        term = (-1) ** len(S) * ss * Li(k + len(S), x)
+        total += term; terms.append((tuple(S), ss, term))
+        for i in range(start, len(cand)):
+            if admissible_small(HS + [cand[i]]):
+                rec(i + 1, S + [cand[i]])
+    rec(0, [])
+    return total, terms
+
+if __name__ == "__main__":
+    x = float(sys.argv[1]) if len(sys.argv) > 1 else 4e9
+    for k, d in [(3, 6), (3, 12), (3, 30), (4, 6), (4, 30), (5, 30), (6, 30), (7, 210)]:
+        tot, terms = predict(k, d, x)
+        print(f"k={k} d={d} x={x:.3g}: predicted {tot:.1f}  (#IE terms={len(terms)}, leading S(H)={terms[0][1]:.4f})")

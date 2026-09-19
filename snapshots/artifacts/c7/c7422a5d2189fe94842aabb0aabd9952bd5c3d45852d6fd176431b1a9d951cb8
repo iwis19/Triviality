@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""
+Batch 5.
+ L4 (structured injection, I4): for some element i there is an injection phi: M_i -> R_i with A ⊆ phi(A), where
+     M_i = {A in F : i ∉ A, A ∪ {i} ∉ F},  R_i = {B in F : i ∈ B, B \\ {i} ∉ F}.
+     (|R_i| >= |M_i|  <=>  i abundant, so L4 is a structured strengthening of abundance for that i.)
+     Checked by bipartite maximum matching (Hopcroft-Karp is overkill; augmenting paths suffice at this size).
+ C5 (equality case, I5): if max frequency == 1/2 exactly then (F, ⊆) is a Boolean lattice:
+     atoms (minimal nonempty members) pairwise disjoint and F = all unions of atoms.
+ C5' (stability probe): among non-Boolean families report the minimum of maxfreq - 1/2.
+"""
+import random, sys
+from collections import defaultdict
+from ucs_experiments import union_closure, all_union_closed_families, random_union_closed, freqs, top, popcount
+
+def is_boolean(fam):
+    fam = set(fam)
+    nonempty = [A for A in fam if A]
+    atoms = [A for A in nonempty if not any(B != A and (B | A) == A for B in nonempty)]
+    for a in atoms:
+        for b in atoms:
+            if a != b and a & b: return False
+    if len(fam) != 1 << len(atoms): return False
+    # all unions of atoms present
+    gen = {0}
+    for a in atoms: gen = gen | {g | a for g in gen}
+    return gen == fam
+
+def max_matching(left, right_of):
+    match_r = {}
+    def try_(u, seen):
+        for v in right_of[u]:
+            if v in seen: continue
+            seen.add(v)
+            if v not in match_r or try_(match_r[v], seen):
+                match_r[v] = u; return True
+        return False
+    return sum(1 for u in left if try_(u, set()))
+
+def test_L4(fam, n):
+    fam_s = set(fam); T = top(fam); F = len(fam)
+    fr = freqs(list(fam), n)
+    any_ok = False; abundant_ok = []
+    for i in range(n):
+        if not (T >> i & 1): continue
+        M = [A for A in fam if not (A >> i & 1) and (A | 1 << i) not in fam_s]
+        R = [B for B in fam if (B >> i & 1) and (B & ~(1 << i)) not in fam_s]
+        if len(R) < len(M): continue  # i not abundant
+        right_of = {A: [B for B in R if (B | A) == B] for A in M}
+        ok = max_matching(M, right_of) == len(M)
+        abundant_ok.append(ok)
+        any_ok |= ok
+    return {"L4 some i": any_ok, "L4 every abundant i": all(abundant_ok)}
+
+def test_C5(fam, n):
+    F = len(fam); fr = freqs(list(fam), n)
+    mf = max(fr) / F
+    if 2 * max(fr) == F:
+        return {"C5": is_boolean(fam)}, None
+    return {}, (mf - 0.5 if not is_boolean(fam) else None)
+
+def run(fams, n, label):
+    agg = defaultdict(lambda: [0, 0]); ex = {}; gap = 9; gapfam = None
+    for f in fams:
+        r = test_L4(f, n); r2, g = test_C5(f, n); r.update(r2)
+        for k, v in r.items():
+            agg[k][1] += 1
+            if v: agg[k][0] += 1
+            elif k not in ex: ex[k] = sorted(f)
+        if g is not None and g < gap: gap, gapfam = g, sorted(f)
+    print(f"== {label}: {len(fams)} families n={n}")
+    for k in sorted(agg): print(f"  {k:22s} pass {agg[k][0]}/{agg[k][1]}" + ("" if agg[k][0] == agg[k][1] else f"  first failure {ex[k]}"))
+    print(f"  min (maxfreq-1/2) over non-Boolean families = {gap:.4f}  at {gapfam}")
+    sys.stdout.flush()
+
+if __name__ == "__main__":
+    rng = random.Random(5)
+    for n in (2, 3, 4): run(all_union_closed_families(n), n, f"exhaustive n={n}")
+    for n, k, N in ((5, 5, 3000), (6, 7, 1500), (7, 8, 500), (8, 8, 200), (9, 9, 100)):
+        fams = set()
+        while len(fams) < N:
+            f = random_union_closed(n, k, rng)
+            if len(f) > 1: fams.add(f)
+        run(sorted(fams, key=sorted), n, f"random n={n} k={k}")

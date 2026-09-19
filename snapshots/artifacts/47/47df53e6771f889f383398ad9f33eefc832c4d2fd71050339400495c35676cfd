@@ -1,0 +1,14 @@
+import Mathlib
+
+/-- Column-loss lemma used in the sharpened peeling step: the number of uncovered
+columns hit by a class `C` (a residue class mod `d`, of size `M/d`) is at most
+`min (M/d) |U|`. Stated abstractly for finsets. -/
+theorem card_inter_le_min {α : Type*} [DecidableEq α] (U C : Finset α) :
+    (U ∩ C).card ≤ min U.card C.card := by
+  exact le_min (Finset.card_le_card Finset.inter_subset_left)
+    (Finset.card_le_card Finset.inter_subset_right)
+
+/-- The peeling functional `f(U) = (p^a - g) U - g * Σ_d min(M/d, U)` evaluated at the
+certificate values for L = 45045 = 13 · 3465 (peel p = 13, g = 1): with u(3465) ≥ 363
+the bound is positive. Here Σ_{d|3465,d>1} min(3465/d, 363) = 2747. -/
+theorem peel_45045_positive : (13 - 1) * 363 - 1 * 2747 = 1609 := by norm_num

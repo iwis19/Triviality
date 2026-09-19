@@ -1,0 +1,40 @@
+import Mathlib
+
+/-- `n - 2^k` is prime for every `k` with `1 < 2^k < n` (Erdős #1142 property). -/
+def Erdos1142Prop (n : ℕ) : Prop := ∀ k : ℕ, 1 < 2 ^ k → 2 ^ k < n → (n - 2 ^ k).Prime
+
+/-- Local obstruction at `p = 3`: every `n > 7` with the Erdős #1142 property is divisible by 3. -/
+theorem erdos1142_three_dvd (n : ℕ) (hn : 7 < n) (h : Erdos1142Prop n) : 3 ∣ n := by
+  have h1 : (n - 2).Prime := h 1 (by norm_num) (by omega)
+  have h2 : (n - 4).Prime := h 2 (by norm_num) (by omega)
+  have hc : n % 3 = 0 ∨ n % 3 = 1 ∨ n % 3 = 2 := by omega
+  rcases hc with h0 | h0 | h0
+  · omega
+  · have hd : 3 ∣ n - 4 := by omega
+    have := Nat.Prime.eq_one_or_self_of_dvd h2 3 hd
+    omega
+  · have hd : 3 ∣ n - 2 := by omega
+    have := Nat.Prime.eq_one_or_self_of_dvd h1 3 hd
+    omega
+
+/-- Local obstruction at `p = 5`: every `n > 21` with the Erdős #1142 property is divisible by 5. -/
+theorem erdos1142_five_dvd (n : ℕ) (hn : 21 < n) (h : Erdos1142Prop n) : 5 ∣ n := by
+  have h1 : (n - 2).Prime := h 1 (by norm_num) (by omega)
+  have h2 : (n - 4).Prime := h 2 (by norm_num) (by omega)
+  have h3 : (n - 8).Prime := h 3 (by norm_num) (by omega)
+  have h4 : (n - 16).Prime := h 4 (by norm_num) (by omega)
+  have hc : n % 5 = 0 ∨ n % 5 = 1 ∨ n % 5 = 2 ∨ n % 5 = 3 ∨ n % 5 = 4 := by omega
+  rcases hc with h0 | h0 | h0 | h0 | h0
+  · omega
+  · have hd : 5 ∣ n - 16 := by omega
+    have := Nat.Prime.eq_one_or_self_of_dvd h4 5 hd
+    omega
+  · have hd : 5 ∣ n - 2 := by omega
+    have := Nat.Prime.eq_one_or_self_of_dvd h1 5 hd
+    omega
+  · have hd : 5 ∣ n - 8 := by omega
+    have := Nat.Prime.eq_one_or_self_of_dvd h3 5 hd
+    omega
+  · have hd : 5 ∣ n - 4 := by omega
+    have := Nat.Prime.eq_one_or_self_of_dvd h2 5 hd
+    omega

@@ -1,0 +1,18 @@
+# Stage 2: read candidate n (one per line) and test whether n - 2^k is prime for all 1 < 2^k < n.
+import sys
+try:
+    import gmpy2
+    def isprime(x): return gmpy2.is_prime(x, 30)
+except ImportError:
+    from sympy import isprime
+cnt = 0; sols = []
+for line in sys.stdin:
+    line = line.strip()
+    if not line: continue
+    n = int(line); cnt += 1
+    k = 1; ok = True
+    while (1 << k) < n:
+        if not isprime(n - (1 << k)): ok = False; break
+        k += 1
+    if ok: sols.append(n); print("SOLUTION", n, flush=True)
+print("stage2: tested", cnt, "candidates; solutions:", sols)

@@ -1,0 +1,102 @@
+# OUTPUT:
+# p=3 t=1 v=4: LS(1,2,4) Z_3-cyclic (1 fixed pts): SAT  [orbits=2, t-set orbits=2, clauses=33]
+# p=5 t=3 v=8: LS(3,4,8) Z_5-cyclic (3 fixed pts): UNSAT  [orbits=14, t-set orbits=12, clauses=815]
+# p=5 t=2 v=7: LS(2,3,7) Z_5-cyclic (2 fixed pts): UNSAT  [orbits=7, t-set orbits=5, clauses=353]
+# p=7 t=2 v=9: LS(2,3,9) Z_7-cyclic (2 fixed pts): SAT  [orbits=12, t-set orbits=6, clauses=1189]
+# p=7 t=3 v=10: LS(3,4,10) Z_7-cyclic (3 fixed pts): UNSAT  [orbits=30, t-set orbits=18, clauses=3433]
+# p=7 t=5 v=12: LS(5,6,12) Z_7-cyclic (5 fixed pts): UNSAT  [orbits=132, t-set orbits=114, clauses=20461]
+# p=11 t=2 v=13: LS(2,3,13) Z_11-cyclic (2 fixed pts): SAT  [orbits=26, t-set orbits=8, clauses=6385]
+# p=11 t=3 v=14: LS(3,4,14) Z_11-cyclic (3 fixed pts): UNSAT  [orbits=91, t-set orbits=34, clauses=26041]
+# p=13 t=2 v=15: LS(2,3,15) Z_13-cyclic (2 fixed pts): SAT  [orbits=35, t-set orbits=9, clauses=12009]
+
+#!/usr/bin/env python3
+"""Z_p-cyclic large sets LS(t, t+1, p+t) with p = k+1 prime (Kramer-Mesner / Phelps type).
+
+Point set: P = Z_p (one p-cycle) plus F = {p, ..., p+t-1} (t fixed points), v = p + t.
+A colouring c of (t+1)-sets with p colours is Z_p-cyclic if c(g X) = c(X) + 1 mod p,
+where g = x -> x+1 on P, identity on F.  Then each colour class is an S(t, t+1, v) and
+the p classes form a cyclic large set (automorphism with t fixed points permuting the
+p systems cyclically).
+
+For the Erdos #835 chain: a Z_p-cyclic (k+1)-colouring of J(2k,k), k = p-1, with the
+action (p-cycle + (p-2) fixed points) and derived (k-t) times at fixed points gives a
+Z_p-cyclic LS(t, t+1, p+t).  So UNSAT here at any level t rules out that symmetric ansatz.
+
+usage: python3 cyclic_ls.py p t
+"""
+import sys, itertools
+from pysat.solvers import Cadical153
+from pysat.card import CardEnc, EncType
+from pysat.formula import IDPool
+
+
+def solve(p, t, want_model=False):
+    v = p + t
+    P = list(range(p))
+    F = list(range(p, v))
+
+    def shift(X, s):
+        return tuple(sorted(((x + s) % p) if x < p else x for x in X))
+
+    # orbit representatives of (t+1)-sets: canonical = lexicographically least shift
+    def canon(X):
+        best = None
+        for s in range(p):
+            Y = shift(X, s)
+            if best is None or Y < best[0]:
+                best = (Y, s)  # Y = g^s X, so X = g^{-s} Y
+        return best
+
+    pool = IDPool()
+    reps = {}
+    for X in itertools.combinations(range(v), t + 1):
+        Y, s = canon(X)
+        if Y not in reps:
+            reps[Y] = len(reps)
+    nrep = len(reps)
+
+    def var(o, c):
+        return pool.id((o, c % p))
+
+    clauses = []
+    for o in range(nrep):
+        lits = [var(o, c) for c in range(p)]
+        clauses += CardEnc.equals(lits, 1, vpool=pool, encoding=EncType.pairwise).clauses
+    # colour of X = colour(rep) - s  where g^s X = rep
+    ntrip = 0
+    for T in itertools.combinations(range(v), t):
+        # only one representative per Z_p-orbit of t-sets is needed
+        if canon(T)[0] != T:
+            continue
+        ntrip += 1
+        ext = []
+        for x in range(v):
+            if x in T:
+                continue
+            X = tuple(sorted(T + (x,)))
+            Y, s = canon(X)
+            ext.append((reps[Y], s))
+        # colours c(X) = col(o) - s must be a permutation of Z_p
+        for c in range(p):
+            lits = [var(o, c + s) for (o, s) in ext]  # col(o) = c + s  <=>  c(X) = c
+            clauses += CardEnc.equals(lits, 1, vpool=pool, encoding=EncType.pairwise).clauses
+    # symmetry breaking (colour shift only): the block F u {0} gets colour 0.
+    # (Multipliers Z_p^* and S_t on F are further symmetries but need lex-leader
+    #  constraints rather than unit clauses; not used.)
+    def fix_colour(X, c):
+        Y, s = canon(tuple(sorted(X)))
+        clauses.append([var(reps[Y], c + s)])
+    fix_colour(tuple(F) + (0,), 0)
+    with Cadical153(bootstrap_with=clauses) as S:
+        sat = S.solve()
+        model = S.get_model() if (sat and want_model) else None
+    return sat, nrep, ntrip, len(clauses), model
+
+
+if __name__ == "__main__":
+    p, t = int(sys.argv[1]), int(sys.argv[2])
+    sat, nrep, ntrip, ncl, model = solve(p, t, want_model=True)
+    print(f"p={p} t={t} v={p+t}: LS({t},{t+1},{p+t}) Z_{p}-cyclic ({t} fixed pts): "
+          f"{'SAT' if sat else 'UNSAT'}  [orbits={nrep}, t-set orbits={ntrip}, clauses={ncl}]")
+    if sat and model:
+        print("positive literals:", sum(1 for l in model if l > 0))

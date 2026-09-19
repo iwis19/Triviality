@@ -1,0 +1,180 @@
+"""
+Experiments 2-4 for Erdős #699.
+ (A) Størmer-type enumeration for the near-middle case (n-2j < i), i = 4..12:
+     odd (2i-2)-smooth pairs (x, x+2) up to LIMIT give all candidate n; check them.
+ (B) Middle-exclusion zone implied by C1 + Kummer bound U_i(n) <= n^{pi(i-1)}
+     (and by C1 + EEES V^2 > C(n,i)).
+ (C) Independence heuristic: expected number of counterexamples for the '>i' and
+     '>=i' variants, n <= NMODEL, calibrated against Cong's list for '>i'.
+"""
+import sys
+from math import comb, log
+from bisect import bisect_left
+
+def primes_upto(N):
+    s = bytearray([1]) * (N + 1); s[0:2] = b'\x00\x00'
+    for i in range(2, int(N ** 0.5) + 1):
+        if s[i]: s[i*i::i] = bytearray(len(s[i*i::i]))
+    return [p for p in range(N + 1) if s[p]]
+
+def vp_binom(n, k, p):
+    a, b, carries, c = k, n - k, 0, 0
+    while a or b or c:
+        s = a % p + b % p + c
+        c = 1 if s >= p else 0
+        carries += c
+        a //= p; b //= p
+    return carries
+
+def factor(m):
+    f, out = 2, {}
+    while f * f <= m:
+        while m % f == 0:
+            out[f] = out.get(f, 0) + 1; m //= f
+        f += 1 if f == 2 else 2
+    if m > 1: out[m] = out.get(m, 0) + 1
+    return out
+
+def is_counterexample(n, i, j):
+    """True iff no prime p >= i divides gcd(C(n,i), C(n,j)). Uses the block factorisation."""
+    ps = set()
+    for k in range(i):
+        ps.update(factor(n - k).keys())
+    for p in ps:
+        if p >= i and vp_binom(n, i, p) > 0 and vp_binom(n, j, p) > 0:
+            return False
+    return True
+
+def smooth_odd(B, LIMIT):
+    ps = [p for p in primes_upto(B) if p > 2]
+    out = [1]
+    for p in ps:
+        new = []
+        for x in out:
+            y = x * p
+            while y <= LIMIT:
+                new.append(y); y *= p
+        out += new
+    return sorted(out)
+
+def stormer_check(imax, LIMIT):
+    print("(A) near-middle case via C4 + Stormer pairs, LIMIT =", LIMIT)
+    for i in range(4, imax + 1):
+        B = 2 * i - 2
+        S = smooth_odd(B, LIMIT)
+        Sset = set(S)
+        pairs = [x for x in S if x + 2 in Sset]
+        cands = set()
+        for x in pairs:
+            for k1 in range(0, i - 2):      # n-k1 = x+2, n-(k1+2) = x, k1+2 < i
+                n = x + 2 + k1
+                cands.add(n)
+        bad = []
+        checked = 0
+        for n in sorted(cands):
+            for d in range(0, i):
+                if (n - d) % 2: continue
+                j = (n - d) // 2
+                if j <= i or j > n // 2: continue
+                checked += 1
+                if is_counterexample(n, i, j):
+                    bad.append((n, i, j))
+        print(f"  i={i}: B={B}, #smooth odd <= LIMIT: {len(S)}, pairs (x,x+2): {len(pairs)}, "
+              f"largest pair x={max(pairs) if pairs else None}, candidate n: {len(cands)}, "
+              f"(n,j) checked: {checked}, counterexamples: {bad}")
+
+def pi(x, primes):
+    return bisect_left(primes, x + 1)
+
+def middle_zone(primes):
+    print("(B) middle-exclusion: minimal d=n-2j>=i compatible with C1")
+    print("    Kummer version:  C(n,i) <= n^pi(i-1) * prod_{|t|<i}(d-t)")
+    print("    EEES version:    C(n,i) <  (prod_{|t|<i}(d-t))^2   (outside 12 EEES exceptions)")
+    for i in [3, 4, 5, 6, 8, 10, 20]:
+        row = []
+        for n in [10**3, 10**4, 10**5, 10**6, 10**7, 10**9]:
+            c = comb(n, i); U = n ** pi(i - 1, primes)
+            def prod(d):
+                r = 1
+                for t in range(-(i - 1), i): r *= (d - t)
+                return r
+            lo, hi = i, n
+            while lo < hi:
+                mid = (lo + hi) // 2
+                if U * prod(mid) >= c: hi = mid
+                else: lo = mid + 1
+            dK = lo
+            lo, hi = i, n
+            while lo < hi:
+                mid = (lo + hi) // 2
+                if prod(mid) ** 2 > c: hi = mid
+                else: lo = mid + 1
+            dE = lo
+            expo = (i - pi(i - 1, primes)) / (2 * i - 1)
+            row.append(f"n=1e{round(log(n,10))}: dK={dK} dE={dE} (n^{expo:.3f}={n**expo:.0f})")
+        print(f"  i={i}: " + " | ".join(row))
+
+def dominated_fraction(n, p):
+    """fraction of j in [0,n] with j <=_p n digitwise = prod (n_k+1)/(n+1)."""
+    m, r = n, 1
+    while m:
+        r *= (m % p) + 1; m //= p
+    return r / (n + 1)
+
+def heuristic(NMODEL, IMAX, primes):
+    print(f"(C) independence heuristic, n <= {NMODEL}, i <= {IMAX}")
+    # smallest prime factor sieve
+    spf = list(range(NMODEL + 1))
+    for p in primes:
+        if p * p > NMODEL: break
+        for k in range(p * p, NMODEL + 1, p):
+            if spf[k] == k: spf[k] = p
+    def pf(m):
+        out = set()
+        while m > 1:
+            out.add(spf[m]); m //= spf[m]
+        return out
+    Egt = {}; Ege = {}
+    per_n_gt = []
+    for n in range(6, NMODEL + 1):
+        blockprimes = []   # primes of n-k, k < IMAX
+        for k in range(min(IMAX, n)):
+            blockprimes.append(pf(n - k))
+        for i in range(2, min(IMAX, n // 2) + 1):
+            P = set()
+            for k in range(i): P |= blockprimes[k]
+            count = max(n / 2 - i, 0)
+            fgt = fge = count
+            for p in P:
+                if p < i: continue
+                if p > n // 2:          # forces j<i or j>n/2 : impossible
+                    fgt = fge = 0.0; break
+                f = dominated_fraction(n, p)
+                if p > i:
+                    if vp_binom(n, i, p) > 0:
+                        fgt *= f; fge *= f
+                else:                   # p == i
+                    if vp_binom(n, i, p) > 0:
+                        fge *= f
+            Egt[i] = Egt.get(i, 0) + fgt
+            Ege[i] = Ege.get(i, 0) + fge
+        per_n_gt.append((n, sum(Egt.values())))
+    tot_gt = sum(Egt.values()); tot_ge = sum(Ege.values())
+    print(f"  '>i' variant: expected #counterexamples = {tot_gt:.3f}; by i: " +
+          ", ".join(f"{i}:{v:.3f}" for i, v in sorted(Egt.items()) if v > 1e-3))
+    print(f"  '>=i' (the problem): expected = {tot_ge:.4f}; by i: " +
+          ", ".join(f"{i}:{v:.4f}" for i, v in sorted(Ege.items()) if v > 1e-4))
+    known_gt = [n for n in (10, 16, 28, 28, 244, 512, 2048, 2188, 1594324) if n <= NMODEL]
+    print(f"  observed '>i' failures with n <= {NMODEL} (Cong 2026): {len(known_gt)} -> {known_gt}")
+    # cumulative model curve at a few checkpoints
+    for chk in [100, 1000, 3000, 10000, NMODEL]:
+        vals = [e for (n, e) in per_n_gt if n <= chk]
+        if vals: print(f"    model cumulative '>i' up to n={chk}: {vals[-1]:.3f}")
+
+if __name__ == "__main__":
+    primes = primes_upto(2_000_000)
+    LIMIT = int(float(sys.argv[1])) if len(sys.argv) > 1 else 10**12
+    NMODEL = int(sys.argv[2]) if len(sys.argv) > 2 else 20000
+    stormer_check(12, LIMIT)
+    middle_zone(primes)
+    heuristic(NMODEL, 60, primes)

@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""
+Erdős #97, idea I4 test-bed: angular quantities on the k=3 Danzer nonagon
+(coordinates as in formal-conjectures ErdosProblems/97.lean; they are in Q(sqrt3) and
+appear to be rational approximations, so equidistance is checked to a tolerance).
+For each vertex v with equidistant set Q_v (3 points here), report:
+  theta_v   = angular span of Q_v seen from v,
+  turn_v    = turning (sum of exterior angles) of the boundary chain from first to last point of Q_v,
+  ext angle at each vertex, and which Q_v's contain each vertex (degree d(w)).
+"""
+import math, itertools
+from collections import Counter
+s3 = math.sqrt(3)
+P = [(-s3, -1), (s3, -1), (0, 2),
+     (-8991/10927*s3, -26503/10927), (17747/10927*s3, -235/10927), (-8756/10927*s3, 26738/10927),
+     (-10753/18529*s3, -44665/18529), (27709/18529*s3, 6203/18529), (-16956/18529*s3, 38462/18529)]
+n = len(P)
+cx = sum(p[0] for p in P)/n; cy = sum(p[1] for p in P)/n
+order = sorted(range(n), key=lambda i: math.atan2(P[i][1]-cy, P[i][0]-cx))
+P = [P[i] for i in order]
+def cross(o,a,b): return (a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0])
+print("strictly convex (all left turns):", all(cross(P[i-1],P[i],P[(i+1)%n])>0 for i in range(n)))
+ext = []
+for i in range(n):
+    a,b,c = P[i-1],P[i],P[(i+1)%n]
+    u=(b[0]-a[0],b[1]-a[1]); w=(c[0]-b[0],c[1]-b[1])
+    ext.append(math.atan2(u[0]*w[1]-u[1]*w[0], u[0]*w[0]+u[1]*w[1]))
+print("exterior angles (deg):", [round(math.degrees(e),2) for e in ext], " sum:", round(math.degrees(sum(ext)),6))
+deg = Counter()
+tol = 2e-3
+for i,v in enumerate(P):
+    d = [(math.dist(v,q), j) for j,q in enumerate(P) if j!=i]
+    d.sort()
+    best=None
+    for k in range(len(d)-2):
+        if d[k+2][0]-d[k][0] < tol:
+            best = d[k:k+3]
+    if best is None:
+        print(f"vertex {i}: no 3 equidistant within tol; closest triple gap {min(d[k+2][0]-d[k][0] for k in range(len(d)-2)):.3e}")
+        continue
+    r = sum(x[0] for x in best)/3
+    idx = [x[1] for x in best]
+    for j in idx: deg[j]+=1
+    def ang(a,o,b):
+        u=(a[0]-o[0],a[1]-o[1]); w=(b[0]-o[0],b[1]-o[1])
+        return math.acos(max(-1,min(1,(u[0]*w[0]+u[1]*w[1])/math.hypot(*u)/math.hypot(*w))))
+    theta = max(ang(P[j],v,P[k]) for j in idx for k in idx if j<k)
+    mid = [j for j in idx if all(ang(P[j],v,P[k])<theta-1e-9 for k in idx if k!=j)]
+    # chain from first to last member in boundary order (going away from v)
+    pos = sorted(((j - i) % n, j) for j in idx)
+    first, last = pos[0][1], pos[-1][1]
+    turn = 0.0; j = first
+    while j != last:
+        turn += ext[(j+1)%n] if (j+1)%n != last else 0.0
+        j = (j+1)%n
+    print(f"vertex {i}: r={r:.4f} Q={idx} theta={math.degrees(theta):.2f}deg  chain-turn(first..last, interior vertices)={math.degrees(turn):.2f}deg  half-theta={math.degrees(theta)/2:.2f}  middle={mid} ext(middle)={[round(math.degrees(ext[j]),2) for j in mid]} LemmaA(e_mid<=theta/2)={all(ext[j]<=theta/2+1e-9 for j in mid)}")
+print("Q-degrees d(w):", dict(sorted(deg.items())), " sum:", sum(deg.values()))
+
+
+# ---- output ----
+# strictly convex (all left turns): True
+# exterior angles (deg): [14.89, 79.88, 25.23, 14.89, 79.88, 25.23, 14.89, 79.88, 25.23]  sum: 360.0
+# vertex 0: r=3.4641 Q=[3, 6, 7] theta=84.30deg  chain-turn(first..last, interior vertices)=120.00deg  half-theta=42.15  middle=[6] ext(middle)=[14.89] LemmaA(e_mid<=theta/2)=True
+# vertex 1: r=4.8726 Q=[5, 4, 7] theta=60.00deg  chain-turn(first..last, interior vertices)=40.12deg  half-theta=30.00  middle=[5] ext(middle)=[25.23] LemmaA(e_mid<=theta/2)=True
+# vertex 2: r=4.5236 Q=[5, 6, 8] theta=60.00deg  chain-turn(first..last, interior vertices)=94.77deg  half-theta=30.00  middle=[6] ext(middle)=[14.89] LemmaA(e_mid<=theta/2)=True
+# vertex 3: r=3.4641 Q=[1, 0, 6] theta=84.30deg  chain-turn(first..last, interior vertices)=120.00deg  half-theta=42.15  middle=[0] ext(middle)=[14.89] LemmaA(e_mid<=theta/2)=True
+# vertex 4: r=4.8726 Q=[1, 7, 8] theta=60.00deg  chain-turn(first..last, interior vertices)=40.12deg  half-theta=30.00  middle=[8] ext(middle)=[25.23] LemmaA(e_mid<=theta/2)=True
+# vertex 5: r=4.5236 Q=[0, 2, 8] theta=60.00deg  chain-turn(first..last, interior vertices)=94.77deg  half-theta=30.00  middle=[0] ext(middle)=[14.89] LemmaA(e_mid<=theta/2)=True
+# vertex 6: r=3.4641 Q=[0, 3, 4] theta=84.30deg  chain-turn(first..last, interior vertices)=120.00deg  half-theta=42.15  middle=[3] ext(middle)=[14.89] LemmaA(e_mid<=theta/2)=True
+# vertex 7: r=4.8726 Q=[1, 2, 4] theta=60.00deg  chain-turn(first..last, interior vertices)=40.12deg  half-theta=30.00  middle=[2] ext(middle)=[25.23] LemmaA(e_mid<=theta/2)=True
+# vertex 8: r=4.5236 Q=[2, 3, 5] theta=60.00deg  chain-turn(first..last, interior vertices)=94.77deg  half-theta=30.00  middle=[3] ext(middle)=[14.89] LemmaA(e_mid<=theta/2)=True
+# Q-degrees d(w): {0: 3, 1: 3, 2: 3, 3: 3, 4: 3, 5: 3, 6: 3, 7: 3, 8: 3}  sum: 27

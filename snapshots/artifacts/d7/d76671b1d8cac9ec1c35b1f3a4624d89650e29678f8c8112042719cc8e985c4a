@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+r"""
+Independent check of claim c6b0fc94 (idea b9c71c896c2347368d3e117050662d19).
+
+For every labelled simple graph G on n <= NMAX vertices (all 2^{C(n,2)} of them),
+F = family of all NONEMPTY unions of edges of G (bitmask closure).
+
+Checks:
+ (A) F == { S != 0 : every v in S has a neighbour in S }   (derived-subgraph description)
+ (B) for every vertex x, with e = V \ N[x]:
+       |{A in F : e ⊆ A, x ∉ A}| == #{T ⊆ N(x) : e∪T != ∅, every v in e∪T has a nbr in e∪T}
+       |{A in F : e ⊆ A, x ∈ A}| == #{T ⊆ N(x) : T != ∅, every v in e has a nbr in e∪T}
+ (C) same as (B) but with ∅ added to F  -> shows the formula is off by one exactly when e = ∅
+ (D) T5(x) (superset injection F_{¬x} -> F_x, via bipartite matching) versus the exact
+     single-interval witness W(x): count1 > count2 at e = V\N[x].
+     Reports how many labelled graphs fail T5 at every x, and among those how many are NOT
+     explained at every x by W(x) (i.e. need a multi-interval Hall violator).
+Also: number of derived subgraphs of C_6 (El-Zahar / Aiat-Hadj-Ahmed et al. report 29).
+"""
+import itertools, sys
+
+NMAX = int(sys.argv[1]) if len(sys.argv) > 1 else 6
+
+def closure(edges):
+    fam = set(edges)
+    frontier = list(fam)
+    while frontier:
+        new = []
+        for a in frontier:
+            for b in list(fam):
+                c = a | b
+                if c not in fam:
+                    fam.add(c); new.append(c)
+        frontier = new
+    return fam
+
+def nbr_mask(adj, S):
+    """vertices of S having a neighbour inside S"""
+    m = 0
+    for v in range(len(adj)):
+        if (S >> v) & 1 and (adj[v] & S):
+            m |= 1 << v
+    return m
+
+def derived(adj, S):
+    return S != 0 and nbr_mask(adj, S) == S
+
+def matching_exists(left, right, ok):
+    """Is there an injection left -> right along relation ok(a,b)? (Kuhn's augmenting paths)"""
+    match = {}
+    def try_(a, seen):
+        for b in right:
+            if ok(a, b) and b not in seen:
+                seen.add(b)
+                if b not in match or try_(match[b], seen):
+                    match[b] = a
+                    return True
+        return False
+    for a in left:
+        if not try_(a, set()):
+            return False
+    return True
+
+def submasks(m):
+    s = m
+    while True:
+        yield s
+        if s == 0: break
+        s = (s - 1) & m
+
+def main():
+    totA = totB = totC_eq = totC_ne = 0
+    badA = badB = 0
+    c_offbyone_e_empty = 0
+    t5_all_fail = 0
+    t5_all_fail_unexplained = 0
+    pairs_t5_fail = 0
+    pairs_t5_fail_no_W = 0
+    W_but_T5_ok = 0
+    for n in range(1, NMAX + 1):
+        pairs = list(itertools.combinations(range(n), 2))
+        V = (1 << n) - 1
+        for mask in range(1 << len(pairs)):
+            adj = [0] * n
+            edges = []
+            for i, (u, v) in enumerate(pairs):
+                if (mask >> i) & 1:
+                    adj[u] |= 1 << v; adj[v] |= 1 << u
+                    edges.append((1 << u) | (1 << v))
+            if not edges:
+                continue
+            F = closure(edges)
+            # (A)
+            D = {S for S in range(1, 1 << n) if derived(adj, S)}
+            totA += 1
+            if D != F:
+                badA += 1
+            F0 = F | {0}
+            all_fail = True
+            all_W = True
+            for x in range(n):
+                Nx = adj[x]
+                e = V & ~Nx & ~(1 << x)
+                bx = 1 << x
+                # brute force
+                c1 = sum(1 for A in F if (A & e) == e and not (A & bx))
+                c2 = sum(1 for A in F if (A & e) == e and (A & bx))
+                # formula
+                f1 = sum(1 for T in submasks(Nx) if derived(adj, e | T))
+                f2 = sum(1 for T in submasks(Nx) if T != 0 and (nbr_mask(adj, e | T) & e) == e)
+                totB += 1
+                if (c1, c2) != (f1, f2):
+                    badB += 1
+                # (C): with empty set
+                c1e = sum(1 for A in F0 if (A & e) == e and not (A & bx))
+                if c1e == f1:
+                    totC_eq += 1
+                else:
+                    totC_ne += 1
+                    if e == 0 and c1e == f1 + 1:
+                        c_offbyone_e_empty += 1
+                # (D)
+                left = [A for A in F if not (A & bx)]
+                right = [B for B in F if (B & bx)]
+                t5 = matching_exists(left, right, lambda a, b: (a & b) == a)
+                W = c1 > c2
+                if W and t5:
+                    W_but_T5_ok += 1  # must be 0 (W refutes T5)
+                if not t5:
+                    pairs_t5_fail += 1
+                    if not W:
+                        pairs_t5_fail_no_W += 1
+                if t5:
+                    all_fail = False
+                if not W:
+                    all_W = False
+            if all_fail:
+                t5_all_fail += 1
+                if not all_W:
+                    t5_all_fail_unexplained += 1
+    print(f"n <= {NMAX}")
+    print(f"(A) graphs checked: {totA}, description failures: {badA}")
+    print(f"(B) (G,x) pairs checked: {totB}, count-formula failures: {badB}")
+    print(f"(C) with ∅ ∈ F: formula agrees {totC_eq}, disagrees {totC_ne}; "
+          f"of the disagreements, e=∅ and off by exactly +1: {c_offbyone_e_empty}")
+    print(f"(D) W(x) true but T5(x) holds (must be 0): {W_but_T5_ok}")
+    print(f"(D) (G,x) with T5(x) false: {pairs_t5_fail}; of these NOT witnessed by e=V\\N[x]: {pairs_t5_fail_no_W}")
+    print(f"(D) labelled graphs failing T5 at all x: {t5_all_fail}; "
+          f"of these not explained by e=V\\N[x] at every x: {t5_all_fail_unexplained}")
+    # C_6 derived subgraph count
+    n = 6
+    edges = [(1 << i) | (1 << ((i + 1) % n)) for i in range(n)]
+    print(f"|closure(C_6)| = {len(closure(edges))}  (literature: 29 derived subgraphs)")
+
+if __name__ == "__main__":
+    main()
+
+
+# ---- OUTPUT ----
+$ python3 check_exact_count.py 6
+n <= 6
+(A) graphs checked: 33861, description failures: 0
+(B) (G,x) pairs checked: 201992, count-formula failures: 0
+(C) with ∅ ∈ F: formula agrees 195488, disagrees 6504; of the disagreements, e=∅ and off by exactly +1: 6504
+(D) W(x) true but T5(x) holds (must be 0): 0
+(D) (G,x) with T5(x) false: 84750; of these NOT witnessed by e=V\N[x]: 23852
+(D) labelled graphs failing T5 at all x: 384; of these not explained by e=V\N[x] at every x: 252
+|closure(C_6)| = 28  (literature: 29 derived subgraphs)
+# direct count: derived subgraphs of C_6 = 29 including the empty subgraph, 28 nonempty; each edge in 12.
+# extra run over all 201,992 (G,x) pairs (isolated vertices allowed):
+#   distribution of c1-c2: {<=-1: 57468, 0: 83626, +1: 60898}  -> never >= 2
+#   (c1 > c2) != [39e94af9 criterion]: 0 mismatches

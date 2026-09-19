@@ -1,0 +1,57 @@
+// Erdos #727, k=2: compare asymmetric set A = {n : (n+2)!(n+1)! | (2n)!}
+// with symmetric set B = {n : (n+2)!^2 | (2n)!}, n <= N.
+// Criterion (Legendre/Kummer): with c_p(n) = #{j>=1: 2(n mod p^j) >= p^j} = v_p(C(2n,n)),
+//   n in A  iff  for all p: c_p(n) >= 2 v_p(n+1) + v_p(n+2)
+//   n in B  iff  for all p: c_p(n) >= 2 v_p(n+1) + 2 v_p(n+2)
+// Only primes dividing (n+1)(n+2) matter. Uses a smallest-prime-factor sieve.
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <math.h>
+
+static uint32_t *spf;
+
+static int carries(uint64_t n, uint64_t p, int *Jout){
+  int c=0,J=0; uint64_t pj=p;
+  while(pj<=2*n){ J++; if(2*(n%pj)>=pj) c++; if(pj>(2*n)/p) break; pj*=p; }
+  *Jout=J; return c;
+}
+
+int main(int argc,char**argv){
+  uint64_t N = argc>1? strtoull(argv[1],0,10):100000000ULL;
+  uint64_t M=N+3;
+  spf=calloc(M,sizeof(uint32_t));
+  for(uint64_t i=2;i<M;i++) if(!spf[i]){ for(uint64_t j=i;j<M;j+=i) if(!spf[j]) spf[j]=i; }
+  // per-decade stats
+  int D=(int)floor(log10((double)N))+1;
+  uint64_t A[20]={0},B[20]={0},Ap[20]={0},Bp[20]={0},Bslack[20][8],F_small[20]={0},F_big[20]={0};
+  uint64_t Fslack[20][8]; for(int i=0;i<20;i++)for(int j=0;j<8;j++){Fslack[i][j]=0;Bslack[i][j]=0;}
+  double H[20]={0}, H2[20]={0};
+  uint64_t cntB_notA=0;
+  uint64_t p1[40],p2[40]; int v1[40],v2[40],m1,m2;
+  for(uint64_t n=1;n<=N;n++){
+    int dec=(int)floor(log10((double)n));
+    m1=m2=0; uint64_t x=n+1; while(x>1){uint64_t p=spf[x];int v=0;while(x%p==0){x/=p;v++;} p1[m1]=p;v1[m1++]=v;}
+    x=n+2; while(x>1){uint64_t p=spf[x];int v=0;while(x%p==0){x/=p;v++;} p2[m2]=p;v2[m2++]=v;}
+    int inA=1,inB=1; int J;
+    uint64_t failp=0; int failslack=-1;
+    for(int i=0;i<m1;i++){ int c=carries(n,p1[i],&J); if(c<2*v1[i]){inA=0;inB=0;break;} }
+    double h=1.0,h2=1.0; int okslack=1; int minslack=99;
+    if(inA) for(int i=0;i<m2;i++){ int c=carries(n,p2[i],&J);
+        if(c<v2[i]){inA=0;inB=0;break;}
+        if(c<2*v2[i]){ if(inB){failp=p2[i]; failslack=J-2*v2[i];} inB=0; }
+        int s=J-2*v2[i]; if(s<1)okslack=0; if(s<minslack)minslack=s; if(s<0)s=0; h*= (1.0-pow(2.0,-(double)s)); // stated heuristic
+        // conditional heuristic: given >= v carries incl. v free (p>4), need v more of remaining J-v positions
+        // P(Bin(J-v,1/2) >= v) approximated crudely; skip, record instead h2 = prod (1-2^{-(J-v)})... (v more among J-v)
+        int s2=J-v2[i]; if(s2<0)s2=0; h2*= (1.0-pow(2.0,-(double)s2));
+    }
+    if(inA){ A[dec]++; if(okslack)Ap[dec]++; H[dec]+=h; H2[dec]+=h2; if(inB){ B[dec]++; if(okslack)Bp[dec]++; int ms=minslack<0?0:(minslack>7?7:minslack); Bslack[dec][ms]++; } else { if(failp<=4) F_small[dec]++; else F_big[dec]++; int s=failslack<0?0:(failslack>7?7:failslack); Fslack[dec][s]++; } }
+  }
+  printf("decade  A(n in [10^d,10^{d+1}))  B  B/A  sumHeur(stated)/A  sumHeur2/A  fail_p<=4  fail_p>4  failslack(J-2v)=0..7\n");
+  uint64_t cA=0,cB=0; double cH=0;
+  for(int d=0;d<D;d++){ cA+=A[d];cB+=B[d];cH+=H[d];
+    printf("%d Aprime=%llu Bprime=%llu Bprime/Aprime=%.5f Bminslack0..7:",d,(unsigned long long)Ap[d],(unsigned long long)Bp[d],Ap[d]?(double)Bp[d]/Ap[d]:0); for(int s=0;s<8;s++)printf(" %llu",(unsigned long long)Bslack[d][s]); printf(" | "); printf("%d %llu %llu %.5f %.5f %.5f %llu %llu |",d,(unsigned long long)A[d],(unsigned long long)B[d],A[d]?(double)B[d]/A[d]:0,A[d]?H[d]/A[d]:0,A[d]?H2[d]/A[d]:0,(unsigned long long)F_small[d],(unsigned long long)F_big[d]);
+    for(int s=0;s<8;s++)printf(" %llu",(unsigned long long)Fslack[d][s]); printf("\n"); }
+  printf("cumulative: A=%llu B=%llu B/A=%.5f\n",(unsigned long long)cA,(unsigned long long)cB,(double)cB/cA);
+  return 0;
+}

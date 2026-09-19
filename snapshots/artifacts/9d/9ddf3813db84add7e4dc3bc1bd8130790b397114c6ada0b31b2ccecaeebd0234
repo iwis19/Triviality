@@ -1,0 +1,117 @@
+"""Reproducible numerical experiments for Goldbach hypotheses (I2, I3).
+
+E1 (parity accounting, idea I2): for even N, compare
+    r1(N)   = #{p prime : N - p prime}             (ordered pairs, p ranges over all primes < N)
+    rsemi(N)= #{p prime : N - p = q1*q2 semiprime} (q1<=q2, squares allowed)
+  Chen's method lower-bounds r1 + rsemi (N - p in P_2) but cannot separate them.
+  Prediction: rsemi/r1 grows like c*log log N, so no bounded improvement of sieve
+  constants can close the gap (parity barrier).
+
+E2 (uniform Hardy-Littlewood lower envelope, idea I3): normalised count
+    rho(N) = r1(N) / ( S(N) * I(N) ),  S(N) = 2*C2*prod_{p|N, p>2} (p-1)/(p-2),
+    I(N)   = sum_{2<=m<=N-2} 1/(log m * log(N-m))   (li-type main term, ordered)
+  Report min rho over even N in dyadic blocks and the N where it is attained.
+
+Run: python3 goldbach_experiments.py [LIMIT]   (default LIMIT = 2_000_000)
+"""
+import sys, math
+import numpy as np
+
+LIMIT = int(sys.argv[1]) if len(sys.argv) > 1 else 2_000_000
+
+# --- sieve: smallest prime factor table (spf) -----------------------------
+def spf_table(n):
+    spf = np.zeros(n + 1, dtype=np.int64)
+    spf[1] = 1
+    for i in range(2, int(n ** 0.5) + 1):
+        if spf[i] == 0:
+            spf[i] = i
+            block = spf[i * i:: i]
+            mask = block == 0
+            block[mask] = i
+            spf[i * i:: i] = block
+    idx = np.nonzero(spf == 0)[0]
+    spf[idx] = idx
+    return spf
+
+spf = spf_table(LIMIT)
+is_prime = np.zeros(LIMIT + 1, dtype=bool)
+is_prime[2:] = spf[2:] == np.arange(2, LIMIT + 1)
+# omega-style: is semiprime iff n/spf(n) is prime (and n not prime)
+quot = np.ones(LIMIT + 1, dtype=np.int64)
+quot[2:] = np.arange(2, LIMIT + 1) // spf[2:]
+is_semi = np.zeros(LIMIT + 1, dtype=bool)
+is_semi[4:] = is_prime[quot[4:]] & ~is_prime[4:]
+
+primes = np.nonzero(is_prime)[0]
+
+C2 = 0.6601618158468695739278121100145557784326233602847334133194484233354056423
+
+def r1_rsemi(N):
+    ps = primes[primes < N]
+    comp = N - ps
+    return int(is_prime[comp].sum()), int(is_semi[comp].sum())
+
+def singular(N):
+    s = 2 * C2
+    m = N
+    while m % 2 == 0:
+        m //= 2
+    while m > 1:
+        p = int(spf[m])
+        s *= (p - 1) / (p - 2)
+        while m % p == 0:
+            m //= p
+    return s
+
+LOG = np.zeros(LIMIT + 1)
+LOG[2:] = np.log(np.arange(2, LIMIT + 1))
+
+def main_term(N):
+    m = np.arange(2, N - 1)
+    return float(np.sum(1.0 / (LOG[m] * LOG[N - m])))
+
+print("=== E1: parity accounting (ordered representations) ===")
+print(f"{'N':>10} {'r1':>8} {'rsemi':>8} {'rsemi/r1':>9} {'loglogN':>8} {'ratio/loglogN':>13}")
+for N in [10**3, 10**4, 10**5, 10**6, 2*10**6, 10**3+2, 10**4+2, 10**5+2, 10**6+2,
+          2**10, 2**14, 2**17, 2**20, 30030*2, 30030*64]:
+    if N > LIMIT: continue
+    a, b = r1_rsemi(N)
+    ll = math.log(math.log(N))
+    print(f"{N:>10} {a:>8} {b:>8} {b/a:>9.3f} {ll:>8.3f} {(b/a)/ll:>13.3f}")
+
+print("\n=== E2: normalised lower envelope rho(N)=r1/(S(N)*I(N)) over even N in dyadic blocks ===")
+print(f"{'block':>22} {'min rho':>8} {'argmin N':>10} {'factorisation':>20} {'median rho':>10}")
+def factor(N):
+    out = []
+    m = N
+    while m > 1:
+        p = int(spf[m]); e = 0
+        while m % p == 0: m //= p; e += 1
+        out.append(f"{p}^{e}" if e > 1 else f"{p}")
+    return "*".join(out)
+
+lo = 64
+records = []
+while lo < LIMIT:
+    hi = min(2 * lo, LIMIT)
+    # sample every even N in the block if small, else a stride
+    stride = 2 if hi - lo <= 20000 else max(2, 2 * ((hi - lo) // 20000))
+    Ns = np.arange(lo, hi, stride)
+    Ns = Ns[Ns % 2 == 0]
+    best = (9.9, None); rhos = []
+    for N in Ns:
+        N = int(N)
+        a, _ = r1_rsemi(N)
+        rho = a / (singular(N) * main_term(N))
+        rhos.append(rho)
+        if rho < best[0]: best = (rho, N)
+    records.append((lo, hi, best[0], best[1], float(np.median(rhos))))
+    print(f"[{lo:>9},{hi:>9})   {best[0]:>8.4f} {best[1]:>10} {factor(best[1]):>20} {np.median(rhos):>10.4f}")
+    lo = hi
+
+print("\n=== E2b: rho at structured N (powers of two vs primorial multiples) ===")
+for N in [2**k for k in range(6, 21)] + [2*3*5*7*11*13*2**k for k in range(1, 7)]:
+    if N > LIMIT: continue
+    a, _ = r1_rsemi(N)
+    print(f"N={N:>8} ({factor(N):>16})  r1={a:>7}  S(N)={singular(N):7.4f}  rho={a/(singular(N)*main_term(N)):.4f}")

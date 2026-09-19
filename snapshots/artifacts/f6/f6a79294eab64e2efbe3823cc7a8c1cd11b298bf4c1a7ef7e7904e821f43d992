@@ -1,0 +1,40 @@
+"""Structural test for the k=2 family n = x^2 - 2 (n+1 = (x-1)(x+1), n+2 = x^2).
+Claims tested (own reasoning, not established):
+  (a) every solution has P^+(x) <= (2n)^(1/4)        [x must be ~sqrt(x)-smooth]
+  (b) every solution has P^+(x-1) <= (2n)^(1/3)      [large prime factor of x-1 forces failure]
+  (c) prime factors p > 2*sqrt(x+1) of x+1 never cause failure by themselves.
+Also prints solution proportion among x and among x satisfying (a)&(b)."""
+import sys
+from sympy import factorint
+
+def carries(n, p):
+    c, pj = 0, p
+    while pj <= 2 * n:
+        if 2 * (n % pj) >= pj:
+            c += 1
+        pj *= p
+    return c
+
+def is_sol(n, k):
+    val = {}
+    for i in range(1, k + 1):
+        for p, v in factorint(n + i).items():
+            val[p] = val.get(p, 0) + v
+    return all(carries(n, p) >= 2 * v for p, v in val.items())
+
+X = int(sys.argv[1]) if len(sys.argv) > 1 else 3000
+sols = 0; viol_a = viol_b = 0; filt = 0; sols_filt = 0
+for x in range(3, X + 1):
+    n = x * x - 2
+    Px = max(factorint(x)); Pxm = max(factorint(x - 1)) if x > 2 else 1
+    ok_a = Px ** 4 <= 2 * n
+    ok_b = Pxm ** 3 <= 2 * n
+    if ok_a and ok_b:
+        filt += 1
+    if is_sol(n, 2):
+        sols += 1
+        if not ok_a: viol_a += 1
+        if not ok_b: viol_b += 1
+        if ok_a and ok_b: sols_filt += 1
+print(f"x<={X}: solutions={sols} ({sols/(X-2):.4f} of x); violations of (a)={viol_a}, of (b)={viol_b}")
+print(f"x passing (a)&(b): {filt} ({filt/(X-2):.4f}); solutions among them: {sols_filt} ({sols_filt/max(filt,1):.4f})")

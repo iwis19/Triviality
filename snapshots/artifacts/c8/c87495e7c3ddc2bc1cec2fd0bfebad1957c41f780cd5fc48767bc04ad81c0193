@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""k=3 reduction for Erdos #677.
+M(x,3) = (x+1)(x+2)(x+3) if x even (x+1 odd), and = (x+1)(x+2)(x+3)/2 if x odd.
+So t(x,3) in {1,2} (T in {3,6}), and M(m,3)=M(n,3), m>n, forces
+    (m+1)(m+2)(m+3) = 2 (n+1)(n+2)(n+3),  m odd, n even,
+i.e. with X=m+2, Y=n+2:   X^3 - X = 2 (Y^3 - Y)   (a plane cubic / genus-1 curve).
+We search all integer points with 0 <= Y <= YMAX by integer cube roots.
+"""
+import sys
+from math import gcd
+
+def icbrt(v):
+    x = round(v ** (1 / 3)) if v < 2**150 else int(v ** (1/3))
+    # fix up
+    while x**3 > v: x -= 1
+    while (x + 1)**3 <= v: x += 1
+    return x
+
+YMAX = int(sys.argv[1]) if len(sys.argv) > 1 else 10**7
+sols = []
+for Y in range(0, YMAX + 1):
+    v = 2 * (Y**3 - Y)
+    X = icbrt(v)
+    for c in (X - 1, X, X + 1):
+        if c >= 0 and c**3 - c == v:
+            sols.append((c, Y))
+print("integer points (X,Y), X>=0, Y<=%d :" % YMAX, sols)
+for X, Y in sols:
+    m, n = X - 2, Y - 2
+    if m >= 0 and n >= 0:
+        def M(x):
+            v = 1
+            for y in range(x + 1, x + 4): v = v * y // gcd(v, y)
+            return v
+        print("  (m,n)=(%d,%d) m-n=%d  M(m,3)=%d M(n,3)=%d equal=%s" % (m, n, m - n, M(m), M(n), M(m) == M(n)))

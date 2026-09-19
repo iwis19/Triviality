@@ -1,0 +1,94 @@
+import Mathlib
+import MathLab.Basic
+
+open Finset ZMod
+open scoped ComplexConjugate
+
+lemma stdAddChar_conj_eq_neg {N : ℕ} [NeZero N] (j : ZMod N) :
+    conj (stdAddChar j) = stdAddChar (-j) := by
+  rw [stdAddChar_apply, stdAddChar_apply, AddChar.map_neg_eq_inv, ← Circle.coe_inv_eq_conj]
+
+lemma sum_stdAddChar_mul {N : ℕ} [NeZero N] (t : ZMod N) :
+    ∑ k : ZMod N, stdAddChar (k * t) = if t = 0 then (N : ℂ) else 0 := by
+  rw [AddChar.sum_mulShift t (isPrimitive_stdAddChar N), ZMod.card]
+  split_ifs <;> simp
+
+theorem zmod_dft_sum_mul_conj {N : ℕ} [NeZero N] (Φ : ZMod N → ℂ) :
+    ∑ k, 𝓕 Φ k * conj (𝓕 Φ k) = N * ∑ j, Φ j * conj (Φ j) := by
+  simp only [dft_apply, smul_eq_mul, map_sum, map_mul, stdAddChar_conj_eq_neg, neg_neg,
+    sum_mul_sum]
+  have h : ∀ x i j : ZMod N, stdAddChar (-(i * x)) * Φ i * (stdAddChar (j * x) * conj (Φ j))
+      = Φ i * conj (Φ j) * stdAddChar (x * (j - i)) := by
+    intro x i j
+    have : x * (j - i) = j * x + -(i * x) := by ring
+    rw [this, AddChar.map_add_eq_mul]; ring
+  simp_rw [h]
+  rw [sum_comm, mul_sum]
+  refine sum_congr rfl (fun i _ => ?_)
+  rw [sum_comm]
+  simp_rw [← mul_sum, sum_stdAddChar_mul, sub_eq_zero, mul_ite, mul_zero]
+  rw [sum_ite_eq']
+  simp only [mem_univ, if_true]
+  ring
+
+/-- Parseval identity for the discrete Fourier transform on `ZMod N`. -/
+theorem zmod_dft_parseval {N : ℕ} [NeZero N] (Φ : ZMod N → ℂ) :
+    ∑ k, ‖𝓕 Φ k‖ ^ 2 = N * ∑ j, ‖Φ j‖ ^ 2 := by
+  have h := zmod_dft_sum_mul_conj Φ
+  simp only [Complex.mul_conj, Complex.normSq_eq_norm_sq] at h
+  exact_mod_cast h
+
+theorem dft_indicator_zero {N : ℕ} [NeZero N] (S : Finset (ZMod N)) :
+    𝓕 (fun j ↦ if j ∈ S then (1 : ℂ) else 0) 0 = S.card := by
+  simp [dft_apply_zero, sum_ite_mem]
+
+theorem sum_sq_norm_indicator {N : ℕ} [NeZero N] (S : Finset (ZMod N)) :
+    ∑ j, ‖(fun j ↦ if j ∈ S then (1 : ℂ) else 0) j‖ ^ 2 = S.card := by
+  simp [apply_ite norm, apply_ite (fun x : ℝ => x ^ 2), sum_ite_mem]
+
+theorem sum_erase_zero_sq_norm_dft_indicator {N : ℕ} [NeZero N] (S : Finset (ZMod N)) :
+    ∑ k ∈ univ.erase (0 : ZMod N), ‖𝓕 (fun j ↦ if j ∈ S then (1 : ℂ) else 0) k‖ ^ 2
+      = S.card * (N - S.card) := by
+  have h := Finset.add_sum_erase univ
+    (fun k => ‖𝓕 (fun j ↦ if j ∈ S then (1 : ℂ) else 0) k‖ ^ 2) (mem_univ (0 : ZMod N))
+  simp only [] at h
+  rw [zmod_dft_parseval, sum_sq_norm_indicator, dft_indicator_zero] at h
+  simp only [Complex.norm_natCast] at h
+  linarith
+
+theorem exists_ne_zero_sq_norm_dft_indicator_ge {N : ℕ} [NeZero N] (hN : 2 ≤ N)
+    (S : Finset (ZMod N)) :
+    ∃ k : ZMod N, k ≠ 0 ∧ (S.card : ℝ) * (N - S.card) / (N - 1)
+      ≤ ‖𝓕 (fun j ↦ if j ∈ S then (1 : ℂ) else 0) k‖ ^ 2 := by
+  have hcard : (univ.erase (0 : ZMod N)).card = N - 1 := by
+    rw [card_erase_of_mem (mem_univ _), card_univ, ZMod.card]
+  have hne : (univ.erase (0 : ZMod N)).Nonempty := Finset.card_pos.1 (by rw [hcard]; omega)
+  have hN1 : ((N : ℝ) - 1) ≠ 0 := by
+    have : (2 : ℝ) ≤ N := by exact_mod_cast hN
+    linarith
+  obtain ⟨k, hk, hle⟩ := Finset.exists_le_of_sum_le hne
+    (f := fun _ => (S.card : ℝ) * (N - S.card) / (N - 1))
+    (g := fun k => ‖𝓕 (fun j ↦ if j ∈ S then (1 : ℂ) else 0) k‖ ^ 2) (by
+      rw [sum_const, hcard, sum_erase_zero_sq_norm_dft_indicator, nsmul_eq_mul,
+        Nat.cast_sub (by omega), Nat.cast_one, mul_div_cancel₀ _ hN1])
+  exact ⟨k, Finset.ne_of_mem_erase hk, hle⟩
+
+/-- Square-root barrier: a subset of `ZMod N` of density at most `1/2` has a nonzero Fourier
+coefficient of modulus at least `√(|S|/2)`. -/
+theorem exists_ne_zero_sqrt_half_card_le_norm_dft_indicator {N : ℕ} [NeZero N] (hN : 2 ≤ N)
+    (S : Finset (ZMod N)) (hS : 2 * S.card ≤ N) :
+    ∃ k : ZMod N, k ≠ 0 ∧
+      Real.sqrt (S.card / 2) ≤ ‖𝓕 (fun j ↦ if j ∈ S then (1 : ℂ) else 0) k‖ := by
+  obtain ⟨k, hk, hle⟩ := exists_ne_zero_sq_norm_dft_indicator_ge hN S
+  refine ⟨k, hk, ?_⟩
+  have hN' : (2 : ℝ) ≤ N := by exact_mod_cast hN
+  have hS' : 2 * (S.card : ℝ) ≤ N := by exact_mod_cast hS
+  have hc : (0 : ℝ) ≤ S.card := Nat.cast_nonneg _
+  have h1 : (S.card : ℝ) / 2 ≤ S.card * (N - S.card) / (N - 1) := by
+    rw [div_le_div_iff₀ (by norm_num) (by linarith)]
+    nlinarith [mul_nonneg hc (by linarith : (0 : ℝ) ≤ N + 1 - 2 * S.card)]
+  calc Real.sqrt (S.card / 2)
+      ≤ Real.sqrt (‖𝓕 (fun j ↦ if j ∈ S then (1 : ℂ) else 0) k‖ ^ 2) :=
+        Real.sqrt_le_sqrt (h1.trans hle)
+    _ = ‖𝓕 (fun j ↦ if j ∈ S then (1 : ℂ) else 0) k‖ := Real.sqrt_sq (norm_nonneg _)
+

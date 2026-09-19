@@ -1,0 +1,51 @@
+"""Max-min-angle local search for N points on S^4 (R^5).
+Smooth surrogate: (1/beta) log sum_{i<j} exp(beta * <x_i,x_j>), beta annealed, L-BFGS.
+Reports best min angle found (60 deg needed for a kissing configuration).
+"""
+import sys
+import numpy as np
+from scipy.optimize import minimize
+
+rng = np.random.default_rng(int(sys.argv[3]) if len(sys.argv) > 3 else 0)
+N = int(sys.argv[1]) if len(sys.argv) > 1 else 41
+STARTS = int(sys.argv[2]) if len(sys.argv) > 2 else 20
+n = 5
+iu = np.triu_indices(N, 1)
+
+
+def fg(x, beta):
+    X = x.reshape(N, n)
+    nr = np.linalg.norm(X, axis=1, keepdims=True)
+    U = X / nr
+    G = U @ U.T
+    g = G[iu]
+    m = g.max()
+    w = np.exp(beta * (g - m))
+    S = w.sum()
+    f = m + np.log(S) / beta
+    W = np.zeros((N, N)); W[iu] = w / S; W = W + W.T
+    dU = W @ U                       # d f / dU
+    # chain rule through normalisation
+    dX = (dU - (dU * U).sum(1, keepdims=True) * U) / nr
+    return f, dX.ravel()
+
+
+def run(seed_x):
+    x = seed_x
+    for beta in (10, 30, 100, 300, 1000, 3000):
+        res = minimize(fg, x, args=(beta,), jac=True, method="L-BFGS-B",
+                       options=dict(maxiter=3000, ftol=1e-15, gtol=1e-10))
+        x = res.x
+    X = x.reshape(N, n); X /= np.linalg.norm(X, axis=1, keepdims=True)
+    G = X @ X.T
+    return np.degrees(np.arccos(np.clip(G[iu].max(), -1, 1))), X
+
+
+best = -1; bestX = None
+for s in range(STARTS):
+    ang, X = run(rng.standard_normal(N * n))
+    if ang > best:
+        best, bestX = ang, X
+    print(f"start {s}: min angle {ang:.4f}", flush=True)
+print(f"N={N}: best min angle over {STARTS} starts = {best:.5f} deg (need 60)")
+np.save(f"best_{N}.npy", bestX)

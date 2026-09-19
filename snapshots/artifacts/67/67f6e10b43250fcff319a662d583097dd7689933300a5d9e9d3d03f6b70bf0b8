@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""k=4 reduction for Erdos #677.
+P(x) = (x+1)(x+2)(x+3)(x+4) = A(x)^2 - 1 with A(x) = x^2+5x+5.
+M(x,4) = C(x+4,4) * T(x), T(x) in {4,12}  (checked numerically in search.py / here).
+M(m,4)=M(n,4) with m>n forces T(m)=4, T(n)=12 and  P(m) = 3 P(n), i.e.
+    A(m)^2 - 3 A(n)^2 = -2.
+All positive solutions of s^2 - 3 t^2 = -2 are (s_i,t_i) = (1+sqrt3)(2+sqrt3)^i.
+We scan i <= IMAX and report every i with both s_i, t_i of the form A(x), x>=0.
+"""
+from math import isqrt, gcd, comb
+
+def A_inverse(s):
+    # s = x^2+5x+5  <=>  4s+5 = (2x+5)^2
+    r = 4 * s + 5
+    q = isqrt(r)
+    if q * q != r or q % 2 == 0 or q < 5:
+        return None
+    return (q - 5) // 2
+
+def M(n, k):
+    v = 1
+    for x in range(n + 1, n + k + 1):
+        v = v * x // gcd(v, x)
+    return v
+
+IMAX = 3000
+s, t = 1, 1
+hits = []
+for i in range(IMAX + 1):
+    m = A_inverse(s)
+    n = A_inverse(t)
+    if m is not None and n is not None:
+        hits.append((i, m, n, m - n, M(m, 4) == M(n, 4)))
+    s, t = 2 * s + 3 * t, s + 2 * t
+print("digits of s at IMAX:", len(str(s)))
+print("i, m, n, m-n, M(m,4)==M(n,4):")
+for h in hits:
+    print(h)
+# sanity: T(x) in {4,12} for x<=10^5
+Ts = set(M(x, 4) // comb(x + 4, 4) for x in range(0, 100000))
+print("T values observed (x<10^5):", sorted(Ts))
+# sanity: every overlapping equality M(n,4)=M(m,4), n<m<10^5, satisfies P(m)=3P(n)
+P = lambda x: (x + 1) * (x + 2) * (x + 3) * (x + 4)
+bad = 0
+prev = {}
+for x in range(0, 100000):
+    v = M(x, 4)
+    if v in prev:
+        for y in prev[v]:
+            if P(x) != 3 * P(y):
+                bad += 1
+        prev[v].append(x)
+    else:
+        prev[v] = [x]
+print("equalities violating P(m)=3P(n):", bad)
+
+
+# ---- pell_orbit_check.py ----
+# sanity: every positive solution of s^2-3t^2=-2 with t<=10^6 lies in the orbit (1+sqrt3)(2+sqrt3)^i
+from math import isqrt
+orbit=set(); s,t=1,1
+while t<=10**6:
+    orbit.add((s,t)); s,t=2*s+3*t,s+2*t
+bad=[(isqrt(3*t*t-2),t) for t in range(1,10**6+1) if (lambda r:(r*r==3*t*t-2))(isqrt(3*t*t-2)) and (isqrt(3*t*t-2),t) not in orbit]
+print("solutions outside orbit (t<=1e6):",bad)
+# k=3: T(n,3)=M/C(n+3,3) values
+from math import gcd,comb
+def M(n,k):
+    v=1
+    for x in range(n+1,n+k+1): v=v*x//gcd(v,x)
+    return v
+print("T(n,3) values n<10^5:",sorted(set(M(n,3)//comb(n+3,3) for n in range(10**5))))
+# k=3 Baker-route: check X<2Y, X>=Y, |2^(1/3)-X/Y|<=0.52/Y^2 for all integer sols found, and that no sol has Y in (4,3e6]

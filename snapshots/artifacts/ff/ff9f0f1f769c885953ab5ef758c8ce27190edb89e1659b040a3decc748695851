@@ -1,0 +1,172 @@
+// Toolchain-independent (C, no Python/numpy) recomputation of the covering statement of
+// claim 104f3f3f (idea d2c8682b): for K=2..77, every candidate of block K
+//   type A: n in (2^K, 2^K+K+1],  type B: n = M*i, i in [floor((2^K+K+1)/M)+1, floor(2^{K+1}/M)]
+// with M = prod{p <= K+1 prime : 2 primitive root mod p} is killed by some (k<=min(K,31), prime q<=997)
+// with q | n-2^k and q < n-2^k, unless it is a solution. Survivors are printed for exact
+// re-verification outside this program. Per-k kill counts (smallest killing k) are printed.
+// build: gcc -O2 -fopenmp cover.c -o cover
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+typedef unsigned long long u64; typedef unsigned __int128 u128;
+#define QMAX 997
+#define KCAP 31
+static int PR[200], NP = 0;
+static void sieve(void){ char s[QMAX+1]; memset(s,1,sizeof s); s[0]=s[1]=0;
+  for(int i=2;i*i<=QMAX;i++) if(s[i]) for(int j=i*i;j<=QMAX;j+=i) s[j]=0;
+  for(int i=2;i<=QMAX;i++) if(s[i]) PR[NP++]=i; }
+static u64 powmod(u64 b,u64 e,u64 m){ u64 r=1%m; b%=m; while(e){ if(e&1) r=(u128)r*b%m; b=(u128)b*b%m; e>>=1;} return r; }
+static int is_prime_small(u64 n){ if(n<2) return 0; for(u64 d=2; d*d<=n; d++) if(n%d==0) return 0; return 1; }
+static int two_prim_root(u64 p){ // check 2^((p-1)/r) != 1 for all prime r | p-1
+  if(p==2) return 0; u64 m=p-1;
+  for(u64 r=2; r*r<=m; r++) if(m%r==0){ if(powmod(2,(p-1)/r,p)==1) return 0; while(m%r==0) m/=r; }
+  if(m>1 && powmod(2,(p-1)/m,p)==1) return 0; return 1; }
+static u64 inv_mod(u64 a,u64 q){ return powmod(a%q,q-2,q); } // q prime, a not divisible by q
+
+int main(void){
+  sieve();
+  u64 totA=0, totB=0; u64 killsB[KCAP+2]={0}, killsA[KCAP+2]={0}; int maxkB=0;
+  for(int K=2;K<=77;K++){
+    u64 M=1; int cntS=0;
+    for(u64 p=3;p<=(u64)K+1;p++) if(is_prime_small(p) && two_prim_root(p)){ M*=p; cntS++; }
+    u128 lo=(u128)1<<K; u128 hi=(u128)1<<(K+1);
+    // type A (exact 128-bit arithmetic)
+    for(u128 n=lo+1; n<=lo+K+1; n++){
+      totA++; int killed=0;
+      for(int k=1;k<=K && k<=KCAP && !killed;k++){ u128 m=n-((u128)1<<k);
+        for(int j=0;j<NP;j++){ u64 q=PR[j]; if(q<m && m%q==0){ killsA[k]++; killed=1; break; } } }
+      if(!killed) printf("SURVIVOR A K=%d n=%llu (low 64 bits)\n",K,(u64)n);
+    }
+    u64 i_lo=(u64)((lo+K+1)/M)+1, i_hi=(u64)(hi/M);
+    if(i_hi<i_lo){ printf("K=%2d |S|=%d M=%llu B=0\n",K,cntS,M); continue; }
+    u64 nB=i_hi-i_lo+1; totB+=nB;
+    if(K<=31){ // exact u64 arithmetic incl. properness q < n-2^k
+      for(u64 i=i_lo;i<=i_hi;i++){ u64 n=M*i; int killed=0;
+        for(int k=1;k<=K && !killed;k++){ u64 m=n-(1ULL<<k);
+          for(int j=0;j<NP;j++){ u64 q=PR[j]; if(q<m && m%q==0){ killsB[k]++; killed=1; if(k>maxkB) maxkB=k; break; } } }
+        if(!killed) printf("SURVIVOR B K=%d n=%llu\n",K,n); }
+      printf("K=%2d |S|=%d M=%llu B=%llu exact\n",K,cntS,M,nB); fflush(stdout); continue;
+    }
+    // K >= 32: k <= 31 < K so n-2^k > 2^(K-1) >= 2^31 > 997, properness automatic.
+    // mask[j][r] = bitmask over k (bit k-1) with r == 2^k * M^{-1} mod q_j, i.e. q_j | M i - 2^k when i = r mod q_j
+    static uint32_t mask[200][QMAX];
+    int usable[200], nu=0;
+    for(int j=0;j<NP;j++){ u64 q=PR[j]; if(M%q==0) continue; usable[nu++]=j;
+      memset(mask[j],0,sizeof(uint32_t)*q); u64 im=inv_mod(M,q);
+      for(int k=1;k<=KCAP;k++){ u64 r=powmod(2,k,q)*im%q; mask[j][r]|=1u<<(k-1); } }
+    u64 loc[KCAP+2]={0}; u64 nsurv=0;
+    #pragma omp parallel
+    { u64 lk[KCAP+2]={0};
+      #pragma omp for schedule(dynamic,65536) reduction(+:nsurv)
+      for(u64 i=i_lo;i<=i_hi;i++){ int best=99;
+        for(int t=0;t<nu;t++){ int j=usable[t]; uint32_t m=mask[j][i%PR[j]]; if(m){ int k=__builtin_ctz(m)+1; if(k<best){ best=k; if(k==1) break; } } }
+        if(best==99){ nsurv++; 
+          #pragma omp critical
+          printf("SURVIVOR B K=%d i=%llu\n",K,i); }
+        else lk[best]++; }
+      #pragma omp critical
+      for(int k=1;k<=KCAP;k++) loc[k]+=lk[k]; }
+    for(int k=1;k<=KCAP;k++){ killsB[k]+=loc[k]; if(loc[k] && k>maxkB) maxkB=k; }
+    printf("K=%2d |S|=%d M=%llu B=%llu i=[%llu,%llu] survivors=%llu\n",K,cntS,M,nB,i_lo,i_hi,nsurv); fflush(stdout);
+  }
+  printf("typeA=%llu typeB=%llu total=%llu maxkB=%d\n",totA,totB,totA+totB,maxkB);
+  printf("killsB:"); for(int k=1;k<=KCAP;k++) if(killsB[k]) printf(" %d:%llu",k,killsB[k]); printf("\n");
+  printf("killsA:"); for(int k=1;k<=KCAP;k++) if(killsA[k]) printf(" %d:%llu",k,killsA[k]); printf("\n");
+  return 0; }
+
+
+/* ---- run log ----
+SURVIVOR A K=2 n=5 (low 64 bits)
+SURVIVOR A K=2 n=7 (low 64 bits)
+K= 2 |S|=1 M=3 B=0
+SURVIVOR A K=3 n=9 (low 64 bits)
+SURVIVOR B K=3 n=15
+K= 3 |S|=1 M=3 B=1 exact
+SURVIVOR A K=4 n=21 (low 64 bits)
+K= 4 |S|=2 M=15 B=1 exact
+SURVIVOR B K=5 n=45
+K= 5 |S|=2 M=15 B=2 exact
+SURVIVOR B K=6 n=75
+SURVIVOR B K=6 n=105
+K= 6 |S|=2 M=15 B=4 exact
+K= 7 |S|=2 M=15 B=8 exact
+K= 8 |S|=2 M=15 B=17 exact
+K= 9 |S|=2 M=15 B=34 exact
+K=10 |S|=3 M=165 B=6 exact
+K=11 |S|=3 M=165 B=12 exact
+K=12 |S|=4 M=2145 B=2 exact
+K=13 |S|=4 M=2145 B=4 exact
+K=14 |S|=4 M=2145 B=8 exact
+K=15 |S|=4 M=2145 B=15 exact
+K=16 |S|=4 M=2145 B=31 exact
+K=17 |S|=4 M=2145 B=61 exact
+K=18 |S|=5 M=40755 B=6 exact
+K=19 |S|=5 M=40755 B=13 exact
+K=20 |S|=5 M=40755 B=26 exact
+K=21 |S|=5 M=40755 B=51 exact
+K=22 |S|=5 M=40755 B=103 exact
+K=23 |S|=5 M=40755 B=206 exact
+K=24 |S|=5 M=40755 B=412 exact
+K=25 |S|=5 M=40755 B=823 exact
+K=26 |S|=5 M=40755 B=1647 exact
+K=27 |S|=5 M=40755 B=3293 exact
+K=28 |S|=6 M=1181895 B=227 exact
+K=29 |S|=6 M=1181895 B=454 exact
+K=30 |S|=6 M=1181895 B=908 exact
+K=31 |S|=6 M=1181895 B=1817 exact
+K=32 |S|=6 M=1181895 B=3634 i=[3634,7267] survivors=0
+K=33 |S|=6 M=1181895 B=7268 i=[7268,14535] survivors=0
+K=34 |S|=6 M=1181895 B=14536 i=[14536,29071] survivors=0
+K=35 |S|=6 M=1181895 B=29072 i=[29072,58143] survivors=0
+K=36 |S|=7 M=43730115 B=1571 i=[1572,3142] survivors=0
+K=37 |S|=7 M=43730115 B=3143 i=[3143,6285] survivors=0
+K=38 |S|=7 M=43730115 B=6286 i=[6286,12571] survivors=0
+K=39 |S|=7 M=43730115 B=12572 i=[12572,25143] survivors=0
+K=40 |S|=7 M=43730115 B=25143 i=[25144,50286] survivors=0
+K=41 |S|=7 M=43730115 B=50286 i=[50287,100572] survivors=0
+K=42 |S|=7 M=43730115 B=100572 i=[100573,201144] survivors=0
+K=43 |S|=7 M=43730115 B=201145 i=[201145,402289] survivors=0
+K=44 |S|=7 M=43730115 B=402290 i=[402290,804579] survivors=0
+K=45 |S|=7 M=43730115 B=804580 i=[804580,1609159] survivors=0
+K=46 |S|=7 M=43730115 B=1609160 i=[1609160,3218319] survivors=0
+K=47 |S|=7 M=43730115 B=3218320 i=[3218320,6436639] survivors=0
+K=48 |S|=7 M=43730115 B=6436639 i=[6436640,12873278] survivors=0
+K=49 |S|=7 M=43730115 B=12873279 i=[12873279,25746557] survivors=0
+K=50 |S|=7 M=43730115 B=25746557 i=[25746558,51493114] survivors=0
+K=51 |S|=7 M=43730115 B=51493114 i=[51493115,102986228] survivors=0
+K=52 |S|=8 M=2317696095 B=1943136 i=[1943137,3886272] survivors=0
+K=53 |S|=8 M=2317696095 B=3886273 i=[3886273,7772545] survivors=0
+K=54 |S|=8 M=2317696095 B=7772546 i=[7772546,15545091] survivors=0
+K=55 |S|=8 M=2317696095 B=15545091 i=[15545092,31090182] survivors=0
+K=56 |S|=8 M=2317696095 B=31090182 i=[31090183,62180364] survivors=0
+K=57 |S|=8 M=2317696095 B=62180365 i=[62180365,124360729] survivors=0
+K=58 |S|=9 M=136744069605 B=2107809 i=[2107809,4215617] survivors=0
+K=59 |S|=9 M=136744069605 B=4215618 i=[4215618,8431235] survivors=0
+K=60 |S|=10 M=8341388245905 B=138217 i=[138217,276433] survivors=0
+K=61 |S|=10 M=8341388245905 B=276434 i=[276434,552867] survivors=0
+K=62 |S|=10 M=8341388245905 B=552868 i=[552868,1105735] survivors=0
+K=63 |S|=10 M=8341388245905 B=1105736 i=[1105736,2211471] survivors=0
+K=64 |S|=10 M=8341388245905 B=2211472 i=[2211472,4422943] survivors=0
+K=65 |S|=10 M=8341388245905 B=4422943 i=[4422944,8845886] survivors=0
+K=66 |S|=11 M=558873012475635 B=132028 i=[132029,264056] survivors=0
+K=67 |S|=11 M=558873012475635 B=264056 i=[264057,528112] survivors=0
+K=68 |S|=11 M=558873012475635 B=528113 i=[528113,1056225] survivors=0
+K=69 |S|=11 M=558873012475635 B=1056225 i=[1056226,2112450] survivors=0
+K=70 |S|=11 M=558873012475635 B=2112451 i=[2112451,4224901] survivors=0
+K=71 |S|=11 M=558873012475635 B=4224901 i=[4224902,8449802] survivors=0
+K=72 |S|=11 M=558873012475635 B=8449802 i=[8449803,16899604] survivors=0
+K=73 |S|=11 M=558873012475635 B=16899605 i=[16899605,33799209] survivors=0
+K=74 |S|=11 M=558873012475635 B=33799209 i=[33799210,67598418] survivors=0
+K=75 |S|=11 M=558873012475635 B=67598419 i=[67598419,135196837] survivors=0
+K=76 |S|=11 M=558873012475635 B=135196837 i=[135196838,270393674] survivors=0
+K=77 |S|=11 M=558873012475635 B=270393675 i=[270393675,540787349] survivors=0
+typeA=3078 typeB=781153370 total=781156448 maxkB=31
+killsB: 1:614047516 2:98359047 3:41915480 4:13910495 5:6788994 6:3153239 7:1555549 8:749418 9:323371 10:166969 11:88389 12:41228 13:23484 14:13283 15:7147 16:4166 17:2411 18:1344 19:809 20:451 21:259 22:132 23:74 24:44 25:29 26:19 27:6 28:5 29:6 30:1 31:1
+killsA: 1:2829 2:217 3:23 4:2 5:2 7:1
+
+real	0m18.225s
+user	2m23.984s
+sys	0m0.018s
+
+*/

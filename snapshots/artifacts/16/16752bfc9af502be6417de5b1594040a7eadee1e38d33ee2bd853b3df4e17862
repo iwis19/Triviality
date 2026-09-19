@@ -1,0 +1,70 @@
+# ===== chirality.py =====
+#!/usr/bin/env python3
+"""Chirality test: do disjoint S(k-1,k,2k) systems always lie in different A_{2k}-orbits?
+Tested for SQS(8) (k=4) and S(5,6,12) (k=6); also S(4,5,11) and SQS(10) for comparison."""
+import itertools
+from e835 import orbit_of_system, hexads, planes  # reuse constructions (module prints its own output)
+
+def alt_orbits(systems, n):
+    """Split list of systems into A_n-orbits (BFS with even generators)."""
+    gens = [[1, 2, 0] + list(range(3, n))]                       # (0 1 2)
+    cyc = [0] + list(range(2, n)) + [1]                           # (1 2 ... n-1), even iff n-1 odd i.e. n even
+    assert n % 2 == 0
+    gens.append(cyc)
+    index = {S: i for i, S in enumerate(systems)}
+    orb = [-1] * len(systems)
+    no = 0
+    for s in range(len(systems)):
+        if orb[s] >= 0:
+            continue
+        orb[s] = no
+        stack = [systems[s]]
+        while stack:
+            S = stack.pop()
+            for g in gens:
+                T = frozenset(frozenset(g[x] for x in b) for b in S)
+                j = index[T]
+                if orb[j] < 0:
+                    orb[j] = no
+                    stack.append(T)
+        no += 1
+    return orb, no
+
+def test(systems, n, label):
+    orb, no = alt_orbits(systems, n)
+    sizes = [orb.count(i) for i in range(no)]
+    same = diff = 0
+    for i in range(len(systems)):
+        for j in range(i + 1, len(systems)):
+            if systems[i].isdisjoint(systems[j]):
+                if orb[i] == orb[j]:
+                    same += 1
+                else:
+                    diff += 1
+    print(f"{label}: A_{n}-orbits sizes {sizes}; disjoint pairs same-orbit={same}, different-orbit={diff}")
+
+sqs8 = orbit_of_system(planes, 8)
+test(sqs8, 8, "SQS(8)=S(3,4,8)")
+s5612 = orbit_of_system(hexads, 12)
+test(s5612, 12, "S(5,6,12)")
+sqs10 = orbit_of_system([h - {10, 11} for h in hexads if {10, 11} <= h], 10)
+test(sqs10, 10, "SQS(10) (v != 2k control)")
+
+# ===== chirality2.py =====
+#!/usr/bin/env python3
+"""Joint distribution of (|S0 & S|, same/different A_n-orbit) for S(5,6,12) and SQS(8)."""
+import sys, io
+_stdout = sys.stdout; sys.stdout = io.StringIO()
+from e835 import orbit_of_system, hexads, planes
+from chirality import alt_orbits
+sys.stdout = _stdout
+
+for label, blocks, n in [("SQS(8)", planes, 8), ("S(5,6,12)", hexads, 12)]:
+    systems = orbit_of_system(blocks, n)
+    orb, no = alt_orbits(systems, n)
+    S0 = systems[0]; o0 = orb[0]
+    joint = {}
+    for S, o in zip(systems, orb):
+        key = (len(S0 & S), "same" if o == o0 else "diff")
+        joint[key] = joint.get(key, 0) + 1
+    print(label, dict(sorted(joint.items())))

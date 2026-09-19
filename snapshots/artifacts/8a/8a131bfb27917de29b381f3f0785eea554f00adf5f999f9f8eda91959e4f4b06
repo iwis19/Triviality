@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Independent covering-style check of claim 047de5 / c3d155 (Erdos #1142 wheel search, blocks K=2..77).
+
+For each block K (n in (2^K, 2^{K+1}]) the candidate set implied by the per-prime lemma
+dvd_of_erdos1142_of_primitiveRoot is
+  type A: n in (2^K, 2^K+K+1]                       (K+1 integers)
+  type B: n = M*i, M = prod{p<=K+1 : ord_p(2)=p-1}, 2^K+K+1 < n <= 2^{K+1}.
+We do NOT read anybody's witness file.  Instead we recompute, for every candidate, whether some
+k <= min(K,31) and prime q <= 997 give a proper divisor q | n-2^k (q < n-2^k), by sieving in index
+space.  Survivors are examined exactly.  This checks the *content* of the 539 MB certificate
+(the covering statement) without the certificate.
+"""
+import sys, time, math
+import numpy as np
+import gmpy2
+
+B = 1000
+KMAX = int(sys.argv[1]) if len(sys.argv) > 1 else 77
+KCAP = 31
+
+def small_primes(B):
+    s = bytearray([1]) * (B + 1); s[0] = s[1] = 0
+    for i in range(2, int(B ** .5) + 1):
+        if s[i]: s[i*i::i] = bytearray(len(s[i*i::i]))
+    return [i for i in range(B + 1) if s[i]]
+
+PR = small_primes(B)               # primes <= 997
+PRSET = set(PR)
+
+def factor_small(m):
+    f, d = [], 2
+    while d * d <= m:
+        if m % d == 0:
+            f.append(d)
+            while m % d == 0: m //= d
+        d += 1
+    if m > 1: f.append(m)
+    return f
+
+def two_is_prim_root(p):
+    return p % 2 == 1 and all(pow(2, (p - 1) // q, p) != 1 for q in factor_small(p - 1))
+
+def S(K):
+    return [p for p in PR if p <= K + 1 and two_is_prim_root(p)]
+
+def first_small_factor_witness(n, K):
+    """exact: return (k, q) with q<=997 prime, q | n-2^k, q < n-2^k, k<=min(K,31); or None."""
+    for k in range(1, min(K, KCAP) + 1):
+        m = n - (1 << k)
+        if m <= 1: return ('one', k) if m == 1 else ('nonpos', k)
+        for q in PR:
+            if q >= m: break
+            if m % q == 0: return (k, q)
+    return None
+
+def is_solution_exact(n):
+    """n>2 and n-2^k prime for all k>=1 with 2^k<n; uses gmpy2.is_prime (probabilistic) AND for the
+    negative direction only (so a 'False' here is rigorous only if is_prime never says composite for a prime,
+    which holds for Miller-Rabin)."""
+    if n <= 2: return False
+    k = 1
+    while (1 << k) < n:
+        if not gmpy2.is_prime(n - (1 << k), 30): return False
+        k += 1
+    return True
+
+totA = totB = 0
+killed_at = {}
+solutions = []
+unresolved = []
+t0 = time.time()
+for K in range(2, KMAX + 1):
+    tK = time.time()
+    SK = S(K); M = 1
+    for p in SK: M *= p
+    lo, hi = 1 << K, 1 << (K + 1)
+    # ---- type A
+    for n in range(lo + 1, lo + K + 2):
+        totA += 1
+        w = first_small_factor_witness(n, K)
+        if w is None:
+            if is_solution_exact(n): solutions.append(n)
+            else: unresolved.append(('A', K, n))
+        elif w[0] == 'one':
+            pass  # n-2^k = 1 -> not prime, n not a solution (n = 2^K+1)
+    # ---- type B
+    i_lo = (lo + K + 1) // M + 1
+    i_hi = hi // M
+    N = i_hi - i_lo + 1
+    if N <= 0:
+        print(f"K={K:2d} |S|={len(SK)} M={M} typeB empty", flush=True); continue
+    totB += N
+    qs = [q for q in PR if M % q != 0]
+    if K <= KCAP:
+        # exact path (blocks are tiny)
+        surv = []
+        for i in range(i_lo, i_hi + 1):
+            n = M * i
+            w = first_small_factor_witness(n, K)
+            if w is None:
+                if is_solution_exact(n): solutions.append(n)
+                else: unresolved.append(('B', K, n))
+            elif w[0] == 'one': unresolved.append(('B-one', K, n))
+            else: killed_at[w[0]] = killed_at.get(w[0], 0) + 1
+        print(f"K={K:2d} |S|={len(SK)} M={M} N_B={N} (exact path) t={time.time()-tK:.1f}s", flush=True)
+        continue
+    # numpy path: k <= 31 < K so n-2^k > 2^{K-1} > 997: every small prime divisor is proper.
+    covered = np.zeros(N, dtype=bool)
+    for q in qs:
+        r = (2 * pow(M, -1, q)) % q            # i ≡ 2*M^{-1} (mod q)  <=>  q | M*i - 2
+        j0 = (r - i_lo) % q
+        covered[j0::q] = True
+    surv = np.flatnonzero(~covered).astype(np.int64) + i_lo
+    k1 = N - surv.size
+    killed_at[1] = killed_at.get(1, 0) + k1
+    for k in range(2, min(K, KCAP) + 1):
+        before = surv.size
+        for q in qs:
+            if surv.size == 0: break
+            Mq = M % q; tq = pow(2, k, q)
+            surv = surv[(Mq * (surv % q)) % q != tq]
+        killed_at[k] = killed_at.get(k, 0) + before - surv.size
+        if surv.size == 0: break
+    for i in surv.tolist():
+        n = M * i
+        if is_solution_exact(n): solutions.append(n)
+        else: unresolved.append(('B', K, n))
+    print(f"K={K:2d} |S|={len(SK)} log2M={math.log2(M):.2f} N_B={N} killed_k1={k1} ({100*k1/N:.2f}%) survivors_after_k<=31={surv.size} t={time.time()-tK:.1f}s", flush=True)
+
+print("\n=== SUMMARY ===")
+print("blocks K=2..%d" % KMAX)
+print("type A candidates:", totA, " type B candidates:", totB, " total:", totA + totB)
+print("solutions found (exact re-check):", sorted(solutions))
+print("candidates with NO (k<=min(K,31), q<=997) proper-divisor witness and not a solution:", unresolved)
+tot = sum(killed_at.values())
+print("type-B kills by k (count, %%): ", {k: (v, round(100 * v / totB, 2)) for k, v in sorted(killed_at.items())})
+print("max k needed:", max(killed_at))
+print("total time %.1fs" % (time.time() - t0))

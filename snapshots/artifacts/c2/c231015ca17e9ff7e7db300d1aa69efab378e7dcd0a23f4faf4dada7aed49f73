@@ -1,0 +1,107 @@
+# ==== critic_checks.py (rank-4 quotient counts, claim arithmetic) ====
+"""Critic checks for ideas 5641... and 953b...
+A_m = (Z/m)[x,y]/(x^2+3, y^2+11), basis 1, x=sqrt(-3), y=sqrt(-11), xy=sqrt(-33)... careful:
+we use basis 1, s3=sqrt(-3), s11=sqrt(-11), s33 = sqrt(33) = -(sqrt(-3)*sqrt(-11)) (choose sign: s3*s11 = -s33).
+Element z = a + b s3 + c s11 + d s33.  conj: s3->-s3, s11->-s11, s33->s33.
+|z|^2 = (a + d s33)^2 + (b sqrt3 + c sqrt11)^2 = a^2+33d^2+3b^2+11c^2 + 2(ad+bc) s33.
+So z*conj(z) = 1  <=>  a^2+3b^2+11c^2+33d^2 = 1  and  ad+bc = 0.
+"""
+import itertools, sys
+import numpy as np
+from fractions import Fraction
+
+def norm_one_set(m):
+    N = []
+    for a, b, c, d in itertools.product(range(m), repeat=4):
+        if (a*a + 3*b*b + 11*c*c + 33*d*d) % m == 1 % m and (a*d + b*c) % m == 0:
+            N.append((a, b, c, d))
+    return np.array(N, dtype=np.int64)
+
+def count_avoiding_functionals(m, N):
+    # functionals u in (Z/m)^4, u.z != 0 mod m for all z in N
+    U = np.array(list(itertools.product(range(m), repeat=4)), dtype=np.int64)  # m^4 x 4
+    ok = np.ones(len(U), dtype=bool)
+    chunk = 20000
+    for i in range(0, len(U), chunk):
+        Uc = U[i:i+chunk]
+        vals = (N @ Uc.T) % m  # |N| x chunk
+        ok[i:i+chunk] = ~np.any(vals == 0, axis=0)
+    return int(ok.sum()), U[ok]
+
+# --- claim f422: f = a + c + 2d mod 5 avoids N_5
+N5 = norm_one_set(5)
+f = np.array([1, 0, 1, 2])
+vals = (N5 @ f) % 5
+print("m=5: |N_5| =", len(N5), "; f=(1,0,1,2) hits zero on", int((vals == 0).sum()), "elements of N_5")
+
+# --- claim d4cc: counts
+for m in [5, 7, 11, 13, 17, 19, 23, 25]:
+    N = norm_one_set(m)
+    cnt, U = count_avoiding_functionals(m, N)
+    print(f"m={m}: |N_m|={len(N)}, avoiding functionals={cnt}")
+    sys.stdout.flush()
+
+# --- claim 0f4a / 4c46 arithmetic (exact, sympy)
+import sympy as sp
+w = (41 + 3*sp.I*sp.sqrt(91))/50
+kappa = (3 + sp.I*sp.sqrt(91))/10
+print("|w|^2 =", sp.simplify(w*sp.conjugate(w)), "; w+conj(w) =", sp.simplify(w + sp.conjugate(w)))
+print("|kappa|^2 =", sp.simplify(kappa*sp.conjugate(kappa)), "; kappa^2 + conj(w) =", sp.simplify(sp.expand(kappa**2) + sp.conjugate(w)))
+print("|(5/3)(w-1)|^2 =", sp.simplify(sp.Rational(25, 9)*(w-1)*sp.conjugate(w-1)))
+# 1/25 in R*: 41x + 25y = 1
+g, x, y = sp.gcdex(41, 25)
+print("gcdex(41,25):", g, x, y, "->", g*41 + x*25 if False else (41*g + 25*x))
+
+
+# ==== rbar2_mod4_check.py (known linear 4-colouring of Rbar_2, Polymath wiki) ====
+"""Known result check (Polymath wiki, 'Algebraic formulation', June 2018): Rbar_2 = Z[w, alpha, 1/3],
+w=(1+i sqrt3)/2 (w^2 = w-1), alpha=(1+sqrt33)/2 (alpha^2 = alpha+8), has a LINEAR 4-colouring via
+Rbar_2 -> Z_4[w,alpha] -> Z_4[w] (alpha -> 0), c(a+bw) = a-b mod 4.
+Here we check it directly on the FULL norm-one set of the 256-element ring Z_4[w,alpha] (no unit-group parametrisation needed).
+Element = a + b w + c alpha + d w alpha, conj: w -> 1-w, alpha -> alpha."""
+import itertools
+m = 4
+def mul(x, y):
+    a,b,c,d = x; e,f,g,h = y
+    # (a + b w + c al + d w al)(e + f w + g al + h w al); w^2 = w-1, al^2 = al+8
+    # collect coefficients on 1, w, al, w al
+    r = [0,0,0,0]
+    def add_w(p, q, coeff):  # (p + q w) * coeff pattern handled below
+        pass
+    terms = {}
+    basis = {(0,0):0,(1,0):1,(0,1):2,(1,1):3}
+    X = {(0,0):a,(1,0):b,(0,1):c,(1,1):d}
+    Y = {(0,0):e,(1,0):f,(0,1):g,(1,1):h}
+    out = {(0,0):0,(1,0):0,(0,1):0,(1,1):0}
+    for (i1,j1),u in X.items():
+        for (i2,j2),v in Y.items():
+            coef = u*v
+            # w^(i1+i2): w^2 = w - 1 -> contributes to (w^0, w^1) parts
+            wpart = {0:{0:1}, 1:{1:1}, 2:{0:-1,1:1}}[i1+i2]
+            apart = {0:{0:1}, 1:{1:1}, 2:{0:8,1:1}}[j1+j2]
+            for wi,wc in wpart.items():
+                for ai,ac in apart.items():
+                    out[(wi,ai)] += coef*wc*ac
+    return tuple(out[k] % m for k in [(0,0),(1,0),(0,1),(1,1)])
+def conj(x):
+    a,b,c,d = x  # w -> 1-w : b w -> b - b w ; d w al -> d al - d w al
+    return ((a+b) % m, (-b) % m, (c+d) % m, (-d) % m)
+N = [x for x in itertools.product(range(m), repeat=4) if mul(x, conj(x)) == (1,0,0,0)]
+print("|Z_4[w,alpha]| = 256, |N_4| =", len(N))
+f = lambda x: (x[0]-x[1]) % m
+bad = [x for x in N if f(x) == 0]
+print("functional a-b (alpha ignored) vanishes on", len(bad), "elements of N_4")
+# also: which elements of N_4 map to which colours
+print("colour values on N_4:", sorted(set(f(x) for x in N)))
+
+
+# ==== recorded output ====
+# m=5: |N_5| = 24 ; f=(1,0,1,2) hits zero on 0 elements of N_5
+# m=7: |N_m|=48, avoiding functionals=0
+# m=11: |N_m|=132, avoiding functionals=60
+# m=13: |N_m|=168, avoiding functionals=0
+# m=17: |N_m|=324, avoiding functionals=288
+# m=19: |N_m|=360, avoiding functionals=0
+# m=23: |N_m|=528, avoiding functionals=0
+# m=25: |N_m|=600, avoiding functionals=30048
+# |Z_4[w,alpha]| = 256, |N_4| = 36 ; functional a-b vanishes on 0 elements of N_4 ; colour values on N_4: [1, 2, 3]

@@ -1,0 +1,20 @@
+
+Claim C1 (necessary condition for exact coset coverings of a finite group).
+Let G be finite and G = ⊔_{i=1}^k a_i G_i an exact covering by left cosets. Write n_i = [G:G_i],
+s_H = Σ_{h∈H} h ∈ C[G]. Then Σ_i a_i s_{G_i} = s_G in C[G]. Let ρ: G → U(V) be a nontrivial
+irreducible unitary representation and P_i the orthogonal projection of V onto V^{G_i}
+(so ρ(s_{G_i}) = |G_i| P_i and m_ρ(G_i) := dim V^{G_i} = ⟨ρ, 1_{G_i}^G⟩). Since ρ(s_G) = 0,
+      Σ_i |G_i| ρ(a_i) P_i = 0.
+Fix i with P_i ≠ 0. Then |G_i| ρ(a_i)P_i = −Σ_{j≠i} |G_j| ρ(a_j) P_j. Operator norms: the left side has norm |G_i|
+(ρ(a_i) unitary, P_i a nonzero projection), the right side has norm ≤ Σ_{j≠i, P_j≠0} |G_j|. Hence
+  (norm form)  |G_i| ≤ Σ_{j≠i, m_ρ(G_j)>0} |G_j|,   i.e.  1/n_i ≤ Σ_{j≠i, ρ ⊂ 1_{G_j}^G} 1/n_j.
+Ranks give  (rank form)  m_ρ(G_i) ≤ Σ_{j≠i} m_ρ(G_j).
+Consequences: (a) if the indices are pairwise distinct, every nontrivial constituent ρ of some 1_{G_i}^G must occur
+in at least two further permutation characters 1_{G_j}^G (a two-element support {i,j} would force 1/n_i ≤ 1/n_j and
+1/n_j ≤ 1/n_i). (b) For G cyclic this recovers the Mirsky–Newman theorem: with n_1<…<n_k and ρ a character of
+exact order n_k, ρ ⊂ 1_{G_i}^G iff n_k | n_i iff i = k, so the support is a singleton and the inequality reads
+|G_k| ≤ 0, a contradiction. The general case is NOT covered by (b): in non-cyclic groups the smallest subgroup
+need not be contained in the others and a 'private' constituent need not exist (see the experiment: in S4 only
+234 of 3453 distinct-index candidate tuples have a private constituent, yet all 3453 violate the norm form).
+Sharper vector form (also immediate): for every unit vector v ∈ V^{G_i},
+      |G_i| ≤ Σ_{j≠i} |G_j| ‖P_j v‖ .

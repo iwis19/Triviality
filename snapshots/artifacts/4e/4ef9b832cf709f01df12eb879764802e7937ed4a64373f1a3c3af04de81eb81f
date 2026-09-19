@@ -1,0 +1,7 @@
+import Mathlib
+
+/-- Kummer/Lucas sanity instance: n = 10 has base-3 digits 101, base-5 digits 20, base-7 digits 13,
+all below p/2, so C(20,10) = 184756 is coprime to 105. -/
+theorem centralBinom_ten_coprime_105 : Nat.Coprime (Nat.centralBinom 10) 105 := by
+  rw [Nat.centralBinom, Nat.coprime_iff_gcd_eq_one]
+  decide

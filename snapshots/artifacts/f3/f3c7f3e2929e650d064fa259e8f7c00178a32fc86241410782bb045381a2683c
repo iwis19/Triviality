@@ -1,0 +1,77 @@
+/* Adaptive certification of the lonely runner conjecture for N = 7 nonzero speeds
+ * (k = 8 runners) for ALL speed vectors whose second-largest speed v_6 <= B2.
+ *
+ * Reduction lemma (elementary; proof in the accompanying notes):
+ *   if v_N >= N * v_{N-1} and LRC holds for the N-1 speeds v_1..v_{N-1} with gap
+ *   1/N (a theorem for N-1 = 6, Barajas-Serra 2008), then ML(v) >= 1/(N+1).
+ *   Proof: pick t0 with ||t0 v_i|| >= 1/N (i < N).  For |t-t0| <= e := 1/(N(N+1)v_{N-1})
+ *   all ||t v_i|| >= 1/N - e v_{N-1} = 1/(N+1).  Runner N sweeps an arc of length
+ *   2 e v_N >= 2/(N+1), which cannot lie inside the open bad arc (-1/(N+1), 1/(N+1)).
+ *
+ * Hence it suffices to check v_{N-1} < v_N < N v_{N-1}.  For each such v we search a
+ * witness a/q (q in {v_i+v_j, 2 v_i}) with min_i ||a v_i/q|| >= 1/(N+1), exactly.
+ * gcd(v) > 1 is skipped (dilation invariance: v/g has an even smaller v_{N-1}).
+ *
+ * Build: gcc -O2 -o lrc7_adaptive lrc7_adaptive.c ; run: ./lrc7_adaptive N B2
+ */
+#include <stdio.h>
+#include <stdlib.h>
+
+static int N, B2;
+static long long total = 0, tight = 0, fails = 0, prefixes = 0;
+static int v[16];
+
+static int gcd(int a, int b) { while (b) { int t = a % b; a = b; b = t; } return a; }
+
+static int check(void) {
+    int best = 0;
+    int qs[200], nq = 0;
+    for (int i = 0; i < N; i++) {
+        qs[nq++] = 2 * v[i];
+        for (int j = i + 1; j < N; j++) qs[nq++] = v[i] + v[j];
+    }
+    for (int qi = 0; qi < nq; qi++) {
+        int q = qs[qi];
+        for (int a = 1; a < q; a++) {
+            int ok = 2;
+            for (int i = 0; i < N; i++) {
+                int r = (int)(((long long)a * v[i]) % q);
+                if (q - r < r) r = q - r;
+                long long lhs = (long long)(N + 1) * r;
+                if (lhs < q) { ok = 0; break; }
+                if (lhs == q) ok = 1;
+            }
+            if (ok == 2) return 2;
+            if (ok > best) best = ok;
+        }
+    }
+    return best;
+}
+
+static void rec(int idx, int start, int g) {
+    if (idx == N - 1) {
+        prefixes++;
+        int lo = v[N - 2] + 1, hi = N * v[N - 2] - 1;
+        for (int x = lo; x <= hi; x++) {
+            if (gcd(g, x) != 1) continue;
+            v[N - 1] = x;
+            total++;
+            int r = check();
+            if (r == 0) { fails++; printf("FAIL:"); for (int i = 0; i < N; i++) printf(" %d", v[i]); printf("\n"); fflush(stdout); }
+            else if (r == 1) { tight++; printf("TIGHT:"); for (int i = 0; i < N; i++) printf(" %d", v[i]); printf("\n"); fflush(stdout); }
+        }
+        return;
+    }
+    for (int x = start; x <= B2 - (N - 2 - idx); x++) {
+        v[idx] = x;
+        rec(idx + 1, x + 1, gcd(g, x));
+    }
+}
+
+int main(int argc, char **argv) {
+    N = atoi(argv[1]); B2 = atoi(argv[2]);
+    rec(0, 1, 0);
+    printf("N=%d, all v with v_{N-1}<=%d: prefixes=%lld, checked vectors (v_{N-1}<v_N<N v_{N-1}, gcd=1)=%lld, tight=%lld, failures=%lld\n",
+           N, B2, prefixes, total, tight, fails);
+    return 0;
+}

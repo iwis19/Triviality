@@ -1,0 +1,63 @@
+"""Exhaustive SAT check: for a given odd L, is there a covering of Z/L by residue
+classes a_d mod d, d | L, d > 1, each modulus used at most once (distinct moduli)?
+Any distinct odd covering system with lcm of moduli L' | L would give a SAT
+solution, so UNSAT for L rules out all odd distinct coverings whose lcm divides L.
+
+Necessary density filter: sum_{d|L, d>1} 1/d = sigma(L)/L - 1 >= 1, i.e. L is an
+odd abundant (or perfect) number. Smallest such L is 945 = 3^3*5*7.
+"""
+import sys, time
+from sympy import divisors, divisor_sigma, factorint
+from pysat.solvers import Cadical153
+from pysat.card import CardEnc, EncType
+from pysat.formula import IDPool
+
+
+def check(L, time_budget=None):
+    ds = [d for d in divisors(L) if d > 1]
+    pool = IDPool()
+    var = {(d, r): pool.id(('x', d, r)) for d in ds for r in range(d)}
+    clauses = []
+    # at most one residue per modulus
+    for d in ds:
+        lits = [var[(d, r)] for r in range(d)]
+        enc = CardEnc.atmost(lits=lits, bound=1, vpool=pool, encoding=EncType.seqcounter)
+        clauses.extend(enc.clauses)
+    # every n in Z/L covered
+    for n in range(L):
+        clauses.append([var[(d, n % d)] for d in ds])
+    # symmetry breaking: translation. Pick the largest modulus L; if the class
+    # mod L is used WLOG... not always used, so instead break on modulus p =
+    # smallest prime factor: if used, residue 0.  (Translation by t maps a
+    # solution to a solution, so we may assume a_p = 0 whenever p is used.)
+    p = min(factorint(L))
+    for r in range(1, p):
+        clauses.append([-var[(p, r)]])
+    with Cadical153(bootstrap_with=clauses) as s:
+        t0 = time.time()
+        res = s.solve()
+        dt = time.time() - t0
+        model = None
+        if res:
+            m = set(l for l in s.get_model() if l > 0)
+            model = {d: r for (d, r), v in var.items() if v in m}
+        return res, dt, model
+
+
+def main(bound):
+    out = []
+    for L in range(3, bound + 1, 2):
+        if divisor_sigma(L) < 2 * L:
+            continue
+        res, dt, model = check(L)
+        f = dict(factorint(L))
+        out.append((L, f, res, dt))
+        print(f"L={L} {f} sigma/L-1={float(divisor_sigma(L))/L-1:.4f} "
+              f"SAT={res} t={dt:.2f}s", flush=True)
+        if res:
+            print("  COVERING FOUND:", model, flush=True)
+    return out
+
+
+if __name__ == '__main__':
+    main(int(sys.argv[1]) if len(sys.argv) > 1 else 20000)

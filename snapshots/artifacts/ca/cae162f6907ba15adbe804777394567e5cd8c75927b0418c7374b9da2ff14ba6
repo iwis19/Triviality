@@ -1,0 +1,149 @@
+#!/usr/bin/env python3
+"""Sharpened one-prime peeling (own reasoning, see idea I1).
+
+Setting: L = p^a * M, gcd(p,M)=1.  A system uses each divisor m>1 of L at most once.
+Columns = residues mod M.  Let U = set of columns not covered by the moduli dividing M
+(|U| >= u(M)).  Every residue in a column x in U can only be covered by moduli d p^j
+(d | M, j>=1) whose class hits column x, i.e. x = r_{d,j} (mod d).
+  * d = 1 : the pure powers p^j cover at most g = (p^a-1)/(p-1) residues in EVERY column.
+  * d > 1 : modulus d p^j covers p^{a-j} residues in each of the |U ∩ C_{d,j}| columns it hits,
+            |U ∩ C_{d,j}| <= min(M/d, |U|).
+Hence  u(p^a M) >= min_{U >= u(M)} [ (p^a - g) U - g * sum_{d|M, d>1} min(M/d, U) ]  =: peel(p^a, M, u(M)).
+The crude version of claim 949c4495 uses min(M/d,U) <= M/d, i.e. loss (sigma(M)-M) g.
+
+thr(p^a, M): the smallest value u0 such that peel(p^a, M, u0) >= 1, i.e. the exact
+lower bound on u(M) needed to certify u(p^a M) > 0 by this single peeling step.
+"""
+import sys
+from math import gcd
+from sympy import factorint, divisors, divisor_sigma
+
+def peel(pa, M, uM):
+    p = list(factorint(pa).keys())[0]
+    a = factorint(pa)[p]
+    g = (pa - 1) // (p - 1)
+    ds = [d for d in divisors(M) if d > 1]
+    best = None
+    # bound as a function of U is piecewise linear; minimise over U in [uM, M]
+    # slope = (pa-g) - g*#{d: M/d > U}; check breakpoints
+    cands = {uM, M} | {M // d for d in ds if M // d >= uM}
+    for U in sorted(cands):
+        v = (pa - g) * U - g * sum(min(M // d, U) for d in ds)
+        if best is None or v < best[0]:
+            best = (v, U)
+    return best
+
+def thr(pa, M):
+    p = list(factorint(pa).keys())[0]
+    g = (pa - 1) // (p - 1)
+    ds = [d for d in divisors(M) if d > 1]
+    lo, hi = 0, M
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if peel(pa, M, mid)[0] >= 1:
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo
+
+def crude_thr(pa, M):
+    p = list(factorint(pa).keys())[0]
+    g = (pa - 1) // (p - 1)
+    loss = (int(divisor_sigma(M)) - M) * g
+    # (pa-g) u - loss >= 1
+    return -(-(loss + 1) // (pa - g))
+
+if __name__ == "__main__":
+    L = int(sys.argv[1])
+    f = factorint(L)
+    print(f"L = {L} = {f}")
+    for p, a in f.items():
+        pa = p ** a
+        M = L // pa
+        print(f"  peel {pa}: M={M}, sigma(M)-M={int(divisor_sigma(M))-M}, abundance lb u(M)>={max(0, 2*M-int(divisor_sigma(M)))}, "
+              f"need u(M) >= {thr(pa, M)}  (crude: {crude_thr(pa, M)})")
+
+
+# ===== qlb.py =====
+#!/usr/bin/env python3
+"""Quantitative recursive lower bound qlb(L) <= u(L) for odd L (own reasoning, idea I1).
+
+qlb(L) = max( abundance bound  L - (sigma(L) - L),
+              max over p^a || L of  peel(p^a, L/p^a, qlb(L/p^a)) ,
+              exact table value if available )
+where peel is the sharpened single-prime peeling of peel.py.
+Usage: python3 qlb.py L [L ...]   or   python3 qlb.py scan BOUND
+"""
+import sys
+from functools import lru_cache
+from sympy import factorint, divisors, divisor_sigma
+from peel import peel
+
+EXACT = {15: 7, 21: 11, 45: 16, 63: 26, 105: 35, 135: 43, 165: 63, 189: 71, 195: 77}
+
+@lru_cache(maxsize=None)
+def qlb(L, trace=False):
+    if L == 1:
+        return 1
+    s = int(divisor_sigma(L))
+    best = max(0, L - (s - L))
+    how = "abundance"
+    if L in EXACT:
+        if EXACT[L] > best:
+            best, how = EXACT[L], "exact"
+    for p, a in factorint(L).items():
+        pa = p ** a
+        M = L // pa
+        v = peel(pa, M, qlb(M))[0]
+        if v > best:
+            best, how = v, f"peel {pa} (qlb({M})={qlb(M)})"
+    if trace:
+        print(f"qlb({L}) = {best}  via {how}")
+    return best
+
+if __name__ == "__main__":
+    if sys.argv[1] == "scan":
+        B = int(sys.argv[2])
+        bad = []
+        n_ab = 0
+        for L in range(3, B + 1, 2):
+            if int(divisor_sigma(L)) >= 2 * L:  # odd abundant
+                n_ab += 1
+                if qlb(L) < 1:
+                    bad.append(L)
+        print(f"odd abundant L <= {B}: {n_ab}; uncertified by qlb: {len(bad)}")
+        print(bad[:60])
+    else:
+        for L in map(int, sys.argv[1:]):
+            print(f"--- {L} = {factorint(L)}")
+            for M in sorted(divisors(L)):
+                if M > 1 and M % 2:
+                    qlb(M, trace=True)
+
+
+# ===== qlb2.py (sharp vs crude comparison) =====
+import sys
+from functools import lru_cache
+from sympy import factorint, divisors, divisor_sigma
+from peel import peel
+
+def make(use_exact, crude):
+    EXACT = {15: 7, 21: 11, 45: 16, 63: 26, 105: 35, 135: 43, 165: 63, 189: 71, 195: 77} if use_exact else {}
+    @lru_cache(maxsize=None)
+    def q(L):
+        if L == 1: return 1
+        s = int(divisor_sigma(L)); best = max(0, 2*L - s)
+        if L in EXACT: best = max(best, EXACT[L])
+        for p, a in factorint(L).items():
+            pa = p**a; M = L//pa; g = (pa-1)//(p-1)
+            if crude:
+                v = (pa-g)*q(M) - (int(divisor_sigma(M))-M)*g
+            else:
+                v = peel(pa, M, q(M))[0]
+            best = max(best, v)
+        return best
+    return q
+qs = {"sharp+exact": make(True, False), "sharp": make(False, False), "crude+exact": make(True, True), "crude": make(False, True)}
+Ls = [int(x) for x in sys.argv[1:]] or [945, 3465, 45045, 135135, 155925, 176715, 197505, 208845, 225225]
+for L in Ls:
+    print(L, {k: q(L) for k, q in qs.items()})

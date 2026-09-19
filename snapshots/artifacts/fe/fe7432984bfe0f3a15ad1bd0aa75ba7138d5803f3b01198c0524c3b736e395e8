@@ -1,0 +1,37 @@
+"""Probabilistic model for k=3 square ratios (Erdos #686, square N).
+k=3:  F_3(t) = (t+2)^3 - (t+2).  Put X=m+2, Y=n+2 (Y>=2, X>=Y+3).  Want (X^3-X)/(Y^3-Y) = a^2 integer square.
+Model: for fixed Y with D = Y^3-Y, the residues X mod D with D | X^3-X number rho(D) (exact, via CRT),
+and conditional on integrality the quotient Q ~ X^3/D is a perfect square with 'probability' 1/(2 sqrt Q).
+Expected count  E[Xmax] = sum_Y sum_{X=Y+3}^{Xmax} (rho(D)/D) * sqrt(D)/(2 X^{3/2})   (integral approximation in X).
+Compare with the exhaustive data: admissible integer-square ratios with k=3 and m <= 1e8 (from sqhash + analyze_pairs).
+"""
+import sympy as sp
+from math import sqrt
+
+def rho(D):
+    # number of solutions of x^3 = x mod D
+    r = 1
+    for p, e in sp.factorint(D).items():
+        if p == 2:
+            r *= {1: 2, 2: 3}.get(e, 5)
+        else:
+            r *= 3
+    return r
+
+def expected(Ymax, Xmax):
+    tot = 0.0
+    for Y in range(2, Ymax+1):
+        D = Y**3 - Y
+        X0 = Y + 3
+        if X0 > Xmax: break
+        # sum_{X=X0}^{Xmax} X^{-3/2}  ~  2/sqrt(X0-0.5) - 2/sqrt(Xmax+0.5)
+        s = 2/sqrt(X0-0.5) - 2/sqrt(Xmax+0.5)
+        tot += rho(D)/sqrt(D) * s / 2
+    return tot
+
+if __name__ == "__main__":
+    for Xmax in [10**4, 10**6, 10**8, 10**12, 10**30]:
+        print(f"Xmax={Xmax:.0e}: expected # admissible k=3 integer-square ratios (Y<=3000): {expected(3000, Xmax):.2f}")
+    # tail in Y: rho(D) <= 3^omega(D)*5/3 ; sum_{Y>3000} rho(D)/Y^2 ~ small
+    print("tail Y>3000 estimate (crude, rho~3^{omega}):", sum(rho(Y**3-Y)/sqrt(Y**3-Y)*2/sqrt(Y+2.5)/2 for Y in range(3001, 6000)))
+    print("observed (sqhash, m<=1e8): 9 admissible integer-square k=3 ratios; all have n<=336, m<=114241; none with m in (2e6,1e8]")

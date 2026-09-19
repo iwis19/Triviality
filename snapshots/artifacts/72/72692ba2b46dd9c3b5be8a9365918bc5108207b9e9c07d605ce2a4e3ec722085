@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""
+Closed form for the pairwise overlap (my derivation, checked here against the interval computation):
+for speeds v_i = g a, v_j = g b with gcd(a,b)=1, a<b, and threshold d,
+   mu(B_i cap B_j) = (1/(ab)) * sum_{m in Z} max(0, min(2 d a, 2 d b, d(a+b) - |m|)).
+Reason: t -> s = g t (mod 1) is measure preserving and ||g a t|| = ||a s||; the a intervals
+centred at p/a (half-width d/a) and b intervals centred at q/b (half-width d/b) have centre
+distance |pb - qa|/(ab), and pb - qa runs over every residue mod ab exactly once.
+Consequences: (i) the overlap depends only on gcd and the ratio, as the idea asserts;
+(ii) overlap >= 2d/b  (m=0 term); (iii) overlap can be < (2d)^2 (e.g. a=1,b=2,d=1/3: 1/3 < 4/9),
+so the bad events are NOT always positively correlated.
+Also: adversarial hill-climb to minimise the Hunter threshold for n=7 speeds in [1..Nmax].
+"""
+import random, itertools
+from fractions import Fraction
+from math import gcd
+from lrc_bonferroni import bad_intervals, intersect, measure, lcm_list, bounds_at, best_threshold, exact_ML
+
+def closed_form(vi, vj, d):
+    g = gcd(vi, vj); a, b = sorted((vi//g, vj//g))
+    x = d*(a+b); cap = 2*d*a
+    s = Fraction(0); m = 0
+    while x - m > 0:
+        term = min(cap, x - m)
+        s += term if m == 0 else 2*term
+        m += 1
+    return s/(a*b)
+
+def interval_overlap(vi, vj, d):
+    L = lcm_list([vi, vj]); M = d.denominator; D = M*L; dnum = d.numerator*L
+    return Fraction(measure(intersect(bad_intervals(vi, dnum, D), bad_intervals(vj, dnum, D))), D)
+
+def check_closed_form():
+    random.seed(1); bad = 0; cnt = 0
+    for _ in range(3000):
+        vi, vj = random.sample(range(1, 80), 2)
+        d = Fraction(random.randint(1, 500), 1000)
+        cnt += 1
+        if closed_form(vi, vj, d) != interval_overlap(vi, vj, d):
+            bad += 1; print("MISMATCH", vi, vj, d, closed_form(vi, vj, d), interval_overlap(vi, vj, d))
+    print(f"closed form vs interval computation: {cnt} random (v_i,v_j,d) tested, {bad} mismatches")
+    # negative correlation examples
+    neg = 0
+    for _ in range(3000):
+        vi, vj = random.sample(range(1, 80), 2); d = Fraction(random.randint(1, 250), 1000)
+        if closed_form(vi, vj, d) < 4*d*d: neg += 1
+    print(f"overlap < (2d)^2 (negative correlation) in {neg}/3000 random cases")
+
+def adversarial(n=7, Nmax=120, iters=400, seed=3, M=2520*8):
+    random.seed(seed)
+    def score(v): return best_threshold(v, M, 1)
+    v = tuple(sorted(random.sample(range(1, Nmax+1), n)))
+    while gcd(*v) != 1: v = tuple(sorted(random.sample(range(1, Nmax+1), n)))
+    s = score(v); best = (s, v)
+    for it in range(iters):
+        w = list(v); i = random.randrange(n)
+        w[i] = random.randint(1, Nmax)
+        w = tuple(sorted(set(w)))
+        if len(w) != n or gcd(*w) != 1: continue
+        sw = score(w)
+        if sw <= s:
+            v, s = w, sw
+            if s < best[0]: best = (s, v)
+    dU = Fraction(1, 2*n)
+    print(f"adversarial n={n} Nmax={Nmax}: min Hunter threshold {best[0]} ~ {float(best[0]):.6f} at v={best[1]}; "
+          f"gain*n^2 = {float((best[0]-dU)*n*n):.4f}; ML={exact_ML(best[1])}")
+
+if __name__ == '__main__':
+    check_closed_form()
+    for seed in (3, 4):
+        adversarial(seed=seed)
+    adversarial(n=4, Nmax=200, iters=600, seed=5)
+
+
+# ---- run log ----
+closed form vs interval computation: 3000 random (v_i,v_j,d) tested, 0 mismatches
+overlap < (2d)^2 (negative correlation) in 1376/3000 random cases
+adversarial n=7 Nmax=120: min Hunter threshold 1/12 ~ 0.083333 at v=(17, 31, 48, 70, 76, 78, 118); gain*n^2 = 0.5833; ML=24/83
+adversarial n=7 Nmax=120: min Hunter threshold 1/12 ~ 0.083333 at v=(34, 62, 67, 100, 103, 106, 118); gain*n^2 = 0.5833; ML=1/3
+adversarial n=4 Nmax=200: min Hunter threshold 3359/20160 ~ 0.166617 at v=(36, 47, 96, 105); gain*n^2 = 0.6659; ML=59/152

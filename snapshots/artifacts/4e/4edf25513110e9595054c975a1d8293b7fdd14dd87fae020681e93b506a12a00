@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""Exact / bounded computation of u(L) = min number of uncovered residues mod L
+over systems that use each divisor m>1 of L at most once (one residue class per modulus).
+
+Encoding: variable x[m][r] (m | L, m>1, 0<=r<m): "class r mod m is used".
+At most one r per m (pairwise / sequential counter).  Residue t mod L is covered
+iff some x[m][t mod m] is true.  Uncovered indicator y[t] >= 1 - OR(...).
+Decision mode:  is u(L) <= k ?   (k=0: does a covering exist)
+Uses CaDiCaL via python-sat; cardinality via ITotalizer.
+"""
+import sys, time
+from math import gcd
+from pysat.solvers import Cadical153
+from pysat.card import ITotalizer
+
+def divisors(n):
+    return [d for d in range(2, n + 1) if n % d == 0]
+
+def build(L, k, symmetry=True):
+    ds = divisors(L)
+    var = {}
+    nv = 0
+    for m in ds:
+        for r in range(m):
+            nv += 1
+            var[(m, r)] = nv
+    clauses = []
+    # at most one class per modulus (ladder encoding)
+    for m in ds:
+        xs = [var[(m, r)] for r in range(m)]
+        # sequential counter
+        s = []
+        for i in range(m - 1):
+            nv += 1
+            s.append(nv)
+        for i in range(m):
+            if i < m - 1:
+                clauses.append([-xs[i], s[i]])
+            if i > 0:
+                clauses.append([-xs[i], -s[i - 1]])
+                if i < m - 1:
+                    clauses.append([-s[i - 1], s[i]])
+    # y[t] : residue t uncovered
+    ys = []
+    for t in range(L):
+        nv += 1
+        y = nv
+        ys.append(y)
+        clauses.append([y] + [var[(m, t % m)] for m in ds])
+    if symmetry:
+        clauses.append([var[(L, 0)]])  # translate so that class of modulus L is 0
+    return ds, var, nv, clauses, ys
+
+def decide(L, k, timeout=None, symmetry=True):
+    ds, var, nv, clauses, ys = build(L, k, symmetry)
+    s = Cadical153(bootstrap_with=clauses)
+    if k < len(ys):
+        tot = ITotalizer(lits=ys, ubound=k, top_id=nv)
+        for c in tot.cnf.clauses:
+            s.add_clause(c)
+        s.add_clause([-tot.rhs[k]])  # sum(ys) <= k
+    t0 = time.time()
+    res = s.solve()
+    dt = time.time() - t0
+    model = None
+    if res:
+        mm = set(l for l in s.get_model() if l > 0)
+        model = sorted((m, r) for (m, r), v in var.items() if v in mm)
+    s.delete()
+    return res, dt, model
+
+def exact(L, lo, hi):
+    """binary search for u(L) in [lo, hi]; u(L) <= hi assumed (hi may be L)."""
+    while lo < hi:
+        mid = (lo + hi) // 2
+        res, dt, _ = decide(L, mid)
+        print(f"  L={L}: u<= {mid}? {res} ({dt:.1f}s)", flush=True)
+        if res:
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo
+
+if __name__ == "__main__":
+    L = int(sys.argv[1])
+    if len(sys.argv) > 2 and sys.argv[2] == "cover":
+        res, dt, model = decide(L, 0)
+        print(f"L={L} covering exists? {res} ({dt:.1f}s)")
+        if model:
+            print(model)
+    else:
+        lo = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+        hi = int(sys.argv[3]) if len(sys.argv) > 3 else L
+        u = exact(L, lo, hi)
+        print(f"u({L}) = {u}")

@@ -1,0 +1,149 @@
+import Mathlib
+import MathLab.Basic
+
+/-!
+# Erdős #1142: the candidate set used by the wheel search
+
+Erdős #1142 asks whether there are (infinitely many, or any) `n > 105` such that `n - 2^k`
+is prime for every `1 < 2^k < n`.
+
+This file formalizes the two elementary facts that reduce the search in a dyadic block
+`2^K < n ≤ 2^(K+1)` to a small candidate set:
+
+* `erdos1142_eq_of_modEq` (claim C9): if `p` is a prime with `p < 2^(K-1)` and `n ≡ 2^k (mod p)`
+  for some `1 ≤ k ≤ K`, then necessarily `n = 2^K + p`.  So, apart from this single exception,
+  `n` avoids all residue classes `2^k mod p`, `1 ≤ k ≤ K`.
+* `erdos1142_wheel_dvd` (candidate set of the search): with
+  `S(K) = {p ≤ K+1 prime : 2 is a primitive root mod p}` and `M_S(K) = ∏ S(K)`, every `n`
+  with the property and `n > 2^K + K + 1` is a multiple of `M_S(K)`.
+  Hence (`erdos1142_candidate`) in the block `2^K < n` either `n ≤ 2^K + K + 1` or `M_S(K) ∣ n`.
+-/
+
+/-- The property in Erdős #1142: `n - 2^k` is prime for every `k ≥ 1` with `2^k < n`. -/
+def Erdos1142Prop (n : ℕ) : Prop := ∀ k : ℕ, 1 ≤ k → 2 ^ k < n → Nat.Prime (n - 2 ^ k)
+
+lemma not_prime_of_dvd_of_lt {p m : ℕ} (hp : p.Prime) (hdvd : p ∣ m) (hlt : p < m) :
+    ¬ m.Prime := by
+  intro hm
+  rcases (Nat.dvd_prime hm).1 hdvd with h | h
+  · exact hp.one_lt.ne' h
+  · exact hlt.ne h
+
+lemma erdos1142_aux {n p k : ℕ} (hp : p.Prime) (h : Erdos1142Prop n) (hk : 1 ≤ k)
+    (hlt : 2 ^ k + p < n) (hdvd : p ∣ n - 2 ^ k) : False :=
+  not_prime_of_dvd_of_lt hp hdvd (by omega) (h k hk (by omega))
+
+/-- Claim C9 (per-prime exception lemma). Let `p` be a prime, `2^K < n`, `p < 2^(K-1)`, and
+suppose `n` has the Erdős #1142 property. If `n ≡ 2^k (mod p)` for some `1 ≤ k ≤ K`, then
+`n = 2^K + p`. -/
+theorem erdos1142_eq_of_modEq (p K n k : ℕ) (hp : p.Prime) (hn : 2 ^ K < n)
+    (hpK : p < 2 ^ (K - 1)) (h : Erdos1142Prop n) (hk1 : 1 ≤ k) (hkK : k ≤ K)
+    (hmod : n ≡ 2 ^ k [MOD p]) : n = 2 ^ K + p := by
+  have hpow : 2 ^ k ≤ 2 ^ K := Nat.pow_le_pow_right (by norm_num) hkK
+  have hdvd : p ∣ n - 2 ^ k := (Nat.modEq_iff_dvd' (by omega)).1 hmod.symm
+  have hprime : (n - 2 ^ k).Prime := h k hk1 (by omega)
+  have heq : p = n - 2 ^ k := by
+    rcases (Nat.dvd_prime hprime).1 hdvd with h1 | h1
+    · exact absurd h1 hp.one_lt.ne'
+    · exact h1
+  -- if `k < K` then `n = 2^k + p ≤ 2^(K-1) + p < 2^K`, contradiction
+  rcases Nat.lt_or_ge k K with hlt | hge
+  · exfalso
+    have hk' : 2 ^ k ≤ 2 ^ (K - 1) := Nat.pow_le_pow_right (by norm_num) (by omega)
+    have h2K : 2 ^ K = 2 * 2 ^ (K - 1) := by
+      rw [← pow_succ']; congr 1; omega
+    omega
+  · have hkK' : k = K := le_antisymm hkK hge
+    subst hkK'
+    omega
+
+/-- Reformulation of C9 as a residue-avoidance statement: unless `n = 2^K + p`, `n` avoids every
+class `2^k mod p` with `1 ≤ k ≤ K`. -/
+theorem erdos1142_not_modEq (p K n : ℕ) (hp : p.Prime) (hn : 2 ^ K < n)
+    (hpK : p < 2 ^ (K - 1)) (h : Erdos1142Prop n) (hne : n ≠ 2 ^ K + p) :
+    ∀ k, 1 ≤ k → k ≤ K → ¬ n ≡ 2 ^ k [MOD p] :=
+  fun k hk1 hkK hmod => hne (erdos1142_eq_of_modEq p K n k hp hn hpK h hk1 hkK hmod)
+
+/-- If `2` is a primitive root modulo the prime `p` (i.e. `orderOf (2 : ZMod p) = p - 1`),
+then every `n > 2^(p-1) + p` with the Erdős #1142 property is divisible by `p`. -/
+theorem dvd_of_erdos1142_of_primitiveRoot (p : ℕ) [hp : Fact p.Prime]
+    (hord : orderOf (2 : ZMod p) = p - 1) (n : ℕ) (hn : 2 ^ (p - 1) + p < n)
+    (h : Erdos1142Prop n) : p ∣ n := by
+  by_contra hpn
+  have hp1 : 1 ≤ p - 1 := by have := hp.out.two_le; omega
+  have hne : (n : ZMod p) ≠ 0 := by
+    rwa [Ne, ZMod.natCast_eq_zero_iff]
+  have h2 : (2 : ZMod p) ≠ 0 := by
+    intro h20
+    rw [h20, orderOf_zero] at hord
+    omega
+  set u : (ZMod p)ˣ := Units.mk0 (2 : ZMod p) h2 with hu
+  set v : (ZMod p)ˣ := Units.mk0 (n : ZMod p) hne with hv
+  have hordu : orderOf u = p - 1 := by
+    rw [← orderOf_units, hu, Units.val_mk0, hord]
+  have htop : Subgroup.zpowers u = ⊤ := by
+    apply Subgroup.eq_top_of_card_eq
+    rw [Nat.card_zpowers, hordu, Nat.card_eq_fintype_card, ZMod.card_units]
+  have hvmem : v ∈ Subgroup.zpowers u := by rw [htop]; exact Subgroup.mem_top v
+  rw [← mem_powers_iff_mem_zpowers, Submonoid.mem_powers_iff] at hvmem
+  obtain ⟨m, hm⟩ := hvmem
+  set k : ℕ := if m % (p - 1) = 0 then p - 1 else m % (p - 1) with hk
+  have hk1 : 1 ≤ k := by
+    rw [hk]; split_ifs with h0
+    · exact hp1
+    · omega
+  have hkle : k ≤ p - 1 := by
+    rw [hk]; split_ifs with h0
+    · exact le_rfl
+    · exact (Nat.mod_lt _ (by omega)).le
+  have huk : u ^ k = v := by
+    rw [hk]; split_ifs with h0
+    · rw [← hordu, pow_orderOf_eq_one, ← hm, ← pow_mod_orderOf, hordu, h0, pow_zero]
+    · rw [← hm, ← hordu, pow_mod_orderOf]
+  have hcast : ((2 ^ k : ℕ) : ZMod p) = (n : ZMod p) := by
+    have := congrArg Units.val huk
+    rw [Units.val_pow_eq_pow_val, hu, hv, Units.val_mk0, Units.val_mk0] at this
+    rw [Nat.cast_pow, Nat.cast_ofNat]
+    exact this
+  have hmodeq : 2 ^ k ≡ n [MOD p] := (ZMod.natCast_eq_natCast_iff _ _ _).1 hcast
+  have hpow : 2 ^ k ≤ 2 ^ (p - 1) := Nat.pow_le_pow_right (by norm_num) hkle
+  have hdvd : p ∣ n - 2 ^ k := (Nat.modEq_iff_dvd' (by omega)).1 hmodeq
+  exact erdos1142_aux hp.out h hk1 (by omega) hdvd
+
+/-- `S(K)`: the primes `p ≤ K + 1` for which `2` is a primitive root modulo `p`. -/
+noncomputable def erdos1142WheelPrimes (K : ℕ) : Finset ℕ :=
+  (Finset.range (K + 2)).filter (fun p => p.Prime ∧ orderOf (2 : ZMod p) = p - 1)
+
+/-- `M_S(K) = ∏_{p ∈ S(K)} p`, the wheel modulus of block `K`. -/
+noncomputable def erdos1142Wheel (K : ℕ) : ℕ := ∏ p ∈ erdos1142WheelPrimes K, p
+
+lemma mem_erdos1142WheelPrimes {K p : ℕ} :
+    p ∈ erdos1142WheelPrimes K ↔ p ≤ K + 1 ∧ p.Prime ∧ orderOf (2 : ZMod p) = p - 1 := by
+  unfold erdos1142WheelPrimes
+  rw [Finset.mem_filter, Finset.mem_range]
+  constructor
+  · rintro ⟨h1, h2⟩; exact ⟨by omega, h2⟩
+  · rintro ⟨h1, h2⟩; exact ⟨by omega, h2⟩
+
+/-- Every `n > 2^K + K + 1` with the Erdős #1142 property is a multiple of the wheel modulus
+`M_S(K)`. -/
+theorem erdos1142_wheel_dvd (K n : ℕ) (hn : 2 ^ K + K + 1 < n) (h : Erdos1142Prop n) :
+    erdos1142Wheel K ∣ n := by
+  unfold erdos1142Wheel
+  apply Finset.prod_primes_dvd
+  · intro p hp
+    exact Nat.prime_iff.1 (mem_erdos1142WheelPrimes.1 hp).2.1
+  · intro p hp
+    obtain ⟨hpK, hprime, hord⟩ := mem_erdos1142WheelPrimes.1 hp
+    haveI : Fact p.Prime := ⟨hprime⟩
+    have hpow : 2 ^ (p - 1) ≤ 2 ^ K := Nat.pow_le_pow_right (by norm_num) (by omega)
+    exact dvd_of_erdos1142_of_primitiveRoot p hord n (by omega) h
+
+/-- The candidate set of the wheel search: a solution `n` is either at most `2^K + K + 1` (so, in
+the block `2^K < n`, one of the `K + 1` integers in `(2^K, 2^K + K + 1]`) or a multiple of
+`M_S(K)`. -/
+theorem erdos1142_candidate (K n : ℕ) (h : Erdos1142Prop n) :
+    n ≤ 2 ^ K + K + 1 ∨ erdos1142Wheel K ∣ n := by
+  rcases Nat.lt_or_ge (2 ^ K + K + 1) n with hlt | hge
+  · exact Or.inr (erdos1142_wheel_dvd K n hlt h)
+  · exact Or.inl hge

@@ -1,0 +1,649 @@
+{
+ "certify_results": {
+  "b3_L1_same_sign": {
+   "survivors": 0,
+   "rounds": 23,
+   "max_boxes_seen": 805,
+   "hist": [
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     2,
+     4
+    ],
+    [
+     3,
+     8
+    ],
+    [
+     4,
+     16
+    ],
+    [
+     5,
+     32
+    ],
+    [
+     6,
+     64
+    ],
+    [
+     7,
+     128
+    ],
+    [
+     8,
+     160
+    ],
+    [
+     9,
+     316
+    ],
+    [
+     10,
+     267
+    ],
+    [
+     11,
+     475
+    ],
+    [
+     12,
+     805
+    ],
+    [
+     13,
+     769
+    ],
+    [
+     14,
+     654
+    ],
+    [
+     15,
+     297
+    ],
+    [
+     16,
+     72
+    ],
+    [
+     17,
+     68
+    ],
+    [
+     18,
+     46
+    ],
+    [
+     19,
+     29
+    ],
+    [
+     20,
+     8
+    ],
+    [
+     21,
+     2
+    ],
+    [
+     22,
+     0
+    ]
+   ],
+   "time_s": 0.05944108963012695
+  },
+  "b3_L2_equator": {
+   "survivors": 0,
+   "rounds": 21,
+   "max_boxes_seen": 202,
+   "hist": [
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     2,
+     4
+    ],
+    [
+     3,
+     8
+    ],
+    [
+     4,
+     8
+    ],
+    [
+     5,
+     16
+    ],
+    [
+     6,
+     32
+    ],
+    [
+     7,
+     64
+    ],
+    [
+     8,
+     64
+    ],
+    [
+     9,
+     128
+    ],
+    [
+     10,
+     78
+    ],
+    [
+     11,
+     126
+    ],
+    [
+     12,
+     184
+    ],
+    [
+     13,
+     202
+    ],
+    [
+     14,
+     98
+    ],
+    [
+     15,
+     16
+    ],
+    [
+     16,
+     12
+    ],
+    [
+     17,
+     4
+    ],
+    [
+     18,
+     4
+    ],
+    [
+     19,
+     4
+    ],
+    [
+     20,
+     0
+    ]
+   ],
+   "time_s": 0.0420534610748291
+  },
+  "b5_L1_same_sign": {
+   "survivors": 0,
+   "rounds": 29,
+   "max_boxes_seen": 7106,
+   "hist": [
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     2,
+     4
+    ],
+    [
+     3,
+     8
+    ],
+    [
+     4,
+     16
+    ],
+    [
+     5,
+     32
+    ],
+    [
+     6,
+     64
+    ],
+    [
+     7,
+     128
+    ],
+    [
+     8,
+     255
+    ],
+    [
+     9,
+     482
+    ],
+    [
+     10,
+     736
+    ],
+    [
+     11,
+     1370
+    ],
+    [
+     12,
+     2520
+    ],
+    [
+     13,
+     4349
+    ],
+    [
+     14,
+     4257
+    ],
+    [
+     15,
+     7106
+    ],
+    [
+     16,
+     2022
+    ],
+    [
+     17,
+     3350
+    ],
+    [
+     18,
+     5682
+    ],
+    [
+     19,
+     6324
+    ],
+    [
+     20,
+     2206
+    ],
+    [
+     21,
+     1602
+    ],
+    [
+     22,
+     268
+    ],
+    [
+     23,
+     304
+    ],
+    [
+     24,
+     406
+    ],
+    [
+     25,
+     450
+    ],
+    [
+     26,
+     25
+    ],
+    [
+     27,
+     4
+    ],
+    [
+     28,
+     0
+    ]
+   ],
+   "time_s": 0.1960892677307129
+  },
+  "b5_L2_equator": {
+   "survivors": 0,
+   "rounds": 26,
+   "max_boxes_seen": 3690,
+   "hist": [
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     2,
+     4
+    ],
+    [
+     3,
+     8
+    ],
+    [
+     4,
+     16
+    ],
+    [
+     5,
+     32
+    ],
+    [
+     6,
+     64
+    ],
+    [
+     7,
+     128
+    ],
+    [
+     8,
+     246
+    ],
+    [
+     9,
+     452
+    ],
+    [
+     10,
+     630
+    ],
+    [
+     11,
+     1116
+    ],
+    [
+     12,
+     2048
+    ],
+    [
+     13,
+     2040
+    ],
+    [
+     14,
+     3690
+    ],
+    [
+     15,
+     1174
+    ],
+    [
+     16,
+     1940
+    ],
+    [
+     17,
+     3280
+    ],
+    [
+     18,
+     1454
+    ],
+    [
+     19,
+     820
+    ],
+    [
+     20,
+     166
+    ],
+    [
+     21,
+     200
+    ],
+    [
+     22,
+     272
+    ],
+    [
+     23,
+     38
+    ],
+    [
+     24,
+     4
+    ],
+    [
+     25,
+     0
+    ]
+   ],
+   "time_s": 0.10718560218811035
+  }
+ },
+ "certify_all_b": {
+  "1": {
+   "L1": 0,
+   "L1_maxboxes": 0,
+   "L1_rounds": 1,
+   "L2": 0,
+   "L2_maxboxes": 0,
+   "L2_rounds": 1
+  },
+  "2": {
+   "L1": 0,
+   "L1_maxboxes": 16,
+   "L1_rounds": 11,
+   "L2": 0,
+   "L2_maxboxes": 0,
+   "L2_rounds": 1
+  },
+  "3": {
+   "L1": 0,
+   "L1_maxboxes": 805,
+   "L1_rounds": 23,
+   "L2": 0,
+   "L2_maxboxes": 202,
+   "L2_rounds": 21
+  },
+  "4": {
+   "L1": 0,
+   "L1_maxboxes": 824,
+   "L1_rounds": 23,
+   "L2": 0,
+   "L2_maxboxes": 188,
+   "L2_rounds": 19
+  },
+  "5": {
+   "L1": 0,
+   "L1_maxboxes": 7106,
+   "L1_rounds": 29,
+   "L2": 0,
+   "L2_maxboxes": 3690,
+   "L2_rounds": 26
+  },
+  "6": {
+   "L1": 0,
+   "L1_maxboxes": 16,
+   "L1_rounds": 11,
+   "L2": 0,
+   "L2_maxboxes": 0,
+   "L2_rounds": 1
+  },
+  "7": {
+   "L1": 0,
+   "L1_maxboxes": 16,
+   "L1_rounds": 11,
+   "L2": 0,
+   "L2_maxboxes": 0,
+   "L2_rounds": 1
+  },
+  "8": {
+   "L1": 0,
+   "L1_maxboxes": 7106,
+   "L1_rounds": 29,
+   "L2": 0,
+   "L2_maxboxes": 3690,
+   "L2_rounds": 26
+  },
+  "9": {
+   "L1": 0,
+   "L1_maxboxes": 824,
+   "L1_rounds": 23,
+   "L2": 0,
+   "L2_maxboxes": 188,
+   "L2_rounds": 19
+  },
+  "10": {
+   "L1": 0,
+   "L1_maxboxes": 805,
+   "L1_rounds": 23,
+   "L2": 0,
+   "L2_maxboxes": 202,
+   "L2_rounds": 21
+  },
+  "11": {
+   "L1": 0,
+   "L1_maxboxes": 16,
+   "L1_rounds": 11,
+   "L2": 0,
+   "L2_maxboxes": 0,
+   "L2_rounds": 1
+  },
+  "12": {
+   "L1": 0,
+   "L1_maxboxes": 0,
+   "L1_rounds": 1,
+   "L2": 0,
+   "L2_maxboxes": 0,
+   "L2_rounds": 1
+  }
+ },
+ "stageAB_b5": {
+  "b": 5,
+  "stageA_area": 0.4095458984375,
+  "stageA_cells": 214720,
+  "stageA_t_range": [
+   -0.48828125,
+   0.48828125
+  ],
+  "stageA_s_range": [
+   0.234375,
+   0.765625
+  ],
+  "stageB_boxes6": 4823087,
+  "stageB_vol6_frac": 0.002245924901217225,
+  "stageB_proj4_cells": 15009,
+  "stageB_proj4_vol_frac": 0.028627395629882812,
+  "stageB_cell": [
+   0.03125,
+   0.03125,
+   0.03125,
+   0.03125,
+   0.030207621669132625,
+   0.04908738521234057
+  ],
+  "stageB_ti_range": [
+   0.0,
+   0.5
+  ],
+  "stageB_tj_range": [
+   -0.5,
+   0.0
+  ],
+  "time_s": 70.52304816246033
+ },
+ "stageAB_b3": {
+  "b": 3,
+  "zero_ti": false,
+  "stageA_area": 0.1003570556640625,
+  "stageA_cells": 52616,
+  "stageA_t_range": [
+   -0.388671875,
+   0.388671875
+  ],
+  "stageA_s_range": [
+   0.310546875,
+   0.49609375
+  ],
+  "stageB_boxes6": 828800,
+  "stageB_vol6_frac": 1.507578417658801e-06,
+  "stageB_proj4_cells": 3326,
+  "stageB_proj4_vol_frac": 0.00019824504852294922,
+  "stageB_cell": [
+   0.0078125,
+   0.015625,
+   0.015625,
+   0.015625,
+   0.015103810834566312,
+   0.012271846303085088
+  ],
+  "stageB_ti_range": [
+   0.171875,
+   0.40625
+  ],
+  "stageB_tj_range": [
+   -0.421875,
+   -0.171875
+  ],
+  "time_s": 12.561341762542725
+ },
+ "stageAB_b5_ti0": {
+  "b": 5,
+  "zero_ti": true,
+  "stageA_area": 0.4095458984375,
+  "stageA_cells": 214720,
+  "stageA_t_range": [
+   -0.48828125,
+   0.48828125
+  ],
+  "stageA_s_range": [
+   0.234375,
+   0.765625
+  ],
+  "stageB_boxes6": 0,
+  "stageB_vol6_frac": 0.0,
+  "stageB_proj4_vol_frac": 0.0,
+  "time_s": 0.24957823753356934
+ },
+ "stageAB_b3_ti0": {
+  "b": 3,
+  "zero_ti": true,
+  "stageA_area": 0.1003570556640625,
+  "stageA_cells": 52616,
+  "stageA_t_range": [
+   -0.388671875,
+   0.388671875
+  ],
+  "stageA_s_range": [
+   0.310546875,
+   0.49609375
+  ],
+  "stageB_boxes6": 0,
+  "stageB_vol6_frac": 0.0,
+  "stageB_proj4_vol_frac": 0.0,
+  "time_s": 0.07496452331542969
+ },
+ "numcheck_nelder_mead_300_restarts": {
+  "b3": {
+   "same_sign_min_max_cos": 0.5583173,
+   "equator_min_max_cos": 0.5572581,
+   "unrestricted_pair_min_max_cos": 0.4887512
+  },
+  "b5": {
+   "same_sign_min_max_cos": 0.5379861,
+   "equator_min_max_cos": 0.5366936,
+   "unrestricted_pair_min_max_cos": 0.4392407
+  }
+ },
+ "eps_robustness": "L1 and L2 for b=3,5 give 0 survivors with per-operation padding EPS in {1e-9,1e-6,1e-4,1e-3}",
+ "model_check": "orbit formulas (within/cross inner products) reproduced against explicit 5x5 rotation matrices g^k acting on random parameters: exact match"
+}

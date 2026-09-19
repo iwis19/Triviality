@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""
+Follow-up experiments.
+
+I1 (hereditary abundance under random unions). For union-closed F (∅ ∈ F), A,B iid uniform on F, C = A∪B,
+   S_i = {C ∈ F : i is abundant in F_{<=C}}  (abundant = frequency >= 1/2; in {∅} nobody is abundant)
+   L1c   : exists i with P(C ∈ S_i) >= 1/2
+   L1c'  : exists i with T ∈ S_i (i abundant in F) and P(C ∈ S_i) >= 1/2
+   L1c'' : exists i with T ∈ S_i and P(C ∈ S_i) >= P(C = T) + (1/2) P(C != T)   (stronger, "at least half of the non-top mass")
+   L1cA  : exists i with P_A(A ∈ S_i) >= 1/2 for A uniform on F (single set instead of union)
+   plus a hill-climbing search that tries to minimise  max_i P(C ∈ S_i)  over union-closed families on n elements.
+
+I3b (delete-one-element induction). For every y in top(F): F = F_{∌y} ⊔ F_{∋y}, both union-closed.
+   L3b-all : for every y, some element of A(F_{∌y}) ∪ (A(F_{∋y}) \ {y}) is abundant in F
+   L3b-some: for some y, ...
+   L3a-fix : Horn lemma with enlarged candidate set {z} ∪ X ∪ A(F'_{∌y})
+"""
+import math, random, sys
+from collections import Counter, defaultdict
+from ucs_experiments import (union_closure, all_union_closed_families, random_union_closed, freqs, top, popcount, is_union_closed)
+
+def abundant_set(fam, n):
+    F = len(fam)
+    if F <= 1: return set()
+    fr = freqs(fam, n)
+    return {i for i in range(n) if 2 * fr[i] >= F}
+
+def hered(fam, n):
+    fam = list(fam); F = len(fam); T = top(fam)
+    down = {C: [A for A in fam if A & ~C == 0] for C in fam}
+    S = {i: set() for i in range(n)}
+    for C in fam:
+        for i in abundant_set(down[C], n):
+            S[i].add(C)
+    cnt = Counter()
+    for A in fam:
+        for B in fam:
+            cnt[A | B] += 1
+    tot = F * F
+    PT = cnt[T] / tot
+    massU = {i: sum(cnt[C] for C in S[i]) / tot for i in range(n)}
+    massA = {i: len(S[i]) / F for i in range(n)}
+    return T, S, massU, massA, PT
+
+def test_I1(fam, n):
+    T, S, massU, massA, PT = hered(fam, n)
+    res = {}
+    res["L1c"] = any(massU[i] >= 0.5 - 1e-12 for i in range(n))
+    res["L1c'"] = any(T in S[i] and massU[i] >= 0.5 - 1e-12 for i in range(n))
+    res["L1c''"] = any(T in S[i] and massU[i] >= PT + 0.5 * (1 - PT) - 1e-12 for i in range(n))
+    res["L1cA"] = any(massA[i] >= 0.5 - 1e-12 for i in range(n))
+    return res
+
+def test_I3b(fam, n):
+    fam = list(fam); F = len(fam); T = top(fam)
+    ab = abundant_set(fam, n)
+    ok = []
+    for y in range(n):
+        if not (T >> y & 1): continue
+        G1 = [A for A in fam if not (A >> y & 1)]
+        G2 = [A for A in fam if A >> y & 1]
+        cands = abundant_set(G1, n) | (abundant_set(G2, n) - {y})
+        ok.append(bool(cands & ab))
+    return {"L3b-all": all(ok), "L3b-some": any(ok)}
+
+def test_I3a_fix(famp, n):
+    famp = list(famp); Fp = len(famp)
+    abp = abundant_set(famp, n)
+    tested = fails = 0; ex = None
+    for X in range(1, 1 << n):
+        for y in range(n):
+            if X >> y & 1: continue
+            removed = [B for B in famp if (B & X) == 0 and (B >> y & 1)]
+            if not removed: continue
+            fam = [B for B in famp if not ((B & X) == 0 and (B >> y & 1))]
+            if len(fam) <= 1: continue
+            ab = abundant_set(fam, n)
+            G1 = [B for B in famp if not (B >> y & 1)]
+            extra = abundant_set(G1, n)
+            for z in abp:
+                tested += 1
+                cands = {z} | {x for x in range(n) if X >> x & 1} | extra
+                if not (cands & ab):
+                    fails += 1
+                    if ex is None: ex = dict(Fprime=sorted(famp), X=X, y=y, z=z)
+    return tested, fails, ex
+
+def run(families, n, label):
+    print(f"== {label}: {len(families)} families on n={n}")
+    agg = defaultdict(lambda: [0, 0]); examples = {}
+    t3 = f3 = 0; ex3 = None
+    for fam in families:
+        for grp, fn in (("I1", test_I1), ("I3b", test_I3b)):
+            for k, v in fn(fam, n).items():
+                key = f"{grp}:{k}"; agg[key][1] += 1
+                if v: agg[key][0] += 1
+                elif key not in examples: examples[key] = sorted(fam)
+        if n <= 5:
+            t, f, ex = test_I3a_fix(fam, n); t3 += t; f3 += f
+            if ex and ex3 is None: ex3 = ex
+    for k in sorted(agg):
+        p, tot = agg[k]
+        print(f"  {k:12s} pass {p}/{tot}" + ("" if p == tot else f"   first failure: {examples[k]}"))
+    if t3: print(f"  I3a-fix      pass {t3 - f3}/{t3}" + ("" if f3 == 0 else f"   first failure: {ex3}"))
+    sys.stdout.flush()
+
+def hill_climb(n, steps, rng, ngen=6):
+    """Try to minimise max_i P(C in S_i) (L1c score) by mutating generator sets."""
+    gens = [rng.randrange(1, 1 << n) for _ in range(ngen)]
+    def score(gens):
+        fam = frozenset(union_closure(gens))
+        if len(fam) <= 1: return 2.0, fam
+        T, S, massU, massA, PT = hered(fam, n)
+        return max(massU.values()), fam
+    best, bestfam = score(gens)
+    for _ in range(steps):
+        g2 = list(gens)
+        op = rng.random()
+        if op < 0.4 and len(g2) > 1: g2.pop(rng.randrange(len(g2)))
+        elif op < 0.7: g2.append(rng.randrange(1, 1 << n))
+        else: g2[rng.randrange(len(g2))] ^= 1 << rng.randrange(n)
+        s, fam = score(g2)
+        if s <= best:
+            best, bestfam, gens = s, fam, g2
+    return best, sorted(bestfam)
+
+if __name__ == "__main__":
+    rng = random.Random(7)
+    for n in (2, 3, 4):
+        run(all_union_closed_families(n), n, f"exhaustive n={n}")
+    for n, k, N in ((5, 4, 2000), (5, 8, 2000), (6, 6, 800), (7, 6, 300), (7, 12, 300), (8, 7, 120)):
+        fams = set()
+        while len(fams) < N:
+            f = random_union_closed(n, k, rng)
+            if len(f) > 1: fams.add(f)
+        run(sorted(fams, key=sorted), n, f"random n={n} k={k}")
+    print("== hill climb on L1c score (max_i P(C in S_i)); conjecture-like statement L1c needs score >= 1/2")
+    for n in (5, 6, 7):
+        for trial in range(3):
+            s, fam = hill_climb(n, 400 if n < 7 else 150, rng)
+            print(f"  n={n} trial={trial} min score found={s:.4f} family={fam}")
+            sys.stdout.flush()

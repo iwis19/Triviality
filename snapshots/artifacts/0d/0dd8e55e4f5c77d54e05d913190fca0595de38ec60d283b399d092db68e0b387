@@ -1,0 +1,8 @@
+import Mathlib
+
+theorem hereditary_le_frequency {α : Type*} [DecidableEq α] (F : Finset (Finset α)) (i : α) : (F.filter (fun A => i ∈ A ∧ (F.filter (fun B => B ⊆ A)).card ≤ 2 * (F.filter (fun B => B ⊆ A ∧ i ∈ B)).card)).card ≤ (F.filter (fun A => i ∈ A)).card := by
+  apply Finset.card_le_card
+  intro A hA
+  rw [Finset.mem_filter] at hA ⊢
+  exact ⟨hA.1, hA.2.1⟩
+

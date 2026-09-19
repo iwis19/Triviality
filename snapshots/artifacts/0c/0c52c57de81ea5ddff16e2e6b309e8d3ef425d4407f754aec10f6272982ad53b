@@ -1,0 +1,483 @@
+import Mathlib
+
+/-!
+Symbolic (decide-free) formalization attempt for idea 5adce551:
+for `m ≥ 5`, the family `cycleClosure m` (vertex sets of `C_m` inducing a subgraph without
+isolated vertices) has, for every vertex `x` and `e = V \ N[x]`, exactly 3 members containing
+`e ∪ {x}` and exactly 4 members containing `e` but not `x`.
+Combined with `no_superset_injection_of_interval` (idea fa916f35) this yields the m ≥ 5 part of
+claim 25d3d62d, *provided* `cycleClosure m` is identified with the edge-set union-closure of `C_m`
+(not done here).
+-/
+
+open Finset
+
+def cycleClosure (m : ℕ) [NeZero m] : Finset (Finset (Fin m)) :=
+  univ.filter (fun S => S.Nonempty ∧ ∀ v ∈ S, v + 1 ∈ S ∨ v - 1 ∈ S)
+
+/-- `e = V \ N[x]`. -/
+def farSet (m : ℕ) [NeZero m] (x : Fin m) : Finset (Fin m) :=
+  univ.filter (fun v => v ≠ x ∧ v ≠ x + 1 ∧ v ≠ x - 1)
+
+namespace CycleClosure
+
+variable {m : ℕ} [NeZero m]
+
+lemma mem_cycleClosure {S : Finset (Fin m)} :
+    S ∈ cycleClosure m ↔ S.Nonempty ∧ ∀ v ∈ S, v + 1 ∈ S ∨ v - 1 ∈ S := by
+  simp [cycleClosure]
+
+lemma mem_farSet {x v : Fin m} : v ∈ farSet m x ↔ v ≠ x ∧ v ≠ x + 1 ∧ v ≠ x - 1 := by
+  simp [farSet]
+
+theorem unionClosed :
+    ∀ A ∈ cycleClosure m, ∀ B ∈ cycleClosure m, A ∪ B ∈ cycleClosure m := by
+  intro A hA B hB
+  rw [mem_cycleClosure] at hA hB ⊢
+  refine ⟨hA.1.mono subset_union_left, ?_⟩
+  intro v hv
+  rcases mem_union.mp hv with h | h
+  · rcases hA.2 v h with h1 | h1
+    · exact Or.inl (mem_union_left _ h1)
+    · exact Or.inr (mem_union_left _ h1)
+  · rcases hB.2 v h with h1 | h1
+    · exact Or.inl (mem_union_right _ h1)
+    · exact Or.inr (mem_union_right _ h1)
+
+/-! ### Small numerals are nonzero in `Fin m` for `m ≥ 5` (written with `1`s only:
+`ring`/`abel` do not normalise numerals like `(2 : Fin m)` for variable `m`). -/
+
+section numerals
+variable (hm : 5 ≤ m)
+include hm
+
+lemma val_one : ((1 : Fin m) : ℕ) = 1 := by
+  rw [Fin.val_one']; exact Nat.mod_eq_of_lt (by omega)
+
+lemma val_two : ((1 + 1 : Fin m) : ℕ) = 2 := by
+  rw [Fin.val_add, val_one hm]; exact Nat.mod_eq_of_lt (by omega)
+
+lemma val_three : ((1 + 1 + 1 : Fin m) : ℕ) = 3 := by
+  rw [Fin.val_add, val_two hm, val_one hm]; exact Nat.mod_eq_of_lt (by omega)
+
+lemma val_four : ((1 + 1 + 1 + 1 : Fin m) : ℕ) = 4 := by
+  rw [Fin.val_add, val_three hm, val_one hm]; exact Nat.mod_eq_of_lt (by omega)
+
+lemma one_ne : (1 : Fin m) ≠ 0 := fun h => by
+  have := congrArg Fin.val h; rw [val_one hm, Fin.val_zero] at this; omega
+
+lemma two_ne : (1 + 1 : Fin m) ≠ 0 := fun h => by
+  have := congrArg Fin.val h; rw [val_two hm, Fin.val_zero] at this; omega
+
+lemma three_ne : (1 + 1 + 1 : Fin m) ≠ 0 := fun h => by
+  have := congrArg Fin.val h; rw [val_three hm, Fin.val_zero] at this; omega
+
+lemma four_ne : (1 + 1 + 1 + 1 : Fin m) ≠ 0 := fun h => by
+  have := congrArg Fin.val h; rw [val_four hm, Fin.val_zero] at this; omega
+
+end numerals
+
+/-! ### Membership facts about `e = farSet m x`. -/
+
+section far
+variable (hm : 5 ≤ m) (x : Fin m)
+include hm
+
+lemma xm1_ne_xp1 : x - 1 ≠ x + 1 := fun h => two_ne hm (by
+  calc (1 + 1 : Fin m) = (x + 1) - (x - 1) := by abel
+    _ = 0 := sub_eq_zero.mpr h.symm)
+
+lemma xp1_ne_x : x + 1 ≠ x := fun h => one_ne hm (by
+  calc (1 : Fin m) = (x + 1) - x := by abel
+    _ = 0 := sub_eq_zero.mpr h)
+
+lemma xm1_ne_x : x - 1 ≠ x := fun h => one_ne hm (by
+  calc (1 : Fin m) = x - (x - 1) := by abel
+    _ = 0 := sub_eq_zero.mpr h.symm)
+
+lemma x_notMem_far : x ∉ farSet m x := by
+  rw [mem_farSet]; intro h; exact h.1 rfl
+
+lemma xp1_notMem_far : x + 1 ∉ farSet m x := by
+  rw [mem_farSet]; intro h; exact h.2.1 rfl
+
+lemma xm1_notMem_far : x - 1 ∉ farSet m x := by
+  rw [mem_farSet]; intro h; exact h.2.2 rfl
+
+lemma xm2_mem_far : x - 1 - 1 ∈ farSet m x := by
+  rw [mem_farSet]
+  refine ⟨fun h => two_ne hm ?_, fun h => three_ne hm ?_, fun h => one_ne hm ?_⟩
+  · calc (1 + 1 : Fin m) = x - (x - 1 - 1) := by abel
+      _ = 0 := sub_eq_zero.mpr h.symm
+  · calc (1 + 1 + 1 : Fin m) = (x + 1) - (x - 1 - 1) := by abel
+      _ = 0 := sub_eq_zero.mpr h.symm
+  · calc (1 : Fin m) = (x - 1) - (x - 1 - 1) := by abel
+      _ = 0 := sub_eq_zero.mpr h.symm
+
+lemma xp2_mem_far : x + 1 + 1 ∈ farSet m x := by
+  rw [mem_farSet]
+  refine ⟨fun h => two_ne hm ?_, fun h => one_ne hm ?_, fun h => three_ne hm ?_⟩
+  · calc (1 + 1 : Fin m) = (x + 1 + 1) - x := by abel
+      _ = 0 := sub_eq_zero.mpr h
+  · calc (1 : Fin m) = (x + 1 + 1) - (x + 1) := by abel
+      _ = 0 := sub_eq_zero.mpr h
+  · calc (1 + 1 + 1 : Fin m) = (x + 1 + 1) - (x - 1) := by abel
+      _ = 0 := sub_eq_zero.mpr h
+
+lemma xm3_mem_far : x - 1 - 1 - 1 ∈ farSet m x := by
+  rw [mem_farSet]
+  refine ⟨fun h => three_ne hm ?_, fun h => four_ne hm ?_, fun h => two_ne hm ?_⟩
+  · calc (1 + 1 + 1 : Fin m) = x - (x - 1 - 1 - 1) := by abel
+      _ = 0 := sub_eq_zero.mpr h.symm
+  · calc (1 + 1 + 1 + 1 : Fin m) = (x + 1) - (x - 1 - 1 - 1) := by abel
+      _ = 0 := sub_eq_zero.mpr h.symm
+  · calc (1 + 1 : Fin m) = (x - 1) - (x - 1 - 1 - 1) := by abel
+      _ = 0 := sub_eq_zero.mpr h.symm
+
+/-- Every vertex of the path `e` has a neighbour in `e` (this is where `m ≥ 5` is used). -/
+lemma far_nbr {v : Fin m} (hv : v ∈ farSet m x) :
+    v + 1 ∈ farSet m x ∨ v - 1 ∈ farSet m x := by
+  by_cases h : v + 1 ∈ farSet m x
+  · exact Or.inl h
+  · right
+    rw [mem_farSet] at hv h
+    push_neg at h
+    obtain ⟨h1, h2, h3⟩ := hv
+    have : v + 1 = x - 1 := by
+      by_cases h5 : v + 1 = x
+      · exact absurd (eq_sub_of_add_eq h5) h3
+      · by_cases h6 : v + 1 = x + 1
+        · exact absurd (add_right_cancel h6) h1
+        · exact h h5 h6
+    have hv' : v = x - 1 - 1 := eq_sub_of_add_eq this
+    rw [hv']
+    exact xm3_mem_far hm x
+
+lemma far_nonempty : (farSet m x).Nonempty := ⟨_, xp2_mem_far hm x⟩
+
+/-- Every `v : Fin m` is in `e` or in `N[x]`. -/
+lemma mem_far_or (v : Fin m) : v ∈ farSet m x ∨ v = x ∨ v = x + 1 ∨ v = x - 1 := by
+  by_cases h : v ∈ farSet m x
+  · exact Or.inl h
+  · right; rw [mem_farSet] at h; push_neg at h
+    by_cases h1 : v = x
+    · exact Or.inl h1
+    · by_cases h2 : v = x + 1
+      · exact Or.inr (Or.inl h2)
+      · exact Or.inr (Or.inr (h h1 h2))
+
+end far
+
+/-! ### The two cardinalities. -/
+
+section counts
+variable (hm : 5 ≤ m) (x : Fin m)
+include hm
+
+/-- The signature `A ↦ (x-1 ∈ A, x+1 ∈ A)`. -/
+def sig (A : Finset (Fin m)) : Bool × Bool := (decide (x - 1 ∈ A), decide (x + 1 ∈ A))
+
+lemma sig_fst {A : Finset (Fin m)} : (sig x A).1 = true ↔ x - 1 ∈ A := by simp [sig]
+lemma sig_snd {A : Finset (Fin m)} : (sig x A).2 = true ↔ x + 1 ∈ A := by simp [sig]
+
+lemma sig_injOn_of (c : Prop) [Decidable c] :
+    Set.InjOn (sig x)
+      ↑((cycleClosure m).filter (fun A => farSet m x ⊆ A ∧ (x ∈ A ↔ c))) := by
+  intro A hA B hB hAB
+  simp only [coe_filter, Set.mem_setOf_eq] at hA hB
+  have h1 : x - 1 ∈ A ↔ x - 1 ∈ B := by
+    rw [← sig_fst hm x, ← sig_fst hm x, hAB]
+  have h2 : x + 1 ∈ A ↔ x + 1 ∈ B := by
+    rw [← sig_snd hm x, ← sig_snd hm x, hAB]
+  ext v
+  rcases mem_far_or hm x v with hv | rfl | rfl | rfl
+  · exact ⟨fun _ => hB.2.1 hv, fun _ => hA.2.1 hv⟩
+  · rw [hA.2.2, hB.2.2]
+  · exact h2
+  · exact h1
+
+/-- Generic membership criterion for sets of the form `e ∪ T`, `T ⊆ N[x]`. -/
+lemma mem_cc_of_far_subset {A : Finset (Fin m)} (hsub : farSet m x ⊆ A)
+    (hx : x ∈ A → x + 1 ∈ A ∨ x - 1 ∈ A)
+    (hxp : x + 1 ∈ A → x + 1 + 1 ∈ A ∨ x + 1 - 1 ∈ A)
+    (hxm : x - 1 ∈ A → x - 1 + 1 ∈ A ∨ x - 1 - 1 ∈ A) :
+    A ∈ cycleClosure m := by
+  rw [mem_cycleClosure]
+  refine ⟨(far_nonempty hm x).mono hsub, ?_⟩
+  intro v hv
+  rcases mem_far_or hm x v with h | rfl | rfl | rfl
+  · rcases far_nbr hm x h with h' | h'
+    · exact Or.inl (hsub h')
+    · exact Or.inr (hsub h')
+  · exact hx hv
+  · exact hxp hv
+  · exact hxm hv
+
+-- the seven witnesses
+lemma mem_e : farSet m x ∈ cycleClosure m := by
+  refine mem_cc_of_far_subset hm x (subset_refl _) ?_ ?_ ?_
+  · intro h; exact absurd h (x_notMem_far hm x)
+  · intro h; exact absurd h (xp1_notMem_far hm x)
+  · intro h; exact absurd h (xm1_notMem_far hm x)
+
+lemma mem_e_xm : insert (x - 1) (farSet m x) ∈ cycleClosure m := by
+  refine mem_cc_of_far_subset hm x (subset_insert _ _) ?_ ?_ ?_
+  · intro h; rw [mem_insert] at h
+    rcases h with h | h
+    · exact absurd h (xm1_ne_x hm x).symm
+    · exact absurd h (x_notMem_far hm x)
+  · intro h; rw [mem_insert] at h
+    rcases h with h | h
+    · exact absurd h (xm1_ne_xp1 hm x).symm
+    · exact absurd h (xp1_notMem_far hm x)
+  · intro _; exact Or.inr (mem_insert_of_mem (xm2_mem_far hm x))
+
+lemma mem_e_xp : insert (x + 1) (farSet m x) ∈ cycleClosure m := by
+  refine mem_cc_of_far_subset hm x (subset_insert _ _) ?_ ?_ ?_
+  · intro h; rw [mem_insert] at h
+    rcases h with h | h
+    · exact absurd h (xp1_ne_x hm x).symm
+    · exact absurd h (x_notMem_far hm x)
+  · intro _; exact Or.inl (mem_insert_of_mem (xp2_mem_far hm x))
+  · intro h; rw [mem_insert] at h
+    rcases h with h | h
+    · exact absurd h (xm1_ne_xp1 hm x)
+    · exact absurd h (xm1_notMem_far hm x)
+
+lemma mem_e_xm_xp : insert (x - 1) (insert (x + 1) (farSet m x)) ∈ cycleClosure m := by
+  refine mem_cc_of_far_subset hm x ((subset_insert _ _).trans (subset_insert _ _)) ?_ ?_ ?_
+  · intro h; simp only [mem_insert] at h
+    rcases h with h | h | h
+    · exact absurd h (xm1_ne_x hm x).symm
+    · exact absurd h (xp1_ne_x hm x).symm
+    · exact absurd h (x_notMem_far hm x)
+  · intro _; exact Or.inl (mem_insert_of_mem (mem_insert_of_mem (xp2_mem_far hm x)))
+  · intro _; exact Or.inr (mem_insert_of_mem (mem_insert_of_mem (xm2_mem_far hm x)))
+
+lemma mem_e_x_xm : insert x (insert (x - 1) (farSet m x)) ∈ cycleClosure m := by
+  refine mem_cc_of_far_subset hm x ((subset_insert _ _).trans (subset_insert _ _)) ?_ ?_ ?_
+  · intro _; exact Or.inr (mem_insert_of_mem (mem_insert_self _ _))
+  · intro h; simp only [mem_insert] at h
+    rcases h with h | h | h
+    · exact absurd h (xp1_ne_x hm x)
+    · exact absurd h (xm1_ne_xp1 hm x).symm
+    · exact absurd h (xp1_notMem_far hm x)
+  · intro _; exact Or.inr (mem_insert_of_mem (mem_insert_of_mem (xm2_mem_far hm x)))
+
+lemma mem_e_x_xp : insert x (insert (x + 1) (farSet m x)) ∈ cycleClosure m := by
+  refine mem_cc_of_far_subset hm x ((subset_insert _ _).trans (subset_insert _ _)) ?_ ?_ ?_
+  · intro _; exact Or.inl (mem_insert_of_mem (mem_insert_self _ _))
+  · intro _; exact Or.inl (mem_insert_of_mem (mem_insert_of_mem (xp2_mem_far hm x)))
+  · intro h; simp only [mem_insert] at h
+    rcases h with h | h | h
+    · exact absurd h (xm1_ne_x hm x)
+    · exact absurd h (xm1_ne_xp1 hm x)
+    · exact absurd h (xm1_notMem_far hm x)
+
+lemma mem_e_x_xm_xp :
+    insert x (insert (x - 1) (insert (x + 1) (farSet m x))) ∈ cycleClosure m := by
+  refine mem_cc_of_far_subset hm x
+    (((subset_insert _ _).trans (subset_insert _ _)).trans (subset_insert _ _)) ?_ ?_ ?_
+  · intro _; exact Or.inl (mem_insert_of_mem (mem_insert_of_mem (mem_insert_self _ _)))
+  · intro _
+    exact Or.inl (mem_insert_of_mem (mem_insert_of_mem (mem_insert_of_mem (xp2_mem_far hm x))))
+  · intro _
+    exact Or.inr (mem_insert_of_mem (mem_insert_of_mem (mem_insert_of_mem (xm2_mem_far hm x))))
+
+/-- Members of `F ∩ up(e)` containing `x`: exactly 3. -/
+theorem card_contain :
+    ((cycleClosure m).filter (fun A => farSet m x ⊆ A ∧ x ∈ A)).card = 3 := by
+  have hinj := sig_injOn_of hm x True
+  have hfilt : (cycleClosure m).filter (fun A => farSet m x ⊆ A ∧ x ∈ A) =
+      (cycleClosure m).filter (fun A => farSet m x ⊆ A ∧ (x ∈ A ↔ True)) := by
+    simp
+  rw [hfilt, ← card_image_of_injOn hinj]
+  have himg : ((cycleClosure m).filter (fun A => farSet m x ⊆ A ∧ (x ∈ A ↔ True))).image (sig x)
+      = {(true, false), (false, true), (true, true)} := by
+    ext p
+    simp only [mem_image, mem_filter, iff_true]
+    constructor
+    · rintro ⟨A, ⟨hA, hsub, hx⟩, rfl⟩
+      have hnb := ((mem_cycleClosure.mp hA).2 x hx)
+      simp only [sig, mem_insert, mem_singleton, Prod.mk.injEq, decide_eq_true_eq,
+        decide_eq_false_iff_not]
+      by_cases h1 : x - 1 ∈ A <;> by_cases h2 : x + 1 ∈ A <;> simp [h1, h2]
+      exact hnb.elim h2 h1
+    · intro hp
+      simp only [mem_insert, mem_singleton] at hp
+      rcases hp with rfl | rfl | rfl
+      · refine ⟨insert x (insert (x - 1) (farSet m x)), ⟨mem_e_x_xm hm x,
+          (subset_insert _ _).trans (subset_insert _ _), mem_insert_self _ _⟩, ?_⟩
+        simp only [sig, Prod.mk.injEq, decide_eq_true_eq, decide_eq_false_iff_not]
+        refine ⟨mem_insert_of_mem (mem_insert_self _ _), ?_⟩
+        simp only [mem_insert, not_or]
+        exact ⟨xp1_ne_x hm x, (xm1_ne_xp1 hm x).symm, xp1_notMem_far hm x⟩
+      · refine ⟨insert x (insert (x + 1) (farSet m x)), ⟨mem_e_x_xp hm x,
+          (subset_insert _ _).trans (subset_insert _ _), mem_insert_self _ _⟩, ?_⟩
+        simp only [sig, Prod.mk.injEq, decide_eq_true_eq, decide_eq_false_iff_not]
+        refine ⟨?_, mem_insert_of_mem (mem_insert_self _ _)⟩
+        simp only [mem_insert, not_or]
+        exact ⟨xm1_ne_x hm x, xm1_ne_xp1 hm x, xm1_notMem_far hm x⟩
+      · refine ⟨insert x (insert (x - 1) (insert (x + 1) (farSet m x))), ⟨mem_e_x_xm_xp hm x,
+          ((subset_insert _ _).trans (subset_insert _ _)).trans (subset_insert _ _),
+          mem_insert_self _ _⟩, ?_⟩
+        simp only [sig, Prod.mk.injEq, decide_eq_true_eq]
+        exact ⟨mem_insert_of_mem (mem_insert_self _ _),
+          mem_insert_of_mem (mem_insert_of_mem (mem_insert_self _ _))⟩
+  rw [himg]
+  rfl
+
+/-- Members of `F ∩ up(e)` avoiding `x`: exactly 4. -/
+theorem card_avoid :
+    ((cycleClosure m).filter (fun A => farSet m x ⊆ A ∧ x ∉ A)).card = 4 := by
+  have hinj := sig_injOn_of hm x False
+  have hfilt : (cycleClosure m).filter (fun A => farSet m x ⊆ A ∧ x ∉ A) =
+      (cycleClosure m).filter (fun A => farSet m x ⊆ A ∧ (x ∈ A ↔ False)) := by
+    simp
+  rw [hfilt, ← card_image_of_injOn hinj]
+  have himg : ((cycleClosure m).filter (fun A => farSet m x ⊆ A ∧ (x ∈ A ↔ False))).image (sig x)
+      = (univ : Finset (Bool × Bool)) := by
+    ext p
+    simp only [mem_image, mem_filter, iff_false, mem_univ, iff_true]
+    obtain ⟨a, b⟩ := p
+    cases a <;> cases b
+    · refine ⟨farSet m x, ⟨mem_e hm x, subset_refl _, x_notMem_far hm x⟩, ?_⟩
+      simp only [sig, Prod.mk.injEq, decide_eq_false_iff_not]
+      exact ⟨xm1_notMem_far hm x, xp1_notMem_far hm x⟩
+    · refine ⟨insert (x + 1) (farSet m x), ⟨mem_e_xp hm x, subset_insert _ _, ?_⟩, ?_⟩
+      · rw [mem_insert, not_or]; exact ⟨(xp1_ne_x hm x).symm, x_notMem_far hm x⟩
+      · simp only [sig, Prod.mk.injEq, decide_eq_true_eq, decide_eq_false_iff_not]
+        refine ⟨?_, mem_insert_self _ _⟩
+        simp only [mem_insert, not_or]
+        exact ⟨xm1_ne_xp1 hm x, xm1_notMem_far hm x⟩
+    · refine ⟨insert (x - 1) (farSet m x), ⟨mem_e_xm hm x, subset_insert _ _, ?_⟩, ?_⟩
+      · rw [mem_insert, not_or]; exact ⟨(xm1_ne_x hm x).symm, x_notMem_far hm x⟩
+      · simp only [sig, Prod.mk.injEq, decide_eq_true_eq, decide_eq_false_iff_not]
+        refine ⟨mem_insert_self _ _, ?_⟩
+        simp only [mem_insert, not_or]
+        exact ⟨(xm1_ne_xp1 hm x).symm, xp1_notMem_far hm x⟩
+    · refine ⟨insert (x - 1) (insert (x + 1) (farSet m x)), ⟨mem_e_xm_xp hm x,
+        (subset_insert _ _).trans (subset_insert _ _), ?_⟩, ?_⟩
+      · simp only [mem_insert, not_or]
+        exact ⟨(xm1_ne_x hm x).symm, (xp1_ne_x hm x).symm, x_notMem_far hm x⟩
+      · simp only [sig, Prod.mk.injEq, decide_eq_true_eq]
+        exact ⟨mem_insert_self _ _, mem_insert_of_mem (mem_insert_self _ _)⟩
+  rw [himg]
+  simp [card_univ]
+
+end counts
+
+end CycleClosure
+
+/-! ### Composition with the interval lemma of idea fa916f35 (restated and reproved here). -/
+
+theorem no_superset_injection_of_interval {n : ℕ} (F : Finset (Finset (Fin n))) (x : Fin n)
+    (e : Finset (Fin n))
+    (h : (F.filter (fun A => e ⊆ A ∧ x ∈ A)).card < (F.filter (fun A => e ⊆ A ∧ x ∉ A)).card) :
+    ¬ ∃ f : Finset (Fin n) → Finset (Fin n),
+      (∀ A ∈ F, x ∉ A → f A ∈ F ∧ x ∈ f A ∧ A ⊆ f A) ∧
+      Set.InjOn f (↑(F.filter (fun A => x ∉ A)) : Set (Finset (Fin n))) := by
+  rintro ⟨f, hf, hinj⟩
+  have hle : (F.filter (fun A => e ⊆ A ∧ x ∉ A)).card ≤
+      (F.filter (fun A => e ⊆ A ∧ x ∈ A)).card := by
+    apply Finset.card_le_card_of_injOn f
+    · intro A hA
+      simp only [Finset.coe_filter, Set.mem_setOf_eq] at hA ⊢
+      obtain ⟨hAF, heA, hxA⟩ := hA
+      obtain ⟨h1, h2, h3⟩ := hf A hAF hxA
+      exact ⟨h1, heA.trans h3, h2⟩
+    · intro A hA B hB hAB
+      simp only [Finset.coe_filter, Set.mem_setOf_eq] at hA hB
+      exact hinj (by simp [hA.1, hA.2.2]) (by simp [hB.1, hB.2.2]) hAB
+  omega
+
+/-- The m ≥ 5 obstruction for `cycleClosure m` (the family is *not* yet identified with the
+edge-set union-closure of `C_m` in this file). -/
+theorem cycleClosure_no_superset_injection (m : ℕ) [NeZero m] (hm : 5 ≤ m) (x : Fin m) :
+    ¬ ∃ f : Finset (Fin m) → Finset (Fin m),
+      (∀ A ∈ cycleClosure m, x ∉ A → f A ∈ cycleClosure m ∧ x ∈ f A ∧ A ⊆ f A) ∧
+      Set.InjOn f (↑((cycleClosure m).filter (fun A => x ∉ A)) : Set (Finset (Fin m))) :=
+  no_superset_injection_of_interval (cycleClosure m) x (farSet m x)
+    (by rw [CycleClosure.card_contain hm x, CycleClosure.card_avoid hm x]; norm_num)
+
+
+/-! ### Identification with the edge-set union-closure of `C_m`. -/
+
+/-- Edge set of `C_m` on `Fin m` (as 2-element vertex sets). -/
+def cycleEdges (m : ℕ) [NeZero m] : Finset (Finset (Fin m)) :=
+  univ.image (fun v => ({v, v + 1} : Finset (Fin m)))
+
+/-- Union-closure (all nonempty unions) of a family `G`. -/
+def unionClosure {α : Type*} [DecidableEq α] (G : Finset (Finset α)) : Finset (Finset α) :=
+  (G.powerset.filter (fun T => T.Nonempty)).image (fun T => T.sup id)
+
+lemma mem_unionClosure {α : Type*} [DecidableEq α] {G : Finset (Finset α)} {S : Finset α} :
+    S ∈ unionClosure G ↔ ∃ T ⊆ G, T.Nonempty ∧ T.sup id = S := by
+  simp only [unionClosure, mem_image, mem_filter, mem_powerset]
+  constructor
+  · rintro ⟨T, ⟨hTG, hTne⟩, rfl⟩; exact ⟨T, hTG, hTne, rfl⟩
+  · rintro ⟨T, hTG, hTne, rfl⟩; exact ⟨T, ⟨hTG, hTne⟩, rfl⟩
+
+/-- `cycleClosure m` is exactly the union-closure of the edge set of `C_m`
+(the "no isolated vertex" description of claim cf3c1247, for cycles). -/
+theorem cycleClosure_eq_unionClosure (m : ℕ) [NeZero m] :
+    cycleClosure m = unionClosure (cycleEdges m) := by
+  ext S
+  simp only [cycleClosure, mem_filter, mem_univ, true_and]
+  rw [mem_unionClosure]
+  constructor
+  · rintro ⟨hne, hnb⟩
+    refine ⟨(cycleEdges m).filter (fun e => e ⊆ S), filter_subset _ _, ?_, ?_⟩
+    · obtain ⟨v, hv⟩ := hne
+      rcases hnb v hv with h | h
+      · refine ⟨{v, v + 1}, ?_⟩
+        rw [mem_filter, cycleEdges, mem_image]
+        exact ⟨⟨v, mem_univ _, rfl⟩, insert_subset hv (singleton_subset_iff.mpr h)⟩
+      · refine ⟨{v - 1, v - 1 + 1}, ?_⟩
+        rw [mem_filter, cycleEdges, mem_image, sub_add_cancel]
+        exact ⟨⟨v - 1, mem_univ _, by rw [sub_add_cancel]⟩,
+          insert_subset h (singleton_subset_iff.mpr hv)⟩
+    · apply le_antisymm
+      · exact Finset.sup_le (fun e he => (mem_filter.mp he).2)
+      · intro v hv
+        rcases hnb v hv with h | h
+        · have he : ({v, v + 1} : Finset (Fin m)) ∈ (cycleEdges m).filter (fun e => e ⊆ S) := by
+            rw [mem_filter, cycleEdges, mem_image]
+            exact ⟨⟨v, mem_univ _, rfl⟩, insert_subset hv (singleton_subset_iff.mpr h)⟩
+          exact Finset.le_sup (f := id) he (mem_insert_self _ _)
+        · have he : ({v - 1, v} : Finset (Fin m)) ∈ (cycleEdges m).filter (fun e => e ⊆ S) := by
+            rw [mem_filter, cycleEdges, mem_image]
+            exact ⟨⟨v - 1, mem_univ _, by rw [sub_add_cancel]⟩,
+              insert_subset h (singleton_subset_iff.mpr hv)⟩
+          exact Finset.le_sup (f := id) he (mem_insert_of_mem (mem_singleton_self _))
+  · rintro ⟨T, hTG, hTne, rfl⟩
+    obtain ⟨e, he⟩ := hTne
+    have heG := hTG he
+    rw [cycleEdges, mem_image] at heG
+    obtain ⟨v, -, rfl⟩ := heG
+    refine ⟨⟨v, Finset.le_sup (f := id) he (mem_insert_self _ _)⟩, ?_⟩
+    intro u hu
+    rw [Finset.mem_sup] at hu
+    obtain ⟨e', he', hue'⟩ := hu
+    have he'G := hTG he'
+    rw [cycleEdges, mem_image] at he'G
+    obtain ⟨w, -, rfl⟩ := he'G
+    simp only [id, mem_insert, mem_singleton] at hue'
+    rcases hue' with rfl | rfl
+    · exact Or.inl (Finset.le_sup (f := id) he' (mem_insert_of_mem (mem_singleton_self _)))
+    · right
+      rw [add_sub_cancel_right]
+      exact Finset.le_sup (f := id) he' (mem_insert_self _ _)
+
+
+/-- Claim 25d3d62d, m ≥ 5 part, for the edge-set union-closure of `C_m` (no `decide`). -/
+theorem cycle_no_superset_injection (m : ℕ) [NeZero m] (hm : 5 ≤ m) (x : Fin m) :
+    ¬ ∃ f : Finset (Fin m) → Finset (Fin m),
+      (∀ A ∈ unionClosure (cycleEdges m), x ∉ A →
+        f A ∈ unionClosure (cycleEdges m) ∧ x ∈ f A ∧ A ⊆ f A) ∧
+      Set.InjOn f (↑((unionClosure (cycleEdges m)).filter (fun A => x ∉ A)) :
+        Set (Finset (Fin m))) := by
+  rw [← cycleClosure_eq_unionClosure]
+  exact cycleClosure_no_superset_injection m hm x
+
+#print axioms cycle_no_superset_injection

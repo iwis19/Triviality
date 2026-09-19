@@ -1,0 +1,142 @@
+#!/usr/bin/env python3
+"""Erdős #307 support computations.
+
+Notation: P,Q finite disjoint sets of primes, X = prod P, Y = prod Q, U = X*Y,
+S_P = sum_{p in P} 1/p, N(P) = sum_{p in P} X/p = X' (arithmetic derivative of squarefree X).
+
+Part A: lemma constants (S_P + S_Q > 2  =>  |P u Q| >= n0, max prime >= p0, U >= prod first n0 primes).
+Part B: brute-force sanity check of the equivalences on all disjoint pairs from primes <= 23.
+Part C: structured search: U = {primes <= x} minus <= 2 holes, test whether (U')^2 - 4U^2 is a perfect square
+        (necessary: if solution then U' = X^2 + Y^2, so (U')^2 - 4U^2 = (X^2 - Y^2)^2).
+Part D: Monte-Carlo estimate of the naive heuristic expected number of solutions using primes <= x.
+"""
+import sys, math, itertools, time
+from fractions import Fraction
+from math import isqrt
+import numpy as np
+from sympy import primerange, factorint
+
+def deriv_sqfree(primes):
+    X = 1
+    for p in primes: X *= p
+    return sum(X // p for p in primes)
+
+# ---------- Part A ----------
+def part_A():
+    s = Fraction(0); ps = []
+    for p in primerange(2, 10000):
+        ps.append(p); s += Fraction(1, p)
+        if s > 2:
+            break
+    n0, p0 = len(ps), ps[-1]
+    U = 1
+    for p in ps: U *= p
+    print(f"[A] smallest n with sum_{{first n primes}} 1/p > 2: n0={n0}, p0={p0}, sum={float(s):.6f}")
+    print(f"[A] hence |P u Q| >= {n0}, max(P u Q) >= {p0}, XY >= prod(first {n0} primes) ~ 10^{math.log10(U):.1f}")
+    # also: if 2 not in P u Q, or 3 not in P u Q, how far must one go?
+    for excl in ([2], [3], [2, 3]):
+        s = Fraction(0); cnt = 0
+        for p in primerange(2, 10**6):
+            if p in excl: continue
+            s += Fraction(1, p); cnt += 1
+            if s > 2:
+                print(f"[A] if {excl} not in P u Q: need max prime >= {p}, |P u Q| >= {cnt}")
+                break
+
+# ---------- Part B ----------
+def part_B():
+    ps = list(primerange(2, 24))  # 9 primes -> 3^9 pairs
+    n_pairs = 0; n_sol = 0; bad = 0; n_sumsq = 0
+    for assign in itertools.product(range(3), repeat=len(ps)):
+        P = [p for p, a in zip(ps, assign) if a == 1]
+        Q = [p for p, a in zip(ps, assign) if a == 2]
+        if not P or not Q: continue
+        n_pairs += 1
+        X = math.prod(P); Y = math.prod(Q)
+        SP = sum(Fraction(1, p) for p in P); SQ = sum(Fraction(1, q) for q in Q)
+        cond1 = (SP * SQ == 1)
+        cond2 = (deriv_sqfree(P) == Y and deriv_sqfree(Q) == X)
+        Up = deriv_sqfree(P + Q)
+        # identity U' = Y*N(P) + X*N(Q) must always hold
+        assert Up == Y * deriv_sqfree(P) + X * deriv_sqfree(Q)
+        cond3 = (Up == X * X + Y * Y)
+        if cond1 != cond2: bad += 1
+        if cond1: n_sol += 1
+        if cond3: n_sumsq += 1
+        if cond3 and not cond1:
+            print(f"[B] U'=X^2+Y^2 but S_P*S_Q != 1: P={P}, Q={Q}, a={(deriv_sqfree(P)-Y)//X}")
+    print(f"[B] pairs checked={n_pairs}, (S_P S_Q=1) <-> (X'=Y and Y'=X) mismatches={bad}, solutions={n_sol}, U'=X^2+Y^2 hits={n_sumsq}")
+
+# ---------- Part C ----------
+def is_square(t):
+    if t < 0: return False
+    # cheap residue filters
+    if t & 3 not in (0, 1): return False
+    for m, qr in ((9, {0,1,4,7}), (5, {0,1,4}), (7, {0,1,2,4}), (11, {0,1,3,4,5,9}), (13, {0,1,3,4,9,10,12})):
+        if t % m not in qr: return False
+    r = isqrt(t)
+    return r * r == t
+
+def part_C(xmax1=5000, xmax2=1000):
+    ps = list(primerange(2, xmax1 + 1))
+    U = 1; Up = 0; S = Fraction(0)
+    tested = 0; hits = []
+    t0 = time.time()
+    for i, p in enumerate(ps):
+        Up = U + p * Up      # (Up)' = U + p U'
+        U = U * p
+        S += Fraction(1, p)
+        if S <= 2: continue
+        x = p
+        # zero holes
+        tested += 1
+        if is_square(Up * Up - 4 * U * U): hits.append((x, ()))
+        # one hole h: U_h = U/h, U_h' = (U' - U/h)/h
+        for h in ps[:i + 1]:
+            Uh = U // h; Uph = (Up - Uh) // h
+            assert (Up - Uh) % h == 0
+            if S - Fraction(1, h) <= 2: continue
+            tested += 1
+            if is_square(Uph * Uph - 4 * Uh * Uh): hits.append((x, (h,)))
+            # two holes, only for x <= xmax2
+            if x <= xmax2:
+                for h2 in ps[:i + 1]:
+                    if h2 <= h: continue
+                    if S - Fraction(1, h) - Fraction(1, h2) <= 2: continue
+                    Uh2 = Uh // h2; Uph2 = (Uph - Uh2) // h2
+                    tested += 1
+                    if is_square(Uph2 * Uph2 - 4 * Uh2 * Uh2): hits.append((x, (h, h2)))
+    print(f"[C] U = primes<=x minus <=1 hole for x<={xmax1}, minus <=2 holes for x<={xmax2} (only U with S_U>2): tested={tested}, hits={hits}, time={time.time()-t0:.1f}s")
+
+# ---------- Part D ----------
+def part_D(x, nsamp=2_000_000, chunk=100_000, seed=1):
+    """Heuristic: E(x) ~ sum over disjoint (P,Q) in primes<=x of kappa/(XY) * 1[size-compatible].
+    Size-compatible: |log(Y/(X S_P))| < 1/2 and |log(X/(Y S_Q))| < 1/2 (N(P)=X S_P must be able to equal Y, etc.).
+    sum_{(P,Q)} 1/(XY) = prod_p (1+2/p) =: W, so E ~ W * Pr_mu[compatible] with mu: p in P w.p. (1/p)/(1+2/p), in Q same."""
+    rng = np.random.default_rng(seed)
+    ps = np.array(list(primerange(2, x + 1)), dtype=np.float64)
+    W = float(np.prod(1 + 2 / ps)); logW = float(np.sum(np.log1p(2 / ps)))
+    pin = (1 / ps) / (1 + 2 / ps)
+    hits = 0; hits_loose = 0
+    for _ in range(nsamp // chunk):
+        u = rng.random((chunk, len(ps)))
+        inP = u < pin
+        inQ = (u >= pin) & (u < 2 * pin)
+        SP = (inP / ps).sum(1); SQ = (inQ / ps).sum(1)
+        lX = (inP * np.log(ps)).sum(1); lY = (inQ * np.log(ps)).sum(1)
+        ok = (SP > 0) & (SQ > 0)
+        with np.errstate(divide='ignore', invalid='ignore'):
+            c1 = np.abs(lY - lX - np.log(SP)) < 0.5
+            c2 = np.abs(lX - lY - np.log(SQ)) < 0.5
+        hits += int((ok & c1 & c2).sum())
+        hits_loose += int((ok & (SP * SQ > 0.5) & (SP * SQ < 2)).sum())
+    pr = hits / nsamp; pr_loose = hits_loose / nsamp
+    print(f"[D] x={x}: #primes={len(ps)}, W=prod(1+2/p)=exp({logW:.2f})={W:.3g}; Pr_mu[compatible]~{pr:.2e} (hits={hits}), "
+          f"Pr_mu[1/2<S_P S_Q<2]~{pr_loose:.2e}; heuristic E(x)~W*Pr ~ {W*pr:.3g} (loose: {W*pr_loose:.3g})")
+
+if __name__ == "__main__":
+    part_A()
+    part_B()
+    for x in (300, 1000, 3000):
+        part_D(x)
+    part_C()

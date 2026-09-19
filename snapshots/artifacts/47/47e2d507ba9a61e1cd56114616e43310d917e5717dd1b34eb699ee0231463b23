@@ -1,0 +1,31 @@
+#!/usr/bin/env python3
+"""(a) Check W_{2j+2} ⊇ E_j ∩ S_j  (S_j = small-prime carry conditions p ≤ 2j+2) and
+   W_{2j+2} ⊇ E_j ∩ {N ≡ -1 mod L_{2j+2}}.
+   (b) Polynomial family N = x^2 (so N, N-1 are (x+1)-smooth): witness rate for m=1..4."""
+import sys
+from exp2 import *
+NMAX = int(sys.argv[1]) if len(sys.argv) > 1 else 200000
+spf = spf_sieve(2 * NMAX + 2)
+sp = [p for p in range(2, 200) if spf[p] == p]
+for j in range(0, 4):
+    m = 2 * j + 2
+    L = L_m(m, sp)
+    viol_S = viol_L = cnt_S = cnt_L = 0
+    for N in range(m + 2, NMAX):
+        if not is396(N, j, spf):
+            continue
+        inS = all(cp(m, N, p) <= Vp(N, p) for p in sp if p <= m)
+        inL = (N + 1) % L == 0
+        w = is389(N, m, spf, sp)
+        if inS:
+            cnt_S += 1
+            if not w: viol_S += 1
+        if inL:
+            cnt_L += 1
+            if not w: viol_L += 1
+    print(f"j={j}: |E_j∩S_j|={cnt_S}, not in W_{m}: {viol_S};  |E_j∩(N≡-1 mod {L})|={cnt_L}, not in W_{m}: {viol_L}", flush=True)
+
+xmax = isqrt(NMAX)
+for m in range(1, 7):
+    hits = [x for x in range(2, xmax) if is389(x * x, m, spf, sp)]
+    print(f"family N=x^2, m={m} (n={m+1}): witnesses x<{xmax}: {len(hits)} (rate {len(hits)/(xmax-2):.3f}); first: {hits[:8]}", flush=True)

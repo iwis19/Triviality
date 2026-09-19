@@ -1,0 +1,72 @@
+"""Numerical test of the surviving p=13 case of idea 302bb253.
+
+If a 41-point kissing configuration C in R^5 admits a symmetry g of order 13, the argument
+forces: g = diag(R(2*pi/13), R(2*pi*b/13), 1) up to conjugacy, C = {+-e5} U O1 U O2 U O3 with
+O_j a 13-orbit of x_j = (w1_j, w2_j, t_j) in C x C x R, |t_j| <= 1/2.
+
+We maximise the minimum angle over this family (10 free parameters after fixing the torus
+gauge; we simply use 15 parameters and let the optimiser handle the redundancy) for each
+b in 1..12 with many random restarts, via SLSQP on the epigraph form
+    min m  s.t.  <x,y> <= m for all distinct pairs.
+Output: best min angle per b (degrees); 60 deg would be a 41-point kissing configuration.
+"""
+import numpy as np
+from scipy.optimize import minimize
+import sys
+
+P = 13
+zeta = np.exp(2j * np.pi / P)
+
+def orbit(rep, b):
+    w1, w2, t = rep[0] + 1j * rep[1], rep[2] + 1j * rep[3], rep[4]
+    ks = np.arange(P)
+    a = w1 * zeta ** ks
+    c = w2 * zeta ** (b * ks)
+    return np.stack([a.real, a.imag, c.real, c.imag, np.full(P, t)], axis=1)
+
+def config(params, b):
+    reps = params.reshape(3, 5)
+    reps = reps / np.linalg.norm(reps, axis=1, keepdims=True)
+    pts = [np.array([[0, 0, 0, 0, 1.0], [0, 0, 0, 0, -1.0]])]
+    for r in reps:
+        pts.append(orbit(r, b))
+    return np.vstack(pts)
+
+def maxcos(params, b):
+    X = config(params, b)
+    G = X @ X.T
+    np.fill_diagonal(G, -2)
+    return G.max()
+
+def solve(b, seed, iters=300):
+    rng = np.random.default_rng(seed)
+    x0 = rng.normal(size=15)
+    x0 = x0 / np.linalg.norm(x0.reshape(3, 5), axis=1).repeat(5)
+    # epigraph: variables (params, m); constraints m - <x_i,x_j> >= 0
+    iu = np.triu_indices(41, 1)
+    def cons(v):
+        X = config(v[:15], b)
+        G = X @ X.T
+        return v[15] - G[iu]
+    v0 = np.concatenate([x0, [maxcos(x0, b)]])
+    res = minimize(lambda v: v[15], v0, constraints=[{'type': 'ineq', 'fun': cons}],
+                   method='SLSQP', options={'maxiter': iters, 'ftol': 1e-12})
+    return maxcos(res.x[:15], b), res.x[:15]
+
+if __name__ == '__main__':
+    nrest = int(sys.argv[1]) if len(sys.argv) > 1 else 40
+    best_all = {}
+    for b in range(1, P):
+        best = (2.0, None)
+        for s in range(nrest):
+            try:
+                m, x = solve(b, 1000 * b + s)
+            except Exception as e:
+                continue
+            if m < best[0]:
+                best = (m, x)
+        ang = np.degrees(np.arccos(best[0]))
+        best_all[b] = (best[0], ang)
+        print(f"b={b:2d}  best max-cos={best[0]:.6f}  min angle={ang:.4f} deg", flush=True)
+    bb = min(best_all, key=lambda k: best_all[k][0])
+    print("overall best: b=%d cos=%.6f angle=%.4f deg" % (bb, best_all[bb][0], best_all[bb][1]))

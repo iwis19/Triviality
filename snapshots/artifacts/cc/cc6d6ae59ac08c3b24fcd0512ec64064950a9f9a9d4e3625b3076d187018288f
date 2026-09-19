@@ -1,0 +1,7 @@
+import Mathlib
+
+/-- Arithmetic core of idea 302bb253: for an odd prime `p` with `7 ≤ p ≤ 23`, a 41-point set
+    with `f ∈ {0,1,2}` fixed points and the rest in `p`-orbits (`41 = f + k*p`) exists
+    only for `p = 13`. Primes `p ≥ 29` are excluded separately (`p > κ(4) = 24`). -/
+theorem prime_filter_41 :
+    ∀ p ∈ ({7, 11, 13, 17, 19, 23} : Finset ℕ), (41 % p ≤ 2 ↔ p = 13) := by decide

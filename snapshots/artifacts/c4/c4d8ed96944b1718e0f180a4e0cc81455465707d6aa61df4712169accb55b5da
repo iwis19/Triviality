@@ -1,0 +1,41 @@
+# Numerical sanity check of the CRT-free CPAP template of ideas 2a24d763 / 219be928 for k=3.
+# d=k!, W=(k-1)d, F=W!, X={x<W : d∤x}, M=prod_{x in X}(xF+1), c=F^(E-1) with E=phi(M) (idea 2a24d763)
+# or c=F^(2E-1) (idea 219be928). Everything is checked modulo the relevant moduli (c itself has ~10^97 digits).
+from sympy import factorint, totient, isprime, primerange, gcd
+from math import factorial
+k=3; d=factorial(k); W=(k-1)*d; F=factorial(W)
+X=[x for x in range(W) if x%d!=0]
+Q=[x*F+1 for x in X]
+# pairwise coprime + coprime to F
+assert all(gcd(F,q)==1 for q in Q)
+assert all(gcd(Q[i],Q[j])==1 for i in range(len(Q)) for j in range(i))
+M=1
+for q in Q: M*=q
+phi=1
+for q in Q: phi*=int(totient(q))          # factorint works: q ~ 5e9
+print("k",k,"d",d,"W",W,"F",F,"#X",len(X),"digits(M)",len(str(M)),"phi(M) digits",len(str(phi)))
+for label,E in (("phi-1",phi-1),("2phi-1",2*phi-1)):
+    # (a) F*c ≡ 1 mod M
+    assert (F*pow(F,E,M))%M==1
+    # (b) q_x | c + x for all x in X  (composite part)
+    for x,q in zip(X,Q): assert (pow(F,E,q)+x)%q==0
+    # (c) admissibility, case p | M: n=0, p ∤ c + j d
+    for q in Q:
+        for p in factorint(q):
+            assert p>W
+            for j in range(k): assert (pow(F,E,p)+j*d)%p!=0
+    # (d) p ∤ M, p | d: n=1 ; p | c since E>=1
+    for p in primerange(2,k+1):
+        assert M%p!=0 and pow(F,E,p)==0
+        for j in range(k): assert (M+pow(F,E,p)+j*d)%p!=0
+    # (e) p ∤ M, p ∤ d, p prime <= 2000: n = (c + k d) * M^(p-2) * (p-1)  (mod p) -- Fermat trick of 219be928
+    for p in primerange(k+1,2000):
+        if M%p==0: continue
+        cm=pow(F,E,p)
+        n=((cm+k*d)*pow(M,p-2,p)*(p-1))%p
+        assert (M*n+cm+k*d)%p==0
+        for j in range(k): assert (M*n+cm+j*d)%p!=0
+    print(label,"all modular checks passed")
+# (f) composite part with explicit small n: y=M n + c + x has factor q_x < y (checked as inequality q_x<=M<M n+c+x for n>=1)
+assert all(q<=M for q in Q)
+print("q_x <= M for all x: ok")

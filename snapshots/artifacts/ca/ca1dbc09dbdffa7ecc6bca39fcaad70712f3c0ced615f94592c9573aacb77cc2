@@ -1,0 +1,35 @@
+// Direct search for F_k(m) = N F_k(n), m >= n+k, for fixed N and k in [kmin,kmax], n <= L.
+// For each n, m is pinned down rigorously: the factors (m+i)/(n+i) decrease in i, so
+//   ((m+k)/(n+k))^k <= N <= ((m+1)/(n+1))^k,  i.e.  N^{1/k}(n+1)-1 <= m <= N^{1/k}(n+k)-k
+// (window of width (N^{1/k}-1)(k-1) < log N). We test every integer m in that window
+// (plus a 1-unit guard for floating error) with exact arithmetic modulo two ~2^61 primes.
+// Usage: ./n4search N L kmin kmax
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <math.h>
+typedef unsigned __int128 u128;
+static const uint64_t P1 = 2305843009213693951ULL; // 2^61-1
+static const uint64_t P2 = 4611686018427387847ULL; // prime < 2^62
+static uint64_t mulmod(uint64_t a, uint64_t b, uint64_t p){ return (uint64_t)(((u128)a*b)%p); }
+static uint64_t Fmod(uint64_t t, int k, uint64_t p){ uint64_t r=1; for(int i=1;i<=k;i++) r=mulmod(r,(t+i)%p,p); return r; }
+int main(int argc,char**argv){
+  uint64_t N = strtoull(argv[1],0,10), L = strtoull(argv[2],0,10);
+  int kmin=atoi(argv[3]), kmax=atoi(argv[4]);
+  long hits=0;
+  for(int k=kmin;k<=kmax;k++){
+    long double r = powl((long double)N, 1.0L/k);
+    for(uint64_t n=0;n<=L;n++){
+      int64_t mlo=(int64_t)floorl(r*((long double)n+1)-1)-1;
+      int64_t mhi=(int64_t)ceill(r*((long double)n+k)-k)+1;
+      for(int64_t m=mlo;m<=mhi;m++){
+        if(m < (int64_t)n+k) continue;
+        if(Fmod(m,k,P1)!=mulmod(N%P1,Fmod(n,k,P1),P1)) continue;
+        if(Fmod(m,k,P2)!=mulmod(N%P2,Fmod(n,k,P2),P2)) continue;
+        printf("HIT N=%llu k=%d n=%llu m=%lld\n",(unsigned long long)N,k,(unsigned long long)n,(long long)m); hits++;
+      }
+    }
+    fprintf(stderr,"N=%llu k=%d n<=%llu done, hits so far=%ld\n",(unsigned long long)N,k,(unsigned long long)L,hits);
+  }
+  return 0;
+}

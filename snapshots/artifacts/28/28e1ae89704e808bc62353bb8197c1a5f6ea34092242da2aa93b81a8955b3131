@@ -1,0 +1,70 @@
+"""Critic check for idea 495e: (i) verify pairwise-overlap closed form against brute force;
+(ii) adversarial search for speed sets where no spanning tree reaches (n-1)(2d)^2 at d=1/(2n-2).
+Run: python3 hunter_check.py n Nmax restarts   (e.g. 5 400 40 ; 7 600 25). Seed 1 reproduces
+(30,66,75,85,290), (6,180,183,202,228) for n=5 and (15,135,170,271,287,478,495) for n=7."""
+from fractions import Fraction as F
+from math import gcd
+import random, itertools, sys
+
+def overlap(vi, vj, d):
+    g = gcd(vi, vj); a, b = vi//g, vj//g
+    if a > b: a, b = b, a
+    L = d*(a+b); s = F(0); m = 0
+    while True:
+        term = min(2*d*a, 2*d*b, L-m)
+        if term <= 0: break
+        s += term if m == 0 else 2*term
+        m += 1
+    return s/(a*b)
+
+def overlap_brute(vi, vj, d):
+    def bad(v):
+        return [(F(m,v)-d/v, F(m,v)+d/v) for m in range(v)]
+    def norm(iv):
+        out = []
+        for lo, hi in iv:
+            if lo < 0: out += [(lo+1, 1), (0, hi)]
+            elif hi > 1: out += [(lo, 1), (0, hi-1)]
+            else: out.append((lo, hi))
+        return out
+    A, B = norm(bad(vi)), norm(bad(vj))
+    tot = F(0)
+    for a in A:
+        for b in B:
+            lo, hi = max(a[0], b[0]), min(a[1], b[1])
+            if hi > lo: tot += hi-lo
+    return tot
+
+def mst_sum(v, d, exact=False):
+    n = len(v)
+    w = {(i, j): (overlap(v[i], v[j], d) if exact else float(overlap(v[i], v[j], d))) for i in range(n) for j in range(i+1, n)}
+    intree = {0}; tot = F(0) if exact else 0.0
+    while len(intree) < n:
+        best = max(((w[(min(i, j), max(i, j))], j) for i in intree for j in range(n) if j not in intree))
+        tot += best[0]; intree.add(best[1])
+    return tot
+
+if __name__ == "__main__":
+    random.seed(1)
+    for _ in range(200):
+        a, b = random.randint(1, 30), random.randint(1, 30)
+        if a == b: continue
+        d = F(random.randint(1, 50), 100)
+        assert overlap(a, b, d) == overlap_brute(a, b, d), (a, b, d)
+    print("closed form matches brute force on 200 random pairs")
+    n = int(sys.argv[1]); N = int(sys.argv[2]); iters = int(sys.argv[3])
+    d = F(1, 2*n-2); target = (n-1)*float((2*d)**2)
+    best = None
+    for trial in range(iters):
+        v = sorted(random.sample(range(1, N+1), n))
+        cur = mst_sum(v, d)
+        for step in range(300):
+            w = v[:]; i = random.randrange(n); w[i] = random.randint(1, N)
+            if len(set(w)) < n: continue
+            s = mst_sum(w, d)
+            if s <= cur: v, cur = sorted(w), s
+        if best is None or cur < best[0]:
+            best = (cur, v); print(trial, cur, target, cur-target, v, flush=True)
+    print("min tree-sum minus target:", best[0]-target, best[1])
+    # exact confirmation of the best set
+    s = mst_sum(best[1], d, exact=True); print('exact tree sum', s, 'target', (n-1)*(2*d)**2, 'deficit', s-(n-1)*(2*d)**2)

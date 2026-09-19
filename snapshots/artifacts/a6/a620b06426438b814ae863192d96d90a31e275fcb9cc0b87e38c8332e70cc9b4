@@ -1,0 +1,291 @@
+# ===== ivbb.py =====
+"""
+Interval branch-and-bound for C_13-symmetric candidate kissing configurations in R^5.
+
+Model (idea 2527fc6b / 95d3c2fe): g = diag(R(2pi/13), R(2pi b/13), 1), configuration
+C = {+-e5} U O1 U O2 U O3, O_j = orbit of x_j = (r1_j e^{i a_j}, r2_j e^{i b_j}, t_j),
+r1_j^2 = (1-t_j^2) s_j, r2_j^2 = (1-t_j^2)(1-s_j), s_j in [0,1], |t_j| <= 1/2 (from +-e5).
+
+Constraint families (all must be <= 1/2 for a kissing configuration):
+  within orbit j, m=1..6:  (1-t^2)[ s cos(th_m) + (1-s) cos(b th_m) ] + t^2
+  cross (i,j), m=0..12:    r1_i r1_j cos(th_m + da) + r2_i r2_j cos(b th_m + db) + t_i t_j
+  th_m = 2 pi m / 13, (da, db) = phase differences (a_j - a_i, b_j - b_i).
+
+Interval arithmetic: plain numpy float64 with an explicit outward padding EPS on each
+bound (NOT directed rounding).  Assumption: accumulated rounding error per constraint
+evaluation is far below EPS = 1e-9 (the certified margins are ~1e-2..1e-1).
+"""
+import numpy as np, time, sys
+
+EPS = 1e-9
+TWO_PI = 2 * np.pi
+
+
+def icos(lo, hi):
+    """Interval enclosure of cos on [lo,hi] (vectorized)."""
+    w = hi - lo
+    clo, chi = np.cos(lo), np.cos(hi)
+    mn = np.minimum(clo, chi)
+    mx = np.maximum(clo, chi)
+    # does [lo,hi] contain an even multiple of pi (max=1) / odd multiple (min=-1)?
+    k_lo = np.ceil(lo / np.pi)
+    k_hi = np.floor(hi / np.pi)
+    has_even = (np.floor(k_hi / 2) * 2 >= k_lo) & (k_hi >= k_lo)
+    has_odd = (np.floor((k_hi - 1) / 2) * 2 + 1 >= k_lo) & (k_hi >= k_lo)
+    mx = np.where(has_even | (w >= TWO_PI), 1.0, mx)
+    mn = np.where(has_odd | (w >= TWO_PI), -1.0, mn)
+    return mn - EPS, mx + EPS
+
+
+def imul(alo, ahi, blo, bhi):
+    p = np.stack([alo * blo, alo * bhi, ahi * blo, ahi * bhi])
+    return p.min(0) - EPS, p.max(0) + EPS
+
+
+def imul_nn(alo, ahi, blo, bhi):
+    """product of nonnegative intervals"""
+    return alo * blo - EPS, ahi * bhi + EPS
+
+
+def isqrt_nn(lo, hi):
+    lo = np.maximum(lo, 0.0)
+    hi = np.maximum(hi, 0.0)
+    return np.sqrt(lo) - EPS, np.sqrt(hi) + EPS
+
+
+def isq(lo, hi):
+    """x^2 for interval"""
+    mn = np.where((lo <= 0) & (hi >= 0), 0.0, np.minimum(lo * lo, hi * hi))
+    mx = np.maximum(lo * lo, hi * hi)
+    return mn - EPS, mx + EPS
+
+
+def radii(tlo, thi, slo, shi):
+    """intervals for 1-t^2, r1, r2"""
+    q_lo, q_hi = isq(tlo, thi)
+    u_lo, u_hi = 1 - q_hi, 1 - q_lo  # 1 - t^2
+    a_lo, a_hi = imul_nn(u_lo, u_hi, slo, shi)
+    b_lo, b_hi = imul_nn(u_lo, u_hi, 1 - shi, 1 - slo)
+    r1 = isqrt_nn(a_lo, a_hi)
+    r2 = isqrt_nn(b_lo, b_hi)
+    return (u_lo, u_hi), r1, r2, (q_lo, q_hi)
+
+
+def within_lower_bounds(b, tlo, thi, slo, shi):
+    """lower bounds of the 6 within-orbit constraints; shape (6, N)"""
+    (u_lo, u_hi), _, _, (q_lo, q_hi) = radii(tlo, thi, slo, shi)
+    out = []
+    for m in range(1, 7):
+        c1 = np.cos(TWO_PI * m / 13)
+        c2 = np.cos(TWO_PI * b * m / 13)
+        # g(s) = s c1 + (1-s) c2 is linear in s
+        g_vals = np.stack([slo * c1 + (1 - slo) * c2, shi * c1 + (1 - shi) * c2])
+        g_lo, g_hi = g_vals.min(0), g_vals.max(0)
+        p_lo, p_hi = imul(u_lo, u_hi, g_lo, g_hi)
+        out.append(p_lo + q_lo - EPS)
+    return np.stack(out)
+
+
+def cross_lower_bounds(b, ti, si, tj, sj, da, db):
+    """ti=(lo,hi) etc.  lower bounds of the 13 cross constraints; shape (13, N)"""
+    _, r1i, r2i, _ = radii(*ti, *si)
+    _, r1j, r2j, _ = radii(*tj, *sj)
+    A = imul_nn(*r1i, *r1j)
+    B = imul_nn(*r2i, *r2j)
+    T = imul(*ti, *tj)
+    out = []
+    for m in range(13):
+        th = TWO_PI * m / 13
+        c1 = icos(da[0] + th, da[1] + th)
+        c2 = icos(db[0] + b * th, db[1] + b * th)
+        p1 = imul(*A, *c1)
+        p2 = imul(*B, *c2)
+        out.append(p1[0] + p2[0] + T[0] - EPS)
+    return np.stack(out)
+
+
+def split(lo, hi, scale):
+    """bisect every box along its widest scaled dimension"""
+    w = (hi - lo) / scale
+    d = w.argmax(1)
+    idx = np.arange(len(lo))
+    mid = 0.5 * (lo[idx, d] + hi[idx, d])
+    lo1, hi1 = lo.copy(), hi.copy()
+    lo2, hi2 = lo.copy(), hi.copy()
+    hi1[idx, d] = mid
+    lo2[idx, d] = mid
+    return np.concatenate([lo1, lo2]), np.concatenate([hi1, hi2])
+
+
+# ===== stageAB.py =====
+import numpy as np, time, sys, json
+from ivbb import *
+
+HALF = 0.5
+
+
+def bb_uniform(lo, hi, scale, lb_fun, max_rounds, max_boxes=4_000_000, verbose=True, extra_prune=None):
+    """Uniform B&B: every round bisects all boxes along the same (widest scaled) dim.
+    Returns surviving boxes (lo,hi) and history."""
+    hist = []
+    for r in range(max_rounds):
+        if len(lo) == 0:
+            break
+        lbs = lb_fun(lo, hi)  # (K, N)
+        bad = (lbs > HALF).any(0)
+        if extra_prune is not None:
+            bad |= extra_prune(lo, hi)
+        lo, hi = lo[~bad], hi[~bad]
+        hist.append((r, len(lo)))
+        if verbose:
+            print(f"round {r}: survivors {len(lo)}  widths {np.round((hi[0]-lo[0]) if len(lo) else 0, 4)}", flush=True)
+        if len(lo) == 0 or len(lo) > max_boxes or r == max_rounds - 1:
+            break
+        w = (hi[0] - lo[0]) / scale
+        d = int(w.argmax())
+        mid = 0.5 * (lo[:, d] + hi[:, d])
+        lo1, hi1 = lo.copy(), hi.copy(); hi1[:, d] = mid
+        lo2, hi2 = lo.copy(), hi.copy(); lo2[:, d] = mid
+        lo, hi = np.concatenate([lo1, lo2]), np.concatenate([hi1, hi2])
+    return lo, hi, hist
+
+
+def stageA(b, rounds=20):
+    lo = np.array([[-0.5, 0.0]]); hi = np.array([[0.5, 1.0]])
+    scale = np.array([1.0, 1.0])
+    f = lambda lo, hi: within_lower_bounds(b, lo[:, 0], hi[:, 0], lo[:, 1], hi[:, 1])
+    lo, hi, hist = bb_uniform(lo, hi, scale, f, rounds, verbose=False)
+    area = float(np.prod(hi[0] - lo[0]) * len(lo)) if len(lo) else 0.0
+    return lo, hi, area
+
+
+def stageB(b, RA, rounds, max_boxes, zero_ti=False):
+    """RA = (lo,hi) surviving Stage-A cells (identical shape). 6-dim box:
+    (t_i, s_i, t_j, s_j, da, db), da in [0,2pi/13], db in [0,2pi]."""
+    lo = np.array([[-0.5, 0.0, -0.5, 0.0, 0.0, 0.0]])
+    hi = np.array([[0.5, 1.0, 0.5, 1.0, TWO_PI / 13, TWO_PI]])
+    scale = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])  # phases scaled like the others (radians ~ O(1) sensitivity)
+    if zero_ti:
+        lo[0, 0] = hi[0, 0] = 0.0
+
+    def f(lo, hi):
+        w_i = within_lower_bounds(b, lo[:, 0], hi[:, 0], lo[:, 1], hi[:, 1])
+        w_j = within_lower_bounds(b, lo[:, 2], hi[:, 2], lo[:, 3], hi[:, 3])
+        c = cross_lower_bounds(b, (lo[:, 0], hi[:, 0]), (lo[:, 1], hi[:, 1]),
+                               (lo[:, 2], hi[:, 2]), (lo[:, 3], hi[:, 3]),
+                               (lo[:, 4], hi[:, 4]), (lo[:, 5], hi[:, 5]))
+        return np.concatenate([w_i, w_j, c])
+
+    # symmetry: orbit order -> impose t_i >= t_j (prune boxes with hi t_i < lo t_j)
+    prune = (lambda lo, hi: hi[:, 0] < lo[:, 2]) if not zero_ti else None
+    lo, hi, hist = bb_uniform(lo, hi, scale, f, rounds, max_boxes=max_boxes, extra_prune=prune)
+    return lo, hi, hist
+
+
+if __name__ == "__main__":
+    b = int(sys.argv[1]); roundsB = int(sys.argv[2]); maxb = int(sys.argv[3])
+    zero_ti = len(sys.argv) > 4 and sys.argv[4] == 'zero'
+    tag = f"b{b}" + ("_ti0" if zero_ti else "")
+    res = {"b": b, "zero_ti": zero_ti}
+    t0 = time.time()
+    loA, hiA, areaA = stageA(b)
+    print(f"b={b} Stage A: surviving area {areaA:.5f} of 1.0, cells {len(loA)}, cell {hiA[0]-loA[0]}")
+    res["stageA_area"] = areaA; res["stageA_cells"] = len(loA)
+    if len(loA):
+        res["stageA_t_range"] = [float(loA[:, 0].min()), float(hiA[:, 0].max())]
+        res["stageA_s_range"] = [float(loA[:, 1].min()), float(hiA[:, 1].max())]
+    lo, hi, hist = stageB(b, (loA, hiA), roundsB, maxb, zero_ti)
+    res["stageB_hist"] = hist
+    if len(lo):
+        cell = hi[0] - lo[0]
+        cellp = np.where(cell > 0, cell, 1.0)
+        vol6 = float(np.prod(cellp) * len(lo)); tot6 = (0.5 if zero_ti else 1.0) * (TWO_PI / 13) * TWO_PI
+        proj = np.unique(np.round(lo[:, :4] / cellp[:4]).astype(int), axis=0)
+        vol4 = float(np.prod(cellp[:4]) * len(proj))
+        res.update(stageB_boxes6=len(lo), stageB_vol6_frac=vol6 / tot6, stageB_proj4_cells=len(proj),
+                   stageB_proj4_vol_frac=vol4 / 0.5,  # domain with t_i>=t_j (or t_i=0, 3-dim) has volume 1/2
+                   stageB_cell=cell.tolist(),
+                   stageB_ti_range=[float(lo[:, 0].min()), float(hi[:, 0].max())],
+                   stageB_tj_range=[float(lo[:, 2].min()), float(hi[:, 2].max())])
+        np.savez_compressed(f"stageB_{tag}.npz", lo=lo, hi=hi)
+    else:
+        res.update(stageB_boxes6=0, stageB_vol6_frac=0.0, stageB_proj4_vol_frac=0.0)
+    res["time_s"] = time.time() - t0
+    print(json.dumps(res, indent=1))
+    json.dump(res, open(f"stageAB_{tag}.json", "w"), indent=1)
+
+
+# ===== certify.py =====
+"""
+Certificate runs for the two pair lemmas (b in {3,5}):
+  L1 (same-sign exclusion): no two 13-orbits i != j with t_i, t_j in [0,1/2] (all s, all phases)
+      can have all within-orbit and cross inner products <= 1/2.
+      (By the global reflection e5 -> -e5 the case t_i, t_j in [-1/2,0] follows.)
+  L2 (equator exclusion): no 13-orbit with t_i = 0 can coexist with any other 13-orbit
+      (t_j in [-1/2,1/2], all s, all phases).
+Consequence: three orbits with pairwise t_i t_j < 0 is impossible (pigeonhole on signs), and
+t_k = 0 is impossible by L2, so no configuration {+-e5} U O1 U O2 U O3 exists for b in {3,5}.
+Interval arithmetic = float64 + EPS padding (see ivbb.py).
+"""
+import numpy as np, sys, json, time
+from ivbb import *
+from stageAB import bb_uniform
+
+
+def run(b, tlo_i, thi_i, tlo_j, thi_j, rounds=60, max_boxes=20_000_000):
+    lo = np.array([[tlo_i, 0.0, tlo_j, 0.0, 0.0, 0.0]])
+    hi = np.array([[thi_i, 1.0, thi_j, 1.0, TWO_PI / 13, TWO_PI]])
+    scale = np.ones(6)
+
+    def f(lo, hi):
+        w_i = within_lower_bounds(b, lo[:, 0], hi[:, 0], lo[:, 1], hi[:, 1])
+        w_j = within_lower_bounds(b, lo[:, 2], hi[:, 2], lo[:, 3], hi[:, 3])
+        c = cross_lower_bounds(b, (lo[:, 0], hi[:, 0]), (lo[:, 1], hi[:, 1]),
+                               (lo[:, 2], hi[:, 2]), (lo[:, 3], hi[:, 3]),
+                               (lo[:, 4], hi[:, 4]), (lo[:, 5], hi[:, 5]))
+        return np.concatenate([w_i, w_j, c])
+
+    t0 = time.time()
+    lo, hi, hist = bb_uniform(lo, hi, scale, f, rounds, max_boxes=max_boxes, verbose=False)
+    return dict(survivors=len(lo), rounds=len(hist), max_boxes_seen=max(n for _, n in hist),
+                hist=hist, time_s=time.time() - t0)
+
+
+if __name__ == "__main__":
+    out = {}
+    for b in (3, 5):
+        out[f"b{b}_L1_same_sign"] = run(b, 0.0, 0.5, 0.0, 0.5)
+        out[f"b{b}_L2_equator"] = run(b, 0.0, 0.0, -0.5, 0.5)
+        for k, v in out.items():
+            if k.startswith(f"b{b}"):
+                print(k, {kk: vv for kk, vv in v.items() if kk != 'hist'}, flush=True)
+    json.dump(out, open("certify_results.json", "w"), indent=1)
+
+
+# ===== numcheck.py =====
+import numpy as np
+from scipy.optimize import minimize
+TWO_PI=2*np.pi
+def maxcon(p,b):
+    ti,si,tj,sj,da,db=p
+    si=np.clip(si,0,1); sj=np.clip(sj,0,1)
+    r1i=np.sqrt((1-ti*ti)*si); r2i=np.sqrt((1-ti*ti)*(1-si)); r1j=np.sqrt((1-tj*tj)*sj); r2j=np.sqrt((1-tj*tj)*(1-sj))
+    m=np.arange(1,7); th=TWO_PI*m/13
+    w=[(1-t*t)*(s*np.cos(th)+(1-s)*np.cos(b*th))+t*t for t,s in ((ti,si),(tj,sj))]
+    m=np.arange(13); th=TWO_PI*m/13
+    c=r1i*r1j*np.cos(th+da)+r2i*r2j*np.cos(b*th+db)+ti*tj
+    return max(np.max(w[0]),np.max(w[1]),np.max(c),abs(ti),abs(tj))
+def opt(b,bounds,n=300,seed=0):
+    rng=np.random.default_rng(seed); best=9
+    for _ in range(n):
+        x0=np.array([rng.uniform(l,h) for l,h in bounds])
+        # epigraph via Nelder-Mead on maxcon (nonsmooth) with bounds
+        r=minimize(lambda p: maxcon(np.clip(p,[l for l,h in bounds],[h for l,h in bounds]),b),x0,method='Nelder-Mead',options=dict(xatol=1e-9,fatol=1e-10,maxiter=4000))
+        v=maxcon(np.clip(r.x,[l for l,h in bounds],[h for l,h in bounds]),b)
+        if v<best: best=v; bx=np.clip(r.x,[l for l,h in bounds],[h for l,h in bounds])
+    return best,bx
+for b in (3,5):
+    print('b',b)
+    print(' same-sign  ', opt(b,[(0,.5),(0,1),(0,.5),(0,1),(0,TWO_PI/13),(0,TWO_PI)]))
+    print(' equator    ', opt(b,[(0,0),(0,1),(-.5,.5),(0,1),(0,TWO_PI/13),(0,TWO_PI)]))
+    print(' unrestricted', opt(b,[(-.5,.5),(0,1),(-.5,.5),(0,1),(0,TWO_PI/13),(0,TWO_PI)]))

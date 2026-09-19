@@ -1,0 +1,251 @@
+=== out/summary.txt (generator per-block summary) ===
+K=2 S=[3] M=3 i_lo=3 i_hi=2 N_B=0 N_A=3 mr_entries=0 solutions=1 time=0.0s
+K=3 S=[3] M=3 i_lo=5 i_hi=5 N_B=1 N_A=4 mr_entries=1 solutions=1 time=0.0s
+K=4 S=[3, 5] M=15 i_lo=2 i_hi=2 N_B=1 N_A=5 mr_entries=0 solutions=1 time=0.0s
+K=5 S=[3, 5] M=15 i_lo=3 i_hi=4 N_B=2 N_A=6 mr_entries=1 solutions=1 time=0.0s
+K=6 S=[3, 5] M=15 i_lo=5 i_hi=8 N_B=4 N_A=7 mr_entries=2 solutions=2 time=0.0s
+K=7 S=[3, 5] M=15 i_lo=10 i_hi=17 N_B=8 N_A=8 mr_entries=0 solutions=0 time=0.0s
+K=8 S=[3, 5] M=15 i_lo=18 i_hi=34 N_B=17 N_A=9 mr_entries=0 solutions=0 time=0.0s
+K=9 S=[3, 5] M=15 i_lo=35 i_hi=68 N_B=34 N_A=10 mr_entries=0 solutions=0 time=0.0s
+K=10 S=[3, 5, 11] M=165 i_lo=7 i_hi=12 N_B=6 N_A=11 mr_entries=0 solutions=0 time=0.0s
+K=11 S=[3, 5, 11] M=165 i_lo=13 i_hi=24 N_B=12 N_A=12 mr_entries=0 solutions=0 time=0.0s
+K=12 S=[3, 5, 11, 13] M=2145 i_lo=2 i_hi=3 N_B=2 N_A=13 mr_entries=0 solutions=0 time=0.0s
+K=13 S=[3, 5, 11, 13] M=2145 i_lo=4 i_hi=7 N_B=4 N_A=14 mr_entries=0 solutions=0 time=0.0s
+K=14 S=[3, 5, 11, 13] M=2145 i_lo=8 i_hi=15 N_B=8 N_A=15 mr_entries=0 solutions=0 time=0.0s
+K=15 S=[3, 5, 11, 13] M=2145 i_lo=16 i_hi=30 N_B=15 N_A=16 mr_entries=0 solutions=0 time=0.0s
+K=16 S=[3, 5, 11, 13] M=2145 i_lo=31 i_hi=61 N_B=31 N_A=17 mr_entries=0 solutions=0 time=0.0s
+K=17 S=[3, 5, 11, 13] M=2145 i_lo=62 i_hi=122 N_B=61 N_A=18 mr_entries=0 solutions=0 time=0.0s
+K=18 S=[3, 5, 11, 13, 19] M=40755 i_lo=7 i_hi=12 N_B=6 N_A=19 mr_entries=0 solutions=0 time=0.0s
+K=19 S=[3, 5, 11, 13, 19] M=40755 i_lo=13 i_hi=25 N_B=13 N_A=20 mr_entries=0 solutions=0 time=0.0s
+K=20 S=[3, 5, 11, 13, 19] M=40755 i_lo=26 i_hi=51 N_B=26 N_A=21 mr_entries=0 solutions=0 time=0.0s
+K=21 S=[3, 5, 11, 13, 19] M=40755 i_lo=52 i_hi=102 N_B=51 N_A=22 mr_entries=0 solutions=0 time=0.0s
+K=22 S=[3, 5, 11, 13, 19] M=40755 i_lo=103 i_hi=205 N_B=103 N_A=23 mr_entries=0 solutions=0 time=0.0s
+K=23 S=[3, 5, 11, 13, 19] M=40755 i_lo=206 i_hi=411 N_B=206 N_A=24 mr_entries=0 solutions=0 time=0.0s
+K=24 S=[3, 5, 11, 13, 19] M=40755 i_lo=412 i_hi=823 N_B=412 N_A=25 mr_entries=0 solutions=0 time=0.0s
+K=25 S=[3, 5, 11, 13, 19] M=40755 i_lo=824 i_hi=1646 N_B=823 N_A=26 mr_entries=0 solutions=0 time=0.0s
+K=26 S=[3, 5, 11, 13, 19] M=40755 i_lo=1647 i_hi=3293 N_B=1647 N_A=27 mr_entries=0 solutions=0 time=0.0s
+K=27 S=[3, 5, 11, 13, 19] M=40755 i_lo=3294 i_hi=6586 N_B=3293 N_A=28 mr_entries=0 solutions=0 time=0.0s
+K=28 S=[3, 5, 11, 13, 19, 29] M=1181895 i_lo=228 i_hi=454 N_B=227 N_A=29 mr_entries=0 solutions=0 time=0.0s
+K=29 S=[3, 5, 11, 13, 19, 29] M=1181895 i_lo=455 i_hi=908 N_B=454 N_A=30 mr_entries=0 solutions=0 time=0.0s
+K=30 S=[3, 5, 11, 13, 19, 29] M=1181895 i_lo=909 i_hi=1816 N_B=908 N_A=31 mr_entries=0 solutions=0 time=0.0s
+K=31 S=[3, 5, 11, 13, 19, 29] M=1181895 i_lo=1817 i_hi=3633 N_B=1817 N_A=32 mr_entries=0 solutions=0 time=0.0s
+K=32 S=[3, 5, 11, 13, 19, 29] M=1181895 i_lo=3634 i_hi=7267 N_B=3634 N_A=33 mr_entries=0 solutions=0 time=0.0s
+K=33 S=[3, 5, 11, 13, 19, 29] M=1181895 i_lo=7268 i_hi=14535 N_B=7268 N_A=34 mr_entries=0 solutions=0 time=0.0s
+K=34 S=[3, 5, 11, 13, 19, 29] M=1181895 i_lo=14536 i_hi=29071 N_B=14536 N_A=35 mr_entries=0 solutions=0 time=0.0s
+K=35 S=[3, 5, 11, 13, 19, 29] M=1181895 i_lo=29072 i_hi=58143 N_B=29072 N_A=36 mr_entries=0 solutions=0 time=0.0s
+K=36 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=1572 i_hi=3142 N_B=1571 N_A=37 mr_entries=0 solutions=0 time=0.0s
+K=37 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=3143 i_hi=6285 N_B=3143 N_A=38 mr_entries=0 solutions=0 time=0.0s
+K=38 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=6286 i_hi=12571 N_B=6286 N_A=39 mr_entries=0 solutions=0 time=0.0s
+K=39 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=12572 i_hi=25143 N_B=12572 N_A=40 mr_entries=0 solutions=0 time=0.0s
+K=40 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=25144 i_hi=50286 N_B=25143 N_A=41 mr_entries=0 solutions=0 time=0.0s
+K=41 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=50287 i_hi=100572 N_B=50286 N_A=42 mr_entries=0 solutions=0 time=0.0s
+K=42 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=100573 i_hi=201144 N_B=100572 N_A=43 mr_entries=0 solutions=0 time=0.0s
+K=43 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=201145 i_hi=402289 N_B=201145 N_A=44 mr_entries=0 solutions=0 time=0.1s
+K=44 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=402290 i_hi=804579 N_B=402290 N_A=45 mr_entries=0 solutions=0 time=0.2s
+K=45 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=804580 i_hi=1609159 N_B=804580 N_A=46 mr_entries=0 solutions=0 time=0.3s
+K=46 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=1609160 i_hi=3218319 N_B=1609160 N_A=47 mr_entries=0 solutions=0 time=0.6s
+K=47 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=3218320 i_hi=6436639 N_B=3218320 N_A=48 mr_entries=0 solutions=0 time=1.2s
+K=48 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=6436640 i_hi=12873278 N_B=6436639 N_A=49 mr_entries=0 solutions=0 time=2.5s
+K=49 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=12873279 i_hi=25746557 N_B=12873279 N_A=50 mr_entries=0 solutions=0 time=5.0s
+K=50 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=25746558 i_hi=51493114 N_B=25746557 N_A=51 mr_entries=0 solutions=0 time=10.6s
+K=51 S=[3, 5, 11, 13, 19, 29, 37] M=43730115 i_lo=51493115 i_hi=102986228 N_B=51493114 N_A=52 mr_entries=0 solutions=0 time=21.6s
+K=52 S=[3, 5, 11, 13, 19, 29, 37, 53] M=2317696095 i_lo=1943137 i_hi=3886272 N_B=1943136 N_A=53 mr_entries=0 solutions=0 time=0.8s
+K=53 S=[3, 5, 11, 13, 19, 29, 37, 53] M=2317696095 i_lo=3886273 i_hi=7772545 N_B=3886273 N_A=54 mr_entries=0 solutions=0 time=1.6s
+K=54 S=[3, 5, 11, 13, 19, 29, 37, 53] M=2317696095 i_lo=7772546 i_hi=15545091 N_B=7772546 N_A=55 mr_entries=0 solutions=0 time=3.1s
+K=55 S=[3, 5, 11, 13, 19, 29, 37, 53] M=2317696095 i_lo=15545092 i_hi=31090182 N_B=15545091 N_A=56 mr_entries=0 solutions=0 time=6.2s
+K=56 S=[3, 5, 11, 13, 19, 29, 37, 53] M=2317696095 i_lo=31090183 i_hi=62180364 N_B=31090182 N_A=57 mr_entries=0 solutions=0 time=13.2s
+K=57 S=[3, 5, 11, 13, 19, 29, 37, 53] M=2317696095 i_lo=62180365 i_hi=124360729 N_B=62180365 N_A=58 mr_entries=0 solutions=0 time=27.2s
+K=58 S=[3, 5, 11, 13, 19, 29, 37, 53, 59] M=136744069605 i_lo=2107809 i_hi=4215617 N_B=2107809 N_A=59 mr_entries=0 solutions=0 time=0.8s
+K=59 S=[3, 5, 11, 13, 19, 29, 37, 53, 59] M=136744069605 i_lo=4215618 i_hi=8431235 N_B=4215618 N_A=60 mr_entries=0 solutions=0 time=1.7s
+K=60 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61] M=8341388245905 i_lo=138217 i_hi=276433 N_B=138217 N_A=61 mr_entries=0 solutions=0 time=0.1s
+K=61 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61] M=8341388245905 i_lo=276434 i_hi=552867 N_B=276434 N_A=62 mr_entries=0 solutions=0 time=0.1s
+K=62 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61] M=8341388245905 i_lo=552868 i_hi=1105735 N_B=552868 N_A=63 mr_entries=0 solutions=0 time=0.2s
+K=63 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61] M=8341388245905 i_lo=1105736 i_hi=2211471 N_B=1105736 N_A=64 mr_entries=0 solutions=0 time=0.4s
+K=64 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61] M=8341388245905 i_lo=2211472 i_hi=4422943 N_B=2211472 N_A=65 mr_entries=0 solutions=0 time=0.9s
+K=65 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61] M=8341388245905 i_lo=4422944 i_hi=8845886 N_B=4422943 N_A=66 mr_entries=0 solutions=0 time=1.8s
+K=66 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67] M=558873012475635 i_lo=132029 i_hi=264056 N_B=132028 N_A=67 mr_entries=0 solutions=0 time=0.1s
+K=67 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67] M=558873012475635 i_lo=264057 i_hi=528112 N_B=264056 N_A=68 mr_entries=0 solutions=0 time=0.1s
+K=68 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67] M=558873012475635 i_lo=528113 i_hi=1056225 N_B=528113 N_A=69 mr_entries=0 solutions=0 time=0.2s
+K=69 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67] M=558873012475635 i_lo=1056226 i_hi=2112450 N_B=1056225 N_A=70 mr_entries=0 solutions=0 time=0.4s
+K=70 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67] M=558873012475635 i_lo=2112451 i_hi=4224901 N_B=2112451 N_A=71 mr_entries=0 solutions=0 time=0.9s
+K=71 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67] M=558873012475635 i_lo=4224902 i_hi=8449802 N_B=4224901 N_A=72 mr_entries=0 solutions=0 time=1.8s
+K=72 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67] M=558873012475635 i_lo=8449803 i_hi=16899604 N_B=8449802 N_A=73 mr_entries=0 solutions=0 time=3.5s
+K=73 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67] M=558873012475635 i_lo=16899605 i_hi=33799209 N_B=16899605 N_A=74 mr_entries=0 solutions=0 time=7.1s
+K=74 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67] M=558873012475635 i_lo=33799210 i_hi=67598418 N_B=33799209 N_A=75 mr_entries=0 solutions=0 time=17.8s
+K=75 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67] M=558873012475635 i_lo=67598419 i_hi=135196837 N_B=67598419 N_A=76 mr_entries=0 solutions=0 time=33.0s
+K=76 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67] M=558873012475635 i_lo=135196838 i_hi=270393674 N_B=135196837 N_A=77 mr_entries=0 solutions=0 time=69.4s
+K=77 S=[3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67] M=558873012475635 i_lo=270393675 i_hi=540787349 N_B=270393675 N_A=78 mr_entries=0 solutions=0 time=150.5s
+
+=== out/solutions.txt ===
+2 A 3 7
+3 B 5 15
+4 A 5 21
+5 B 3 45
+6 B 5 75
+6 B 7 105
+
+=== check_fast.log ===
+K=2 OK candidates=3 solutions=[7] []
+K=3 OK candidates=5 solutions=[15] []
+K=4 OK candidates=6 solutions=[21] []
+K=5 OK candidates=8 solutions=[45] []
+K=6 OK candidates=11 solutions=[75, 105] []
+K=7 OK candidates=16 solutions=[] []
+K=8 OK candidates=26 solutions=[] []
+K=9 OK candidates=44 solutions=[] []
+K=10 OK candidates=17 solutions=[] []
+K=11 OK candidates=24 solutions=[] []
+K=12 OK candidates=15 solutions=[] []
+K=13 OK candidates=18 solutions=[] []
+K=14 OK candidates=23 solutions=[] []
+K=15 OK candidates=31 solutions=[] []
+K=16 OK candidates=48 solutions=[] []
+K=17 OK candidates=79 solutions=[] []
+K=18 OK candidates=25 solutions=[] []
+K=19 OK candidates=33 solutions=[] []
+K=20 OK candidates=47 solutions=[] []
+K=21 OK candidates=73 solutions=[] []
+K=22 OK candidates=126 solutions=[] []
+K=23 OK candidates=230 solutions=[] []
+K=24 OK candidates=437 solutions=[] []
+K=25 OK candidates=849 solutions=[] []
+K=26 OK candidates=1674 solutions=[] []
+K=27 OK candidates=3321 solutions=[] []
+K=28 OK candidates=256 solutions=[] []
+K=29 OK candidates=484 solutions=[] []
+K=30 OK candidates=939 solutions=[] []
+K=31 OK candidates=1849 solutions=[] []
+K=32 OK candidates=3667 solutions=[] []
+K=33 OK candidates=7302 solutions=[] []
+K=34 OK candidates=14571 solutions=[] []
+K=35 OK candidates=29108 solutions=[] []
+K=36 OK candidates=1608 solutions=[] []
+K=37 OK candidates=3181 solutions=[] []
+K=38 OK candidates=6325 solutions=[] []
+K=39 OK candidates=12612 solutions=[] []
+K=40 OK candidates=25184 solutions=[] []
+K=41 OK candidates=50328 solutions=[] []
+K=42 OK candidates=100615 solutions=[] []
+K=43 OK candidates=201189 solutions=[] []
+K=44 OK candidates=402335 solutions=[] []
+K=45 OK candidates=804626 solutions=[] []
+K=46 OK candidates=1609207 solutions=[] []
+K=47 OK candidates=3218368 solutions=[] []
+K=48 OK candidates=6436688 solutions=[] []
+K=49 OK candidates=12873329 solutions=[] []
+K=50 OK candidates=25746608 solutions=[] []
+K=51 OK candidates=51493166 solutions=[] []
+K=52 OK candidates=1943189 solutions=[] []
+K=53 OK candidates=3886327 solutions=[] []
+K=54 OK candidates=7772601 solutions=[] []
+K=55 OK candidates=15545147 solutions=[] []
+K=56 OK candidates=31090239 solutions=[] []
+K=57 OK candidates=62180423 solutions=[] []
+K=58 OK candidates=2107868 solutions=[] []
+K=59 OK candidates=4215678 solutions=[] []
+K=60 OK candidates=138278 solutions=[] []
+K=61 OK candidates=276496 solutions=[] []
+K=62 OK candidates=552931 solutions=[] []
+K=63 OK candidates=1105800 solutions=[] []
+K=64 OK candidates=2211537 solutions=[] []
+K=65 OK candidates=4423009 solutions=[] []
+K=66 OK candidates=132095 solutions=[] []
+K=67 OK candidates=264124 solutions=[] []
+K=68 OK candidates=528182 solutions=[] []
+K=69 OK candidates=1056295 solutions=[] []
+K=70 OK candidates=2112522 solutions=[] []
+K=71 OK candidates=4224973 solutions=[] []
+K=72 OK candidates=8449875 solutions=[] []
+K=73 OK candidates=16899679 solutions=[] []
+K=74 OK candidates=33799284 solutions=[] []
+K=75 OK candidates=67598495 solutions=[] []
+K=76 OK candidates=135196914 solutions=[] []
+K=77 OK candidates=270393753 solutions=[] []
+RANGE (2^2, 2^78] checked; total candidates 781156448; all witnesses valid: True; solutions: [7, 15, 21, 45, 75, 105]
+
+real	1m23.653s
+user	1m13.213s
+sys	0m11.199s
+
+=== check_slow.log ===
+K=2 OK candidates=3 solutions=[7] []
+K=3 OK candidates=5 solutions=[15] []
+K=4 OK candidates=6 solutions=[21] []
+K=5 OK candidates=8 solutions=[45] []
+K=6 OK candidates=11 solutions=[75, 105] []
+K=7 OK candidates=16 solutions=[] []
+K=8 OK candidates=26 solutions=[] []
+K=9 OK candidates=44 solutions=[] []
+K=10 OK candidates=17 solutions=[] []
+K=11 OK candidates=24 solutions=[] []
+K=12 OK candidates=15 solutions=[] []
+K=13 OK candidates=18 solutions=[] []
+K=14 OK candidates=23 solutions=[] []
+K=15 OK candidates=31 solutions=[] []
+K=16 OK candidates=48 solutions=[] []
+K=17 OK candidates=79 solutions=[] []
+K=18 OK candidates=25 solutions=[] []
+K=19 OK candidates=33 solutions=[] []
+K=20 OK candidates=47 solutions=[] []
+K=21 OK candidates=73 solutions=[] []
+K=22 OK candidates=126 solutions=[] []
+K=23 OK candidates=230 solutions=[] []
+K=24 OK candidates=437 solutions=[] []
+K=25 OK candidates=849 solutions=[] []
+K=26 OK candidates=1674 solutions=[] []
+K=27 OK candidates=3321 solutions=[] []
+K=28 OK candidates=256 solutions=[] []
+K=29 OK candidates=484 solutions=[] []
+K=30 OK candidates=939 solutions=[] []
+K=31 OK candidates=1849 solutions=[] []
+K=32 OK candidates=3667 solutions=[] []
+K=33 OK candidates=7302 solutions=[] []
+K=34 OK candidates=14571 solutions=[] []
+K=35 OK candidates=29108 solutions=[] []
+K=36 OK candidates=1608 solutions=[] []
+K=37 OK candidates=3181 solutions=[] []
+K=38 OK candidates=6325 solutions=[] []
+K=39 OK candidates=12612 solutions=[] []
+K=40 OK candidates=25184 solutions=[] []
+K=41 OK candidates=50328 solutions=[] []
+K=42 OK candidates=100615 solutions=[] []
+K=43 OK candidates=201189 solutions=[] []
+K=44 OK candidates=402335 solutions=[] []
+K=45 OK candidates=804626 solutions=[] []
+K=46 OK candidates=1609207 solutions=[] []
+K=47 OK candidates=3218368 solutions=[] []
+K=48 OK candidates=6436688 solutions=[] []
+K=49 OK candidates=12873329 solutions=[] []
+K=50 OK candidates=25746608 solutions=[] []
+K=51 OK candidates=51493166 solutions=[] []
+K=52 OK candidates=1943189 solutions=[] []
+K=53 OK candidates=3886327 solutions=[] []
+K=54 OK candidates=7772601 solutions=[] []
+K=55 OK candidates=15545147 solutions=[] []
+K=56 OK candidates=31090239 solutions=[] []
+K=57 OK candidates=62180423 solutions=[] []
+K=58 OK candidates=2107868 solutions=[] []
+K=59 OK candidates=4215678 solutions=[] []
+K=60 OK candidates=138278 solutions=[] []
+K=61 OK candidates=276496 solutions=[] []
+K=62 OK candidates=552931 solutions=[] []
+K=63 OK candidates=1105800 solutions=[] []
+K=64 OK candidates=2211537 solutions=[] []
+K=65 OK candidates=4423009 solutions=[] []
+K=66 OK candidates=132095 solutions=[] []
+K=67 OK candidates=264124 solutions=[] []
+K=68 OK candidates=528182 solutions=[] []
+K=69 OK candidates=1056295 solutions=[] []
+K=70 OK candidates=2112522 solutions=[] []
+K=71 OK candidates=4224973 solutions=[] []
+K=72 OK candidates=8449875 solutions=[] []
+K=73 OK candidates=16899679 solutions=[] []
+K=74 OK candidates=33799284 solutions=[] []
+K=75 OK candidates=67598495 solutions=[] []
+K=76 OK candidates=135196914 solutions=[] []
+K=77 OK candidates=270393753 solutions=[] []
+RANGE (2^2, 2^78] checked; total candidates 781156448; all witnesses valid: True; solutions: [7, 15, 21, 45, 75, 105]
+
+real	6m45.589s
+user	6m45.715s
+sys	0m0.540s

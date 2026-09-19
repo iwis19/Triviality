@@ -1,0 +1,68 @@
+"""Fourier 'polygon' obstruction for covering Z/L with distinct moduli d | L, d>1.
+
+Let D be the set of moduli used, a_d the residues, F(n) = #{d in D : n = a_d mod d}.
+Covering <=> G := F - 1 >= 0.  For a character chi of Z/L of exact order m > 1,
+   F^(chi) = sum_{d in D, m | d} (L/d) chi(a_d)      (class sums vanish unless m | d)
+and G^(chi) = F^(chi) since chi != 1.  Nonnegativity of G gives |G^(chi)| <= G^(1) = E,
+where E = sum_{d in D} L/d - L is the excess.  Hence for every m>1 the multiset
+{L/d : d in D, m | d} must satisfy a 'polygon' inequality:
+   max_j (L/d_j) - sum_{i != j} (L/d_i) <= E,
+since some choice of unit complex numbers must bring the sum within E of 0.
+(The polygon condition is exactly the set of |z| achievable, so this is the sharp
+one-character-at-a-time relaxation; it depends only on D, not on the residues.)
+
+This script enumerates all subsets D of divisors with E >= 0 and reports which
+survive the polygon test for all m | L, m > 1.  (Own reasoning; not from literature.)
+"""
+import sys
+from sympy import divisors, factorint
+
+
+def survivors(L, verbose=True):
+    ds = [d for d in divisors(L) if d > 1]
+    ms = ds
+    w = {d: L // d for d in ds}
+    surv = []
+    n_density = 0
+    # DFS over subsets with pruning on the remaining possible excess
+    order = sorted(ds)
+    suffix = [0] * (len(order) + 1)
+    for i in range(len(order) - 1, -1, -1):
+        suffix[i] = suffix[i + 1] + w[order[i]]
+
+    def polygon_ok(D, E):
+        for m in ms:
+            vals = [w[d] for d in D if d % m == 0]
+            if not vals:
+                continue
+            mx = max(vals)
+            if mx - (sum(vals) - mx) > E:
+                return False
+        return True
+
+    def rec(i, D, tot):
+        nonlocal n_density
+        if tot + suffix[i] < L:
+            return
+        if i == len(order):
+            E = tot - L
+            n_density += 1
+            if polygon_ok(D, E):
+                surv.append((sorted(D), E))
+            return
+        D.append(order[i]); rec(i + 1, D, tot + w[order[i]]); D.pop()
+        rec(i + 1, D, tot)
+
+    rec(0, [], 0)
+    if verbose:
+        print(f"L={L} {dict(factorint(L))}: subsets passing density: {n_density}, "
+              f"passing polygon test: {len(surv)}", flush=True)
+        for D, E in surv[:10]:
+            print("   D=", D, "E=", E)
+    return n_density, surv
+
+
+if __name__ == '__main__':
+    Ls = [int(x) for x in sys.argv[1:]] or [945, 1575, 2205, 2835, 3465, 4095, 4725]
+    for L in Ls:
+        survivors(L)

@@ -1,0 +1,67 @@
+// Erdős #727 numerics: find n <= N with (n+k)!^2 | (2n)! for k = KMIN..KMAX.
+// Criterion (Legendre): for each prime p, v_p((2n)!) >= 2 v_p((n+k)!)
+//   <=> c_p(n) >= 2 v_p((n+1)(n+2)...(n+k)),
+// where c_p(n) = v_p((2n)!) - 2 v_p(n!) = #{ j>=1 : (n mod p^j) >= p^j/2 }   (Kummer carries of n+n).
+// Only primes dividing (n+1)...(n+k) matter.  Uses a smallest-prime-factor sieve.
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef unsigned long long u64;
+
+static int maxpos(u64 n, u64 p) { // floor(log_p(2n)) = number of digit positions that could carry
+    int c = 0; u64 pj = p;
+    while (pj <= 2*n) { c++; if (pj > (u64)4e18 / p) break; pj *= p; }
+    return c;
+}
+
+static int carries(u64 n, u64 p) {
+    // number of j>=1 with 2*(n mod p^j) >= p^j
+    int c = 0; u64 pj = p;
+    while (pj <= 2*n) {
+        if (2*(n % pj) >= pj) c++;
+        if (pj > (u64)4e18 / p) break;
+        pj *= p;
+    }
+    return c;
+}
+
+int main(int argc, char **argv) {
+    u64 N = argc > 1 ? strtoull(argv[1], 0, 10) : 1000000ULL;
+    int KMIN = argc > 2 ? atoi(argv[2]) : 2;
+    int KMAX = argc > 3 ? atoi(argv[3]) : 5;
+    int printmax = argc > 4 ? atoi(argv[4]) : 40;
+    u64 M = N + KMAX + 1;
+    unsigned *spf = calloc(M + 1, sizeof(unsigned));
+    if (!spf) { fprintf(stderr, "alloc fail\n"); return 1; }
+    for (u64 i = 2; i <= M; i++) if (!spf[i]) { for (u64 j = i; j <= M; j += i) if (!spf[j]) spf[j] = (unsigned)i; }
+
+    for (int k = KMIN; k <= KMAX; k++) {
+        u64 count = 0, cand = 0, checkpoints[] = {1000, 10000, 100000, 1000000, 10000000, 100000000};
+        int ci = 0;
+        printf("k=%d:", k);
+        for (u64 n = 1; n <= N; n++) {
+            // gather prime valuations of (n+1)...(n+k)
+            u64 ps[64]; int vs[64]; int np = 0;
+            for (int i = 1; i <= k; i++) {
+                u64 m = n + i;
+                while (m > 1) {
+                    u64 p = spf[m]; int v = 0;
+                    while (m % p == 0) { m /= p; v++; }
+                    int f = -1;
+                    for (int t = 0; t < np; t++) if (ps[t] == p) { f = t; break; }
+                    if (f < 0) { ps[np] = p; vs[np] = v; np++; } else vs[f] += v;
+                }
+            }
+            int ok = 1, isc = 1;
+            for (int t = 0; t < np && isc; t++) if (maxpos(n, ps[t]) < 2 * vs[t]) isc = 0;
+            if (isc) cand++; else ok = 0;
+            for (int t = 0; t < np && ok; t++) if (carries(n, ps[t]) < 2 * vs[t]) ok = 0;
+            if (ok) { count++; if (count <= (u64)printmax) printf(" %llu", n); }
+            while (ci < 6 && n == checkpoints[ci]) { printf("\n  count(n<=%llu)=%llu  candidates(necessary digit-room condition)=%llu  ratio=%.4f", n, count, cand, cand ? (double)count / cand : 0.0); ci++; }
+        }
+        printf("\n  total count(n<=%llu)=%llu\n", N, count);
+        fflush(stdout);
+    }
+    return 0;
+}

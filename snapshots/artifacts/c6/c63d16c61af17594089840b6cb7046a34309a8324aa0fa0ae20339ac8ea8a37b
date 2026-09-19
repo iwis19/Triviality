@@ -1,0 +1,63 @@
+"""
+Experiment: search for a PERIODIC, tile-based k-coloring of the plane via SAT on a pixelated torus.
+Fundamental domain: lattice Lambda spanned by (a,0) and (b*a, c*a) (parallelogram), pixel side h.
+Two pixels get a same-color constraint (forbidden) if the min/max distance between any points in
+them (accounting for the periodicity) can equal 1, i.e. |center distance - 1| <= h*sqrt(2).
+A SAT solution is a genuine k-coloring of the whole plane (each pixel is a closed square tile,
+boundaries assigned to one owner), so SAT => tile-based k-coloring exists.  UNSAT at a given
+resolution/lattice is NOT a refutation (discretization is a strengthening).
+Usage: python3 torus_tiles.py k a shear ratio N   (period vectors (a,0),(shear*a, ratio*a); N pixels/side)
+"""
+import math, sys, time, itertools
+from pysat.solvers import Cadical153
+
+k = int(sys.argv[1]); a = float(sys.argv[2]); shear = float(sys.argv[3]); ratio = float(sys.argv[4]); N = int(sys.argv[5])
+u = (a, 0.0); v = (shear * a, ratio * a)
+# pixels indexed (i,j) in [0,N)^2 -> centre = (i+.5)/N * u + (j+.5)/N * v
+def centre(i, j):
+    s, t = (i + 0.5) / N, (j + 0.5) / N
+    return (s * u[0] + t * v[0], s * u[1] + t * v[1])
+# pixel "radius" (half-diagonal of parallelogram cell)
+e1 = (u[0] / N, u[1] / N); e2 = (v[0] / N, v[1] / N)
+diag = max(math.hypot(e1[0] + e2[0], e1[1] + e2[1]), math.hypot(e1[0] - e2[0], e1[1] - e2[1]))
+tol = diag  # conservative: two cells can contain points at distance 1 iff |d(centres)-1| <= diag
+print(f"k={k} lattice u={u} v={v} N={N} cell diag={diag:.4f}")
+n = N * N
+var = lambda i, j, c: (i * N + j) * k + c + 1
+s = Cadical153()
+for i in range(N):
+    for j in range(N):
+        s.add_clause([var(i, j, c) for c in range(k)])
+# shifts to cover distance-1 neighbours through periodicity
+M = int(math.ceil((1 + diag) / min(a, ratio * a))) + 2
+shifts = [(p * u[0] + q * v[0], p * u[1] + q * v[1]) for p in range(-M, M + 1) for q in range(-M, M + 1)]
+ncons = 0
+cells = [(i, j) for i in range(N) for j in range(N)]
+cent = {c: centre(*c) for c in cells}
+for idx, (i, j) in enumerate(cells):
+    ci = cent[(i, j)]
+    for (i2, j2) in cells[idx:]:
+        cj = cent[(i2, j2)]
+        hit = False
+        for sh in shifts:
+            d = math.hypot(ci[0] - cj[0] - sh[0], ci[1] - cj[1] - sh[1])
+            if abs(d - 1.0) <= tol:
+                hit = True; break
+        if hit:
+            ncons += 1
+            for c in range(k):
+                s.add_clause([-var(i, j, c), -var(i2, j2, c)])
+print(f"{n} cells, {ncons} conflicting cell pairs")
+s.add_clause([var(0, 0, 0)])
+t = time.time()
+res = s.solve()
+print(f"SAT={res} ({time.time()-t:.1f}s)")
+if res:
+    model = set(x for x in s.get_model() if x > 0)
+    for j in range(N - 1, -1, -1):
+        print("".join(str(c) for i in range(N) for c in range(k) if var(i, j, c) in model))
+
+# ---- run log ----
+# torus_tiles.py: k=7, u=(2.06,0), v=(1.03,1.784) (60-degree lattice), N=24 (cell diag 0.149): SAT in 0.0s (a genuine periodic 7-coloring)
+# k=6, N=20, lattices (a,shear in {0,0.5}) for a in {1.6,1.8,2.0,2.2,2.4,2.6,3.0}: all 14 UNSAT (0.0-12.2s each)
+# UNSAT at this coarse resolution is a strengthened problem, so it is NOT evidence against 6-tile colorings.

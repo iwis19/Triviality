@@ -1,0 +1,43 @@
+// Find all pairs (m,n), m>n, with F_k(m)/F_k(n) a rational square, where
+// F_k(t)=prod_{i=1..k}(t+i), for all windows with m+k <= L.
+// Method: parity-of-exponent hashing. key(x) = XOR of h(p) over primes p with odd exponent in x.
+// key(F_k(m)) = XOR_{i=1..k} key(m+i). Equal keys <=> equal squarefree parts (up to 64-bit hash collision).
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+
+static uint64_t mix(uint64_t x){ x ^= x>>33; x*=0xff51afd7ed558ccdULL; x^=x>>33; x*=0xc4ceb9fe1a85ec53ULL; x^=x>>33; return x|1; }
+
+typedef struct { uint64_t key; uint32_t m; } rec;
+static int cmp(const void*a,const void*b){ const rec*x=a,*y=b; if(x->key<y->key) return -1; if(x->key>y->key) return 1; return (x->m<y->m)?-1:(x->m>y->m); }
+
+int main(int argc,char**argv){
+  uint32_t L = (argc>1)? (uint32_t)atol(argv[1]) : 10000000u;
+  int kmin = (argc>2)? atoi(argv[2]) : 3, kmax=(argc>3)?atoi(argv[3]):11;
+  uint32_t *spf = malloc((size_t)(L+1)*sizeof(uint32_t));
+  for(uint32_t i=0;i<=L;i++) spf[i]=0;
+  for(uint32_t i=2;i<=L;i++){ if(spf[i]==0){ spf[i]=i; if((uint64_t)i*i<=L) for(uint32_t j=i*i;j<=L;j+=i) if(spf[j]==0) spf[j]=i; } }
+  uint64_t *ko = malloc((size_t)(L+1)*sizeof(uint64_t));
+  ko[0]=0; ko[1]=0;
+  for(uint32_t x=2;x<=L;x++){ uint32_t p=spf[x]; uint32_t y=x/p; // ko[x] = ko[y] xor h(p)
+    ko[x] = ko[y] ^ mix(p); }
+  free(spf);
+  rec *R = malloc((size_t)L*sizeof(rec));
+  for(int k=kmin;k<=kmax;k++){
+    uint32_t M = L-k; // m from 0..M-? ensure m+k<=L
+    uint64_t w=0; for(int i=1;i<=k;i++) w^=ko[i];
+    size_t cnt=0;
+    for(uint32_t m=0; m+k<=L; m++){
+      if(m>0){ w ^= ko[m]; w ^= ko[m+k]; }
+      R[cnt].key=w; R[cnt].m=m; cnt++;
+    }
+    qsort(R,cnt,sizeof(rec),cmp);
+    long pairs=0;
+    for(size_t i=0;i<cnt;){ size_t j=i; while(j<cnt && R[j].key==R[i].key) j++;
+      if(j-i>1){ for(size_t a=i;a<j;a++) for(size_t b=a+1;b<j;b++){ printf("k=%d n=%u m=%u\n",k,R[a].m,R[b].m); pairs++; } }
+      i=j; }
+    fprintf(stderr,"k=%d done, pairs=%ld\n",k,pairs);
+  }
+  return 0;
+}

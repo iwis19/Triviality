@@ -1,0 +1,328 @@
+===== lrc_fourier.py =====
+#!/usr/bin/env python3
+"""Experiment for idea f9b98c22: Fourier form of pairwise overlap + sign-structure obstruction.
+
+Part A: check identity  mu(B_a cap B_b) = 4d^2 + (2/(ab)) sum_{k>=1} sin(2pi k d a) sin(2pi k d b)/(pi^2 k^2)
+        against the exact m-sum closed form (Fractions), for coprime a<b and rational d in (0,1/2].
+Part B: Hunter threshold search (structured + simulated annealing) for n=5..8.
+"""
+import sys, random, math
+from fractions import Fraction as Fr
+from math import gcd
+import mpmath as mp
+
+mp.mp.dps = 40
+
+def overlap_exact(vi, vj, d):
+    """mu({||vi t||<d} cap {||vj t||<d}), d Fraction. Exact via m-sum closed form (claim 12f2cdd1)."""
+    g = gcd(vi, vj); a, b = vi // g, vj // g
+    if a > b: a, b = b, a
+    top = d * (a + b)
+    M = int(math.floor(top))
+    s = Fr(0)
+    for m in range(-M, M + 1):
+        s += max(Fr(0), min(2 * d * a, 2 * d * b, top - abs(m)))
+    return s / (a * b)
+
+def overlap_fourier(a, b, d, K):
+    """Truncated Fourier series (mpmath), plus rigorous tail bound 2/(ab pi^2 K)."""
+    d = mp.mpf(d.numerator) / d.denominator
+    s = mp.mpf(0)
+    for k in range(1, K + 1):
+        s += mp.sin(2 * mp.pi * k * d * a) * mp.sin(2 * mp.pi * k * d * b) / (mp.pi ** 2 * k ** 2)
+    val = 4 * d ** 2 + 2 * s / (a * b)
+    tail = mp.mpf(2) / (a * b * mp.pi ** 2 * K)
+    return val, tail
+
+def part_A(trials=300, seed=1):
+    rng = random.Random(seed)
+    worst = 0; fails = 0
+    for _ in range(trials):
+        a = rng.randint(1, 60); b = rng.randint(a + 1, 400)
+        if gcd(a, b) != 1: continue
+        den = rng.randint(2, 60); num = rng.randint(1, den // 2)
+        d = Fr(num, den)
+        ex = overlap_exact(a, b, d)
+        K = 20000
+        fv, tail = overlap_fourier(a, b, d, K)
+        err = abs(fv - mp.mpf(ex.numerator) / ex.denominator)
+        worst = max(worst, err / tail)
+        if err > tail: fails += 1; print("FAIL", a, b, d, ex, fv, err, tail)
+    print(f"PartA: {trials} trials, failures={fails}, max err/tailbound={mp.nstr(worst,5)}")
+    # also some non-coprime pairs: identity applied to reduced pair
+    for (vi, vj, d) in [(6, 15, Fr(1, 8)), (30, 290, Fr(1, 8)), (135, 495, Fr(1, 12))]:
+        g = gcd(vi, vj); ex = overlap_exact(vi, vj, d); fv, tail = overlap_fourier(vi // g, vj // g, d, 20000)
+        print(" noncoprime", vi, vj, d, ex, float(ex), mp.nstr(fv, 12), "err<=tail:", abs(fv - mp.mpf(ex.numerator) / ex.denominator) <= tail)
+
+# ---------------- Part B ----------------
+def overlap_float(vi, vj, d):
+    g = gcd(vi, vj); a, b = vi // g, vj // g
+    if a > b: a, b = b, a
+    top = d * (a + b); M = int(math.floor(top)); s = 0.0
+    da2, db2 = 2 * d * a, 2 * d * b
+    for m in range(-M, M + 1):
+        s += max(0.0, min(da2, db2, top - abs(m)))
+    return s / (a * b)
+
+def max_tree(v, d, ov=overlap_float):
+    n = len(v); W = [[0] * n for _ in range(n)]
+    for i in range(n):
+        for j in range(i + 1, n):
+            W[i][j] = W[j][i] = ov(v[i], v[j], d)
+    intree = [False] * n; best = [None] * n; intree[0] = True
+    for j in range(1, n): best[j] = W[0][j]
+    tot = 0
+    for _ in range(n - 1):
+        j = max((j for j in range(n) if not intree[j]), key=lambda j: best[j])
+        tot += best[j]; intree[j] = True
+        for k in range(n):
+            if not intree[k] and W[j][k] > best[k]: best[k] = W[j][k]
+    return tot
+
+def hunter_bound(v, d, ov=overlap_float):
+    return 2 * len(v) * d - max_tree(v, d, ov)
+
+def hunter_threshold(v, iters=50):
+    """sup{d : 2nd - maxtree(d) < 1} by bisection (assumes monotone; verified by exact check at the end)."""
+    lo, hi = 0.0, 0.5
+    for _ in range(iters):
+        mid = (lo + hi) / 2
+        if hunter_bound(v, mid) < 1: lo = mid
+        else: hi = mid
+    return lo
+
+def certify_below(v, d):
+    """Exact: Hunter bound >= 1 at d  (so Hunter cannot certify ML >= d)."""
+    return hunter_bound(v, d, overlap_exact) >= 1
+
+def anneal(n, N, steps, seed, init=None):
+    rng = random.Random(seed)
+    v = sorted(init) if init else sorted(rng.sample(range(1, N + 1), n))
+    def score(v):
+        if math.gcd(*v) != 1: return 1.0
+        return hunter_threshold(v, 40)
+    cur = score(v); best = (cur, v[:]); T = 0.002
+    for s in range(steps):
+        w = v[:]; i = rng.randrange(n)
+        w[i] = rng.randint(1, N) if rng.random() < 0.3 else min(N, max(1, w[i] + rng.randint(-5, 5)))
+        if len(set(w)) < n: continue
+        w.sort(); sc = score(w)
+        if sc < cur or rng.random() < math.exp((cur - sc) / T):
+            v, cur = w, sc
+            if cur < best[0]: best = (cur, v[:])
+        T *= 0.9995
+    return best
+
+def part_B():
+    print("\nPartB: known examples from claim f9a0da3f")
+    for v in [(30, 66, 75, 85, 290), (6, 180, 183, 202, 228), (15, 135, 170, 271, 287, 478, 495)]:
+        n = len(v); d0 = Fr(1, 2 * n - 2)
+        print(v, "thr=", hunter_threshold(list(v)), "1/(2n-2)=", float(d0), "exact bound>=1 at d0:", certify_below(v, d0))
+    print("\nPartB: sign classes and structured constructions")
+    for n in range(5, 9):
+        d0 = Fr(1, 2 * n - 2); q = 2 * n - 2
+        # residues r mod q with sin(2 pi r/q) > 0 / < 0
+        pos = [r for r in range(q) if math.sin(2 * math.pi * r / q) > 1e-12]
+        neg = [r for r in range(q) if math.sin(2 * math.pi * r / q) < -1e-12]
+        print(f"n={n} q={q} pos residues {pos} neg residues {neg}")
+    print("\nPartB: simulated annealing, minimize Hunter threshold")
+    results = {}
+    for n in range(5, 9):
+        d0 = 1 / (2 * n - 2); best = (1, None)
+        for N, seed in [(120, 1), (300, 2), (600, 3), (600, 4)]:
+            b = anneal(n, N, 1500, seed)
+            print(f" n={n} N={N} seed={seed} best thr={b[0]:.7f} ratio thr/d0={b[0]/d0:.6f} set={b[1]}", flush=True)
+            if b[0] < best[0]: best = b
+        v = best[1]; d0f = Fr(1, 2 * n - 2)
+        print(f" n={n} BEST thr={best[0]:.8f} d0={d0:.8f} rel deficit={(d0-best[0])/d0:.5f} set={v} exact(bound>=1 at d0)={certify_below(v, d0f)}")
+        # sign classes of best set at d0
+        cls = [(x, 'pos' if math.sin(2 * math.pi * x * d0) > 0 else 'neg') for x in v]
+        print("   k=1 sign classes:", cls)
+        results[n] = (best, cls)
+    return results
+
+if __name__ == "__main__":
+    part_A()
+    part_B()
+
+
+===== lrc_neg_clique.py =====
+#!/usr/bin/env python3
+"""Search for speed sets in which EVERY pair has overlap < (2d)^2 at d=1/(2n-2)
+(all-negative correction), via clique search in the 'negative overlap' graph on [1..N].
+Any such set automatically has max spanning tree sum < (n-1)(2d)^2, i.e. Hunter threshold < 1/(2n-2).
+Then minimize T(d0)/((n-1)(2d0)^2) over found cliques and report the exact Hunter threshold deficit."""
+import sys, math, itertools
+from fractions import Fraction as Fr
+from math import gcd
+sys.path.insert(0, '/home/ubuntu')
+from lrc_fourier import overlap_float, overlap_exact, max_tree, hunter_threshold, hunter_bound
+
+def run(n, N, maxcliques=20000):
+    d0 = 1 / (2 * n - 2); base = 4 * d0 * d0
+    ov = {}
+    neg = {i: set() for i in range(1, N + 1)}
+    for a in range(1, N + 1):
+        for b in range(a + 1, N + 1):
+            o = overlap_float(a, b, d0); ov[(a, b)] = o
+            if o < base - 1e-12: neg[a].add(b); neg[b].add(a)
+    # simple clique enumeration (Bron-Kerbosch style, size n), bounded
+    found = []
+    def extend(clique, cands):
+        if len(found) >= maxcliques: return
+        if len(clique) == n: found.append(tuple(clique)); return
+        for c in sorted(cands):
+            if c < clique[-1]: continue
+            extend(clique + [c], cands & neg[c])
+    for a in range(1, N + 1):
+        extend([a], set(neg[a]))
+        if len(found) >= maxcliques: break
+    print(f"n={n} N={N}: negative-graph edges={sum(len(s) for s in neg.values())//2} of {N*(N-1)//2}; all-negative {n}-cliques found: {len(found)} (cap {maxcliques})", flush=True)
+    best = None
+    for cl in found:
+        if math.gcd(*cl) != 1: continue
+        T = max_tree(list(cl), d0)
+        r = T / ((n - 1) * base)
+        if best is None or r < best[0]: best = (r, cl, T)
+    if best:
+        r, cl, T = best
+        thr = hunter_threshold(list(cl), 50)
+        d0f = Fr(1, 2 * n - 2)
+        Tex = (n - 1) * 4 * d0f * d0f - (hunter_bound(cl, d0f, overlap_exact) - 2 * n * d0f + max_tree(list(cl), d0f, overlap_exact)) # placeholder
+        Tex = max_tree(list(cl), d0f, overlap_exact)
+        print(f"  best all-negative set {cl}: T(d0)/((n-1)(2d0)^2)={r:.6f}  exact T={Tex} vs {(n-1)*4*d0f*d0f}; Hunter thr={thr:.8f}, rel deficit={(d0-thr)/d0:.6f}")
+        # pairwise reduced residues
+        q = 2 * n - 2
+        print("  reduced pairs (a/g,b/g) mod q:", [((a // gcd(a, b)) % q, (b // gcd(a, b)) % q) for a, b in itertools.combinations(cl, 2)])
+    return best
+
+if __name__ == "__main__":
+    for n, N in [(5, 120), (5, 250), (6, 160), (6, 300), (7, 200), (7, 350), (8, 250), (8, 400)]:
+        run(n, N)
+
+
+===== lrc_local.py =====
+#!/usr/bin/env python3
+"""Seeded local search minimizing T(d0) = max spanning tree overlap sum at d0=1/(2n-2).
+Objective ratio r = T(d0)/((n-1)(2d0)^2); r<1 <=> Hunter threshold < d0. Report exact values + Hunter threshold."""
+import sys, math, random
+from fractions import Fraction as Fr
+sys.path.insert(0, '/home/ubuntu')
+from lrc_fourier import max_tree, overlap_exact, hunter_threshold
+
+seeds = {
+ 5: [(30, 66, 75, 85, 290), (6, 180, 183, 202, 228), (2, 138, 190, 247, 252)],
+ 6: [(1, 6, 48, 108, 168, 288), (1, 6, 16, 36, 56, 96)],
+ 7: [(2, 9, 16, 33, 81, 88, 112), (15, 135, 170, 271, 287, 478, 495)],
+ 8: [(1, 12, 96, 162, 208, 264, 306, 320), (5, 8, 45, 64, 78, 108, 176, 204)],
+}
+
+def local(v, N, steps, rng):
+    n = len(v); d0 = 1 / (2 * n - 2); base = (n - 1) * 4 * d0 * d0
+    def sc(w):
+        if math.gcd(*w) != 1 or len(set(w)) < n: return 9.0
+        return max_tree(list(w), d0) / base
+    cur = sc(v); best = (cur, tuple(v))
+    for s in range(steps):
+        w = list(v); i = rng.randrange(n); mv = rng.random()
+        if mv < 0.3: w[i] = rng.randint(1, N)
+        elif mv < 0.6: w[i] = max(1, min(N, w[i] + rng.randint(-3, 3)))
+        elif mv < 0.8:
+            f = rng.choice([2, 3, 4, 5, 6, 7]); w[i] = w[i] * f if w[i] * f <= N else max(1, w[i] // f)
+        else:  # scale all but one by small factor (keeps reduced pairs among them)
+            f = rng.choice([2, 3]); w = [x * f if j != i and x * f <= N else x for j, x in enumerate(w)]
+        w = sorted(w); c = sc(w)
+        if c <= cur or rng.random() < 0.02:
+            v, cur = w, c
+            if c < best[0]: best = (c, tuple(w))
+    return best
+
+if __name__ == "__main__":
+    rng = random.Random(7)
+    for n in range(5, 9):
+        overall = None
+        for sd in seeds[n]:
+            for N in (600, 3000):
+                b = local(list(sd), N, 3000, rng)
+                if overall is None or b[0] < overall[0]: overall = b
+                print(f"n={n} seed {sd} N={N}: r={b[0]:.6f} set={b[1]}", flush=True)
+        r, v = overall; d0f = Fr(1, 2 * n - 2); Tex = max_tree(list(v), d0f, overlap_exact)
+        thr = hunter_threshold(list(v), 50)
+        print(f"n={n} OVERALL: set={v} exact T(d0)={Tex} ({float(Tex):.7f}) vs (n-1)(2d0)^2={(n-1)*4*d0f*d0f}; Hunter thr={thr:.8f}; rel deficit {(float(d0f)-thr)/float(d0f):.6f}", flush=True)
+
+
+===== lrc_fourier_out.txt =====
+PartA: 300 trials, failures=0, max err/tailbound=0.50003
+ noncoprime 6 15 1/8 1/20 0.05 0.05 err<=tail: True
+ noncoprime 30 290 1/8 7/116 0.0603448275862069 0.0603448858168 err<=tail: True
+ noncoprime 135 495 1/12 5/198 0.025252525252525252 0.0252525252448 err<=tail: True
+
+PartB: known examples from claim f9a0da3f
+(30, 66, 75, 85, 290) thr= 0.12480325802697179 1/(2n-2)= 0.125 exact bound>=1 at d0: True
+(6, 180, 183, 202, 228) thr= 0.12490350729988231 1/(2n-2)= 0.125 exact bound>=1 at d0: True
+(15, 135, 170, 271, 287, 478, 495) thr= 0.08333111093518664 1/(2n-2)= 0.08333333333333333 exact bound>=1 at d0: True
+
+PartB: sign classes and structured constructions
+n=5 q=8 pos residues [1, 2, 3] neg residues [5, 6, 7]
+n=6 q=10 pos residues [1, 2, 3, 4] neg residues [6, 7, 8, 9]
+n=7 q=12 pos residues [1, 2, 3, 4, 5] neg residues [7, 8, 9, 10, 11]
+n=8 q=14 pos residues [1, 2, 3, 4, 5, 6] neg residues [8, 9, 10, 11, 12, 13]
+
+PartB: simulated annealing, minimize Hunter threshold
+ n=5 N=120 seed=1 best thr=0.1249849 ratio thr/d0=0.999879 set=[6, 28, 45, 83, 110]
+ n=5 N=300 seed=2 best thr=0.1249576 ratio thr/d0=0.999661 set=[2, 138, 190, 247, 252]
+ n=5 N=600 seed=3 best thr=0.1249681 ratio thr/d0=0.999745 set=[1, 85, 398, 558, 574]
+ n=5 N=600 seed=4 best thr=0.1249941 ratio thr/d0=0.999953 set=[6, 19, 92, 346, 526]
+ n=5 BEST thr=0.12495763 d0=0.12500000 rel deficit=0.00034 set=[2, 138, 190, 247, 252] exact(bound>=1 at d0)=True
+   k=1 sign classes: [(2, 'pos'), (138, 'pos'), (190, 'neg'), (247, 'neg'), (252, 'neg')]
+ n=6 N=120 seed=1 best thr=0.0999271 ratio thr/d0=0.999271 set=[1, 19, 87, 97, 98, 108]
+ n=6 N=300 seed=2 best thr=0.0999997 ratio thr/d0=0.999997 set=[14, 87, 127, 128, 186, 202]
+ n=6 N=600 seed=3 best thr=0.0999990 ratio thr/d0=0.999990 set=[237, 368, 396, 473, 498, 576]
+
+
+===== lrc_neg_clique_out.txt =====
+n=5 N=120: negative-graph edges=2350 of 7140; all-negative 5-cliques found: 0 (cap 20000)
+n=5 N=250: negative-graph edges=10357 of 31125; all-negative 5-cliques found: 0 (cap 20000)
+n=6 N=160: negative-graph edges=4171 of 12720; all-negative 6-cliques found: 13145 (cap 20000)
+  best all-negative set (1, 6, 16, 36, 56, 96): T(d0)/((n-1)(2d0)^2)=0.977679  exact T=219/1120 vs 1/5; Hunter thr=0.09946204, rel deficit=0.005380
+  reduced pairs (a/g,b/g) mod q: [(1, 6), (1, 6), (1, 6), (1, 6), (1, 6), (3, 8), (1, 6), (3, 8), (1, 6), (4, 9), (2, 7), (1, 6), (9, 4), (3, 8), (7, 2)]
+n=6 N=300: negative-graph edges=14817 of 44850; all-negative 6-cliques found: 20000 (cap 20000)
+  best all-negative set (1, 6, 48, 108, 168, 288): T(d0)/((n-1)(2d0)^2)=0.974702  exact T=131/672 vs 1/5; Hunter thr=0.09943901, rel deficit=0.005610
+  reduced pairs (a/g,b/g) mod q: [(1, 6), (1, 8), (1, 8), (1, 8), (1, 8), (1, 8), (1, 8), (1, 8), (1, 8), (4, 9), (2, 7), (1, 6), (9, 4), (3, 8), (7, 2)]
+n=7 N=200: negative-graph edges=8205 of 19900; all-negative 7-cliques found: 6518 (cap 20000)
+  best all-negative set (2, 9, 16, 33, 81, 88, 112): T(d0)/((n-1)(2d0)^2)=0.991763  exact T=16495/99792 vs 1/6; Hunter thr=0.08319740, rel deficit=0.001631
+  reduced pairs (a/g,b/g) mod q: [(2, 9), (1, 8), (2, 9), (2, 9), (1, 8), (1, 8), (9, 4), (3, 11), (1, 9), (9, 4), (9, 4), (4, 9), (4, 9), (2, 11), (1, 7), (11, 3), (3, 8), (9, 4), (9, 4), (9, 4), (11, 2)]
+n=7 N=350: negative-graph edges=25295 of 61075; all-negative 7-cliques found: 20000 (cap 20000)
+  best all-negative set (2, 9, 16, 33, 81, 88, 112): T(d0)/((n-1)(2d0)^2)=0.991763  exact T=16495/99792 vs 1/6; Hunter thr=0.08319740, rel deficit=0.001631
+  reduced pairs (a/g,b/g) mod q: [(2, 9), (1, 8), (2, 9), (2, 9), (1, 8), (1, 8), (9, 4), (3, 11), (1, 9), (9, 4), (9, 4), (4, 9), (4, 9), (2, 11), (1, 7), (11, 3), (3, 8), (9, 4), (9, 4), (9, 4), (11, 2)]
+n=8 N=250: negative-graph edges=11538 of 31125; all-negative 8-cliques found: 1222 (cap 20000)
+  best all-negative set (5, 8, 45, 64, 78, 108, 176, 204): T(d0)/((n-1)(2d0)^2)=0.996727  exact T=20935099/147026880 vs 1/7; Hunter thr=0.07139067, rel deficit=0.000531
+  reduced pairs (a/g,b/g) mod q: [(5, 8), (1, 9), (5, 8), (5, 8), (5, 10), (5, 8), (5, 8), (8, 3), (1, 8), (4, 11), (2, 13), (1, 8), (2, 9), (3, 8), (1, 12), (5, 12), (3, 8), (1, 12), (4, 11), (2, 13), (4, 11), (2, 9), (13, 4), (11, 4), (13, 6), (13, 2), (9, 3), (2, 9)]
+n=8 N=400: negative-graph edges=29617 of 79800; all-negative 8-cliques found: 20000 (cap 20000)
+  best all-negative set (1, 12, 96, 162, 208, 264, 306, 320): T(d0)/((n-1)(2d0)^2)=0.992758  exact T=15638801/110270160 vs 1/7; Hunter thr=0.07134669, rel deficit=0.001146
+  reduced pairs (a/g,b/g) mod q: [(1, 12), (1, 12), (1, 8), (1, 12), (1, 12), (1, 12), (1, 12), (1, 8), (2, 13), (3, 10), (1, 8), (2, 9), (3, 10), (2, 13), (6, 13), (4, 11), (2, 9), (3, 10), (11, 6), (13, 2), (9, 3), (11, 6), (12, 5), (6, 13), (13, 6), (2, 9), (5, 12), (13, 6)]
+
+
+===== lrc_local_out.txt =====
+n=5 seed (30, 66, 75, 85, 290) N=600: r=0.992453 set=(30, 66, 105, 150, 290)
+n=5 seed (30, 66, 75, 85, 290) N=3000: r=0.994257 set=(30, 66, 75, 85, 870)
+n=5 seed (6, 180, 183, 202, 228) N=600: r=0.997481 set=(6, 45, 180, 202, 228)
+n=5 seed (6, 180, 183, 202, 228) N=3000: r=0.997511 set=(6, 180, 183, 202, 228)
+n=5 seed (2, 138, 190, 247, 252) N=600: r=0.999045 set=(2, 138, 247, 252, 302)
+n=5 seed (2, 138, 190, 247, 252) N=3000: r=0.998707 set=(2, 140, 191, 252, 670)
+n=5 OVERALL: set=(30, 66, 105, 150, 290) exact T(d0)=166211/669900 (0.2481132) vs (n-1)(2d0)^2=1/4; Hunter thr=0.12471046; rel deficit 0.002316
+n=6 seed (1, 6, 48, 108, 168, 288) N=600: r=0.974702 set=(1, 6, 48, 108, 168, 288)
+n=6 seed (1, 6, 48, 108, 168, 288) N=3000: r=0.974702 set=(1, 6, 48, 108, 168, 288)
+n=6 seed (1, 6, 16, 36, 56, 96) N=600: r=0.977679 set=(1, 6, 16, 36, 56, 96)
+n=6 seed (1, 6, 16, 36, 56, 96) N=3000: r=0.977679 set=(1, 6, 16, 36, 56, 96)
+n=6 OVERALL: set=(1, 6, 48, 108, 168, 288) exact T(d0)=131/672 (0.1949405) vs (n-1)(2d0)^2=1/5; Hunter thr=0.09943901; rel deficit 0.005610
+n=7 seed (2, 9, 16, 33, 81, 88, 112) N=600: r=0.991763 set=(2, 9, 16, 33, 81, 88, 112)
+n=7 seed (2, 9, 16, 33, 81, 88, 112) N=3000: r=0.991763 set=(2, 9, 16, 33, 81, 88, 112)
+n=7 seed (15, 135, 170, 271, 287, 478, 495) N=600: r=0.999868 set=(15, 135, 170, 271, 287, 478, 495)
+n=7 seed (15, 135, 170, 271, 287, 478, 495) N=3000: r=0.999724 set=(15, 103, 135, 170, 286, 495, 2390)
+n=7 OVERALL: set=(2, 9, 16, 33, 81, 88, 112) exact T(d0)=16495/99792 (0.1652938) vs (n-1)(2d0)^2=1/6; Hunter thr=0.08319740; rel deficit 0.001631
+n=8 seed (1, 12, 96, 162, 208, 264, 306, 320) N=600: r=0.992758 set=(1, 12, 96, 162, 208, 264, 306, 320)
+n=8 seed (1, 12, 96, 162, 208, 264, 306, 320) N=3000: r=0.992758 set=(1, 12, 96, 162, 208, 264, 306, 320)
+n=8 seed (5, 8, 45, 64, 78, 108, 176, 204) N=600: r=0.996727 set=(5, 8, 45, 64, 78, 108, 176, 204)
+n=8 seed (5, 8, 45, 64, 78, 108, 176, 204) N=3000: r=0.996727 set=(5, 8, 45, 64, 78, 108, 176, 204)
+n=8 OVERALL: set=(1, 12, 96, 162, 208, 264, 306, 320) exact T(d0)=15638801/110270160 (0.1418226) vs (n-1)(2d0)^2=1/7; Hunter thr=0.07134669; rel deficit 0.001146

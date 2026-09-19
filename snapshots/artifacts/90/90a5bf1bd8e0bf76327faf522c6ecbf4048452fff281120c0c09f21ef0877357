@@ -1,0 +1,16 @@
+# moser_ring.py runs (Cadical153 via python-sat; 8 cores, all runs < 2 min)
+# 12 generator directions (omega^k, zeta*omega^k), ball = sums of <= L generators, edges = all geometric unit distances
+L=2: 73 vertices, 246 edges, 4-colorable True, 5-colorable True, forcers(5 colors, d<2): 0
+L=3: 253 vertices, 1158 edges, 4-col True, 5-col True, forcers: 0
+L=4: 661 vertices, 3576 edges, 4-col True, 5-col True, forcers: 0
+L=5: 1441 vertices, 8640 edges, 4-col True, 5-col True, forcers: 0
+L=6: 2773 vertices, 17814 edges, 4-col True, 5-col True, forcers: 0 (scan 6.9s)
+L=7: 4873 vertices, 32886 edges, 4-col True, 5-col True, forcers: 0 (scan 76.7s)
+# 18 generator directions (adds i*sqrt3*(1-zeta)*omega^k, the other unit vectors of the module)
+L=2: 163 vertices, 576 edges, 4-col True, 5-col True, forcers: 0
+L=3: 865 vertices, 4662 edges, 4-col True, 5-col True, forcers: 0
+L=4: 3103 vertices, 22332 edges, 4-col True, 5-col True, forcers: 0 (scan 46.9s)
+# In every run the only 'forced non-mono' distance from the origin was d=1.0 (adjacency); every other
+# distance < 2 admitted both a mono and a non-mono 5-coloring.
+# Unit vectors of M = Z[omega] + zeta*Z[omega], coefficient box |coeff|<=14: exactly 18, at angles
+# 0,60,...(omega^k), 33.557+60k (zeta*omega^k), 16.779+60k (i*sqrt3*(1-zeta)*omega^k) degrees.

@@ -1,0 +1,16 @@
+import Mathlib
+
+/-!
+Finite check of the approved formal target for even `n < 400`, by kernel evaluation.
+This is *not* progress on the conjecture; it is a reproducible sanity artifact
+showing the formal statement is the intended one and that small cases decide.
+-/
+
+theorem goldbach_lt_400_aux :
+    ∀ n < 400, 2 < n → n % 2 = 0 → ∃ p < n, Nat.Prime p ∧ Nat.Prime (n - p) := by
+  decide +kernel
+
+theorem goldbach_lt_400 (n : Nat) (h2 : 2 < n) (hlt : n < 400) (heven : n % 2 = 0) :
+    ∃ p q, Nat.Prime p ∧ Nat.Prime q ∧ p + q = n := by
+  obtain ⟨p, hp, hpp, hq⟩ := goldbach_lt_400_aux n hlt h2 heven
+  exact ⟨p, n - p, hpp, hq, by omega⟩

@@ -1,0 +1,39 @@
+import Mathlib
+
+/-- The hypothesis `H` of `cpap_of_dickson_ap` (Dickson's conjecture restricted to
+AP-shaped templates with a common leading coefficient) already implies the twin prime
+conjecture.  Construction: `k = 2`, `M = 1`, `c = N`, `d = 2`; admissibility via
+`n = (p-1)(N+1)`, for which `n + N + 1 = p (N+1)`, so the two values are `≡ -1, +1 (mod p)`. -/
+theorem twin_primes_of_dickson_ap
+    (H : ∀ k M c d : ℕ, 0 < M → 0 < d →
+      (∀ p : ℕ, p.Prime → ∃ n, ∀ j < k, ¬ p ∣ M * n + c + j * d) →
+      ∃ n ≥ 1, ∀ j < k, (M * n + c + j * d).Prime) :
+    ∀ N : ℕ, ∃ p, N < p ∧ p.Prime ∧ (p + 2).Prime := by
+  intro N
+  have hadm : ∀ p : ℕ, p.Prime → ∃ n, ∀ j < 2, ¬ p ∣ 1 * n + N + j * 2 := by
+    intro p hp
+    refine ⟨(p - 1) * (N + 1), ?_⟩
+    have hp1 : 1 ≤ p := hp.one_lt.le
+    have key : p ∣ (p - 1) * (N + 1) + N + 1 := by
+      have h : (p - 1) * (N + 1) + N + 1 = p * (N + 1) := by
+        obtain ⟨q, rfl⟩ : ∃ q, p = q + 1 := ⟨p - 1, (Nat.sub_add_cancel hp1).symm⟩
+        simp only [Nat.add_sub_cancel]
+        ring
+      rw [h]
+      exact dvd_mul_right p _
+    intro j hj
+    interval_cases j
+    · intro h
+      simp only [one_mul, zero_mul, add_zero] at h
+      exact hp.not_dvd_one ((Nat.dvd_add_right h).mp key)
+    · intro h
+      simp only [one_mul] at h
+      have h' : p ∣ (p - 1) * (N + 1) + N + 1 + 1 := by
+        rw [add_assoc _ 1 1]; exact h
+      exact hp.not_dvd_one ((Nat.dvd_add_right key).mp h')
+  obtain ⟨n, hn, hprime⟩ := H 2 1 N 2 one_pos two_pos hadm
+  refine ⟨n + N, by omega, ?_, ?_⟩
+  · have := hprime 0 (by norm_num)
+    simpa using this
+  · have := hprime 1 (by norm_num)
+    simpa [add_assoc] using this

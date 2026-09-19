@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+"""Independent re-implementation (critic) of the covering statement of idea d2c8682b
+(claim 104f3f3f): for K=2..77 every candidate n in block (2^K, 2^{K+1}] given by lemma C1
+(type A: n <= 2^K+K+1; type B: n = M_S(K)*i) is either one of {7,15,21,45,75,105}
+or has k <= min(K,31), prime q <= 997 with q | n-2^k, q < n-2^k, or n-2^k = 1.
+
+Differences from the reviewed code (as described): K <= 31 handled entirely with exact Python
+integers (no numpy, no properness shortcut); K >= 32 uses a numpy filter for the residue
+classes but every survivor is re-tested with exact integers; kills are attributed to the
+smallest k (then smallest q) for comparison with the reported per-k counts.
+"""
+import sys, time, math
+import numpy as np
+
+QMAX, KCAP, KMAX = 997, 31, 77
+SOLS = {7, 15, 21, 45, 75, 105}
+
+def primes_upto(B):
+    s = bytearray([1]) * (B + 1); s[0] = s[1] = 0
+    for i in range(2, int(B ** 0.5) + 1):
+        if s[i]:
+            s[i*i::i] = bytearray(len(s[i*i::i]))
+    return [i for i in range(B + 1) if s[i]]
+
+PR = primes_upto(QMAX)
+
+def is_prime_exact(m):
+    if m < 2: return False
+    if m % 2 == 0: return m == 2
+    r = math.isqrt(m); d = 3
+    while d <= r:
+        if m % d == 0: return False
+        d += 2
+    return True
+
+def factor_small(m):
+    out = []; 
+    for p in primes_upto(max(2, math.isqrt(m)) + 1):
+        if m % p == 0:
+            out.append(p)
+            while m % p == 0: m //= p
+    if m > 1: out.append(m)
+    return out
+
+def two_is_primitive_root(p):
+    # 2 generates (Z/p)^* iff 2^((p-1)/r) != 1 mod p for every prime r | p-1 (p odd prime)
+    if p == 2: return False
+    return all(pow(2, (p - 1) // r, p) != 1 for r in factor_small(p - 1))
+
+def S(K):
+    return [p for p in primes_upto(K + 1) if two_is_primitive_root(p)]
+
+def witness_exact(n, K):
+    """Return ('f',k,q) / ('one',k) / ('sol',) / ('none',) using only exact integers."""
+    for k in range(1, min(K, KCAP) + 1):
+        m = n - (1 << k)
+        if m == 1: return ('one', k)
+        for q in PR:
+            if q < m and m % q == 0: return ('f', k, q)
+    # exact check of the full property
+    k = 1
+    while (1 << k) < n:
+        if not is_prime_exact(n - (1 << k)): return ('none',)
+        k += 1
+    return ('sol',)
+
+def main():
+    t0 = time.time()
+    total_A = total_B = 0
+    kills = {}          # k -> count (type B)
+    killsA = {}
+    survivors = []
+    ones = []
+    for K in range(2, KMAX + 1):
+        tK = time.time()
+        SK = S(K); M = 1
+        for p in SK: M *= p
+        lo, hi = 1 << K, 1 << (K + 1)
+        # type A
+        nA = 0
+        for n in range(lo + 1, lo + K + 2):
+            nA += 1
+            w = witness_exact(n, K)
+            if w[0] == 'f': killsA[w[1]] = killsA.get(w[1], 0) + 1
+            elif w[0] == 'one': ones.append((K, n, w[1]))
+            elif w[0] == 'sol': survivors.append((K, 'A', n))
+            else: print("!!! type A candidate with no small witness and not a solution:", K, n); survivors.append((K, 'A?', n))
+        total_A += nA
+        # type B
+        i_lo = (lo + K + 1) // M + 1
+        i_hi = hi // M
+        nB = max(0, i_hi - i_lo + 1)
+        total_B += nB
+        if nB == 0:
+            print(f"K={K:2d} S={SK} M={M} A={nA} B=0"); continue
+        if K <= 31:
+            for i in range(i_lo, i_hi + 1):
+                n = M * i
+                w = witness_exact(n, K)
+                if w[0] == 'f': kills[w[1]] = kills.get(w[1], 0) + 1
+                elif w[0] == 'sol': survivors.append((K, 'B', n))
+                elif w[0] == 'one': ones.append((K, n, w[1]))
+                else: print("!!! type B candidate with no small witness and not a solution:", K, n); survivors.append((K, 'B?', n))
+            print(f"K={K:2d} S={SK} M={M} A={nA} B={nB} exact  {time.time()-tK:.1f}s")
+            continue
+        # K >= 32: k <= 31 < K so n - 2^k > 2^K - 2^31 >= 2^31 > 997: properness automatic
+        Mq = {q: M % q for q in PR}
+        usable = [q for q in PR if Mq[q] != 0]
+        assert all(M % q == 0 for q in PR if q not in usable)
+        alive = np.ones(nB, dtype=bool)
+        for q in usable:
+            c = (2 * pow(Mq[q], -1, q)) % q            # i = 2*M^{-1} mod q  <=>  q | M i - 2
+            off = (c - i_lo) % q
+            alive[off::q] = False
+        surv = np.nonzero(alive)[0].astype(np.int64) + np.int64(i_lo)
+        del alive
+        kills[1] = kills.get(1, 0) + (nB - len(surv))
+        for k in range(2, KCAP + 1):
+            before = len(surv)
+            for q in usable:
+                c = (pow(2, k, q) * pow(Mq[q], -1, q)) % q
+                surv = surv[(surv % q) != c]
+                if len(surv) == 0: break
+            kills[k] = kills.get(k, 0) + (before - len(surv))
+            if len(surv) == 0: break
+        # exact re-test of all survivors (should be none for K >= 32)
+        for i in surv.tolist():
+            n = M * int(i)
+            w = witness_exact(n, K)
+            print("survivor after numpy sieve:", K, n, w)
+            survivors.append((K, 'B' if w[0] == 'sol' else 'B?', n))
+        print(f"K={K:2d} |S|={len(SK)} M={M} A={nA} B={nB} i=[{i_lo},{i_hi}] numpy  {time.time()-tK:.1f}s", flush=True)
+    print("\n=== SUMMARY ===")
+    print("type A candidates:", total_A)
+    print("type B candidates:", total_B)
+    print("total candidates :", total_A + total_B)
+    print("type B kills by k:", {k: kills[k] for k in sorted(kills)})
+    print("type A kills by k:", {k: killsA[k] for k in sorted(killsA)})
+    print("max k used (B):", max(kills), " max k used (A):", max(killsA))
+    print("n-2^k = 1 cases:", ones)
+    print("survivors (exact):", survivors)
+    print("survivor set == known solutions:", {s[2] for s in survivors} == SOLS and all(s[1] in ('A', 'B') for s in survivors))
+    print(f"elapsed {time.time()-t0:.1f}s")
+
+if __name__ == '__main__':
+    main()
+
+
+# ---- run log ----
+# K= 2 S=[3] M=3 A=3 B=0
+# K= 3 S=[3] M=3 A=4 B=1 exact  0.0s
+# K= 4 S=[3, 5] M=15 A=5 B=1 exact  0.0s
+# K= 5 S=[3, 5] M=15 A=6 B=2 exact  0.0s
+# K= 6 S=[3, 5] M=15 A=7 B=4 exact  0.0s
+# K= 7 S=[3, 5] M=15 A=8 B=8 exact  0.0s
+# K= 8 S=[3, 5] M=15 A=9 B=17 exact  0.0s
+# K= 9 S=[3, 5] M=15 A=10 B=34 exact  0.0s
+# K=10 S=[3, 5, 11] M=165 A=11 B=6 exact  0.0s
+# K=11 S=[3, 5, 11] M=165 A=12 B=12 exact  0.0s
+# K=12 S=[3, 5, 11, 13] M=2145 A=13 B=2 exact  0.0s
+# K=13 S=[3, 5, 11, 13] M=2145 A=14 B=4 exact  0.0s
+# K=14 S=[3, 5, 11, 13] M=2145 A=15 B=8 exact  0.0s
+# K=15 S=[3, 5, 11, 13] M=2145 A=16 B=15 exact  0.0s
+# K=16 S=[3, 5, 11, 13] M=2145 A=17 B=31 exact  0.0s
+# K=17 S=[3, 5, 11, 13] M=2145 A=18 B=61 exact  0.0s
+# K=18 S=[3, 5, 11, 13, 19] M=40755 A=19 B=6 exact  0.0s
+# K=19 S=[3, 5, 11, 13, 19] M=40755 A=20 B=13 exact  0.0s
+# K=20 S=[3, 5, 11, 13, 19] M=40755 A=21 B=26 exact  0.0s
+# K=21 S=[3, 5, 11, 13, 19] M=40755 A=22 B=51 exact  0.0s
+# K=22 S=[3, 5, 11, 13, 19] M=40755 A=23 B=103 exact  0.0s
+# K=23 S=[3, 5, 11, 13, 19] M=40755 A=24 B=206 exact  0.0s
+# K=24 S=[3, 5, 11, 13, 19] M=40755 A=25 B=412 exact  0.0s
+# K=25 S=[3, 5, 11, 13, 19] M=40755 A=26 B=823 exact  0.0s
+# K=26 S=[3, 5, 11, 13, 19] M=40755 A=27 B=1647 exact  0.0s
+# K=27 S=[3, 5, 11, 13, 19] M=40755 A=28 B=3293 exact  0.0s
+# K=28 S=[3, 5, 11, 13, 19, 29] M=1181895 A=29 B=227 exact  0.0s
+# K=29 S=[3, 5, 11, 13, 19, 29] M=1181895 A=30 B=454 exact  0.0s
+# K=30 S=[3, 5, 11, 13, 19, 29] M=1181895 A=31 B=908 exact  0.0s
+# K=31 S=[3, 5, 11, 13, 19, 29] M=1181895 A=32 B=1817 exact  0.0s
+# K=32 |S|=6 M=1181895 A=33 B=3634 i=[3634,7267] numpy  0.0s
+# K=33 |S|=6 M=1181895 A=34 B=7268 i=[7268,14535] numpy  0.0s
+# K=34 |S|=6 M=1181895 A=35 B=14536 i=[14536,29071] numpy  0.0s
+# K=35 |S|=6 M=1181895 A=36 B=29072 i=[29072,58143] numpy  0.0s
+# K=36 |S|=7 M=43730115 A=37 B=1571 i=[1572,3142] numpy  0.0s
+# K=37 |S|=7 M=43730115 A=38 B=3143 i=[3143,6285] numpy  0.0s
+# K=38 |S|=7 M=43730115 A=39 B=6286 i=[6286,12571] numpy  0.0s
+# K=39 |S|=7 M=43730115 A=40 B=12572 i=[12572,25143] numpy  0.0s
+# K=40 |S|=7 M=43730115 A=41 B=25143 i=[25144,50286] numpy  0.0s
+# K=41 |S|=7 M=43730115 A=42 B=50286 i=[50287,100572] numpy  0.0s
+# K=42 |S|=7 M=43730115 A=43 B=100572 i=[100573,201144] numpy  0.0s
+# K=43 |S|=7 M=43730115 A=44 B=201145 i=[201145,402289] numpy  0.0s
+# K=44 |S|=7 M=43730115 A=45 B=402290 i=[402290,804579] numpy  0.0s
+# K=45 |S|=7 M=43730115 A=46 B=804580 i=[804580,1609159] numpy  0.1s
+# K=46 |S|=7 M=43730115 A=47 B=1609160 i=[1609160,3218319] numpy  0.2s
+# K=47 |S|=7 M=43730115 A=48 B=3218320 i=[3218320,6436639] numpy  0.3s
+# K=48 |S|=7 M=43730115 A=49 B=6436639 i=[6436640,12873278] numpy  0.6s
+# K=49 |S|=7 M=43730115 A=50 B=12873279 i=[12873279,25746557] numpy  1.2s
+# K=50 |S|=7 M=43730115 A=51 B=25746557 i=[25746558,51493114] numpy  2.5s
+# K=51 |S|=7 M=43730115 A=52 B=51493114 i=[51493115,102986228] numpy  5.8s
+# K=52 |S|=8 M=2317696095 A=53 B=1943136 i=[1943137,3886272] numpy  0.2s
+# K=53 |S|=8 M=2317696095 A=54 B=3886273 i=[3886273,7772545] numpy  0.4s
+# K=54 |S|=8 M=2317696095 A=55 B=7772546 i=[7772546,15545091] numpy  0.8s
+# K=55 |S|=8 M=2317696095 A=56 B=15545091 i=[15545092,31090182] numpy  1.6s
+# K=56 |S|=8 M=2317696095 A=57 B=31090182 i=[31090183,62180364] numpy  3.3s
+# K=57 |S|=8 M=2317696095 A=58 B=62180365 i=[62180365,124360729] numpy  7.4s
+# K=58 |S|=9 M=136744069605 A=59 B=2107809 i=[2107809,4215617] numpy  0.2s
+# K=59 |S|=9 M=136744069605 A=60 B=4215618 i=[4215618,8431235] numpy  0.4s
+# K=60 |S|=10 M=8341388245905 A=61 B=138217 i=[138217,276433] numpy  0.0s
+# K=61 |S|=10 M=8341388245905 A=62 B=276434 i=[276434,552867] numpy  0.0s
+# K=62 |S|=10 M=8341388245905 A=63 B=552868 i=[552868,1105735] numpy  0.1s
+# K=63 |S|=10 M=8341388245905 A=64 B=1105736 i=[1105736,2211471] numpy  0.1s
+# K=64 |S|=10 M=8341388245905 A=65 B=2211472 i=[2211472,4422943] numpy  0.2s
+# K=65 |S|=10 M=8341388245905 A=66 B=4422943 i=[4422944,8845886] numpy  0.5s
+# K=66 |S|=11 M=558873012475635 A=67 B=132028 i=[132029,264056] numpy  0.0s
+# K=67 |S|=11 M=558873012475635 A=68 B=264056 i=[264057,528112] numpy  0.0s
+# K=68 |S|=11 M=558873012475635 A=69 B=528113 i=[528113,1056225] numpy  0.1s
+# K=69 |S|=11 M=558873012475635 A=70 B=1056225 i=[1056226,2112450] numpy  0.1s
+# K=70 |S|=11 M=558873012475635 A=71 B=2112451 i=[2112451,4224901] numpy  0.2s
+# K=71 |S|=11 M=558873012475635 A=72 B=4224901 i=[4224902,8449802] numpy  0.5s
+# K=72 |S|=11 M=558873012475635 A=73 B=8449802 i=[8449803,16899604] numpy  1.0s
+# K=73 |S|=11 M=558873012475635 A=74 B=16899605 i=[16899605,33799209] numpy  1.9s
+# K=74 |S|=11 M=558873012475635 A=75 B=33799209 i=[33799210,67598418] numpy  4.0s
+# K=75 |S|=11 M=558873012475635 A=76 B=67598419 i=[67598419,135196837] numpy  8.9s
+# K=76 |S|=11 M=558873012475635 A=77 B=135196837 i=[135196838,270393674] numpy  22.1s
+# K=77 |S|=11 M=558873012475635 A=78 B=270393675 i=[270393675,540787349] numpy  49.1s
+# 
+# === SUMMARY ===
+# type A candidates: 3078
+# type B candidates: 781153370
+# total candidates : 781156448
+# type B kills by k: {1: 614047516, 2: 98359047, 3: 41915480, 4: 13910495, 5: 6788994, 6: 3153239, 7: 1555549, 8: 749418, 9: 323371, 10: 166969, 11: 88389, 12: 41228, 13: 23484, 14: 13283, 15: 7147, 16: 4166, 17: 2411, 18: 1344, 19: 809, 20: 451, 21: 259, 22: 132, 23: 74, 24: 44, 25: 29, 26: 19, 27: 6, 28: 5, 29: 6, 30: 1, 31: 1}
+# type A kills by k: {1: 2829, 2: 217, 3: 23, 4: 2, 5: 2, 7: 1}
+# max k used (B): 31  max k used (A): 7
+# n-2^k = 1 cases: [(2, 5, 2), (3, 9, 3)]
+# survivors (exact): [(2, 'A', 7), (3, 'B', 15), (4, 'A', 21), (5, 'B', 45), (6, 'B', 75), (6, 'B', 105)]
+# survivor set == known solutions: True
+# elapsed 113.9s

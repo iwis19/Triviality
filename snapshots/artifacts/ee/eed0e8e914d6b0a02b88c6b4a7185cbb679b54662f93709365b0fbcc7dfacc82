@@ -1,0 +1,33 @@
+import sys
+from sympy import primerange, nextprime
+hist=[]
+k=11; d=2310; W=(k-1)*d
+AP=set(j*d for j in range(k))
+pos=[y for y in range(W+1) if y not in AP]
+def run(Pmax, targets):
+    covered=bytearray(W+1)  # only meaningful on non-AP
+    res={}
+    out={}
+    r=len(pos)
+    for p in primerange(2,Pmax+1):
+        forb=set(a%p for a in AP)
+        best=-1;bres=None
+        for rr in range(p):
+            if rr in forb: continue
+            cnt=0
+            for y in range(rr,W+1,p):
+                if not covered[y]: cnt+=1   # AP positions never in this class
+            if cnt>best: best=cnt;bres=rr
+        res[p]=bres
+        for y in range(bres,W+1,p): covered[y]=1
+        r-=best
+        hist.append((p,r))
+        if any(p<=t<nextprime(p) for t in targets):
+            # recount independently
+            rc=sum(1 for y in pos if not covered[y])
+            out[p]=(r,rc)
+            print(p,r,rc,flush=True)
+            if rc==0: break
+    return out
+targets=[227,311,1000,1500,2000,3000,4001,4973,4987]
+run(int(sys.argv[1]),targets)

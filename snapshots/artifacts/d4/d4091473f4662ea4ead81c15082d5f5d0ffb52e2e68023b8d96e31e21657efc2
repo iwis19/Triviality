@@ -1,0 +1,127 @@
+import Mathlib
+/-!
+# Erdős problem #1056 — reduction lemma and explicit finite witnesses
+
+`AllModProdEqualsOne` is copied verbatim from google-deepmind/formal-conjectures
+(`FormalConjectures/ErdosProblems/1056.lean`).  Witness boundaries were produced by the C program
+`fact_collisions.c`: reduce `n!` mod `p` for `0 ≤ n < p`; a residue hit `k+1` times at indices
+`n_0 < … < n_k` yields boundaries `n_i + 1` (half-open `Ico` blocks), because
+`(n_{i+1})! / (n_i)! = ∏_{n_i < j ≤ n_{i+1}} j`.  This is `allModProdEqualsOne_of_factorial_congr`.
+-/
+
+open Nat
+
+def AllModProdEqualsOne (p : ℕ) {k : ℕ} (boundaries : Fin (k + 1) → ℕ) : Prop :=
+  ∀ i : Fin k,
+    (∏ n ∈ Finset.Ico (boundaries i.castSucc) (boundaries (i.castSucc + 1)), n) ≡ 1 [MOD p]
+
+/-- Product of a half-open block times the factorial below it is the factorial above it. -/
+lemma factorial_mul_prod_Ico {a d : ℕ} (ha : 1 ≤ a) (had : a ≤ d) :
+    (a - 1)! * ∏ n ∈ Finset.Ico a d, n = (d - 1)! := by
+  have h1 : (a - 1)! = ∏ n ∈ Finset.Ico 1 a, n := by
+    rw [← Finset.prod_Ico_id_eq_factorial]
+    congr 1
+  have h2 : (d - 1)! = ∏ n ∈ Finset.Ico 1 d, n := by
+    rw [← Finset.prod_Ico_id_eq_factorial]
+    congr 1
+  rw [h1, h2, Finset.prod_Ico_consecutive _ ha had]
+
+/-- Noll–Simmons ⟹ Erdős #1056: if all `(b i - 1)!` are congruent to a common unit `c`
+mod a prime `p`, every block product is `≡ 1`. -/
+theorem allModProdEqualsOne_of_factorial_congr {p k : ℕ} (hp : p.Prime)
+    (b : Fin (k + 1) → ℕ) (hb : StrictMono b) (hpos : ∀ i, 1 ≤ b i)
+    (c : ℕ) (hc : ¬ p ∣ c) (h : ∀ i, (b i - 1)! ≡ c [MOD p]) :
+    AllModProdEqualsOne p b := by
+  intro i
+  have hi : i.castSucc < i.castSucc + 1 := by
+    rw [Fin.lt_def, Fin.val_add_one_of_lt (Fin.castSucc_lt_last i)]; omega
+  have hlt : b i.castSucc < b (i.castSucc + 1) := hb hi
+  have key := factorial_mul_prod_Ico (hpos i.castSucc) hlt.le
+  have h1 := h i.castSucc
+  have h2 := h (i.castSucc + 1)
+  have hcop : Nat.Coprime p c := (Nat.Prime.coprime_iff_not_dvd hp).2 hc
+  have : c * (∏ n ∈ Finset.Ico (b i.castSucc) (b (i.castSucc + 1)), n) ≡ c * 1 [MOD p] := by
+    calc c * (∏ n ∈ Finset.Ico (b i.castSucc) (b (i.castSucc + 1)), n)
+        ≡ (b i.castSucc - 1)! * (∏ n ∈ Finset.Ico (b i.castSucc) (b (i.castSucc + 1)), n) [MOD p] :=
+          Nat.ModEq.mul_right _ h1.symm
+      _ = (b (i.castSucc + 1) - 1)! := key
+      _ ≡ c [MOD p] := h2
+      _ = c * 1 := (mul_one c).symm
+  exact Nat.ModEq.cancel_left_of_coprime hcop this
+
+
+/-- k = 2, p = 5: blocks {1}, {2,3}. -/
+theorem k2 : AllModProdEqualsOne 5 ![1, 2, 4] := by
+  unfold AllModProdEqualsOne; decide +kernel
+
+/-- k = 4, p = 17: 0! ≡ 1! ≡ 5! ≡ 11! ≡ 15! ≡ 1 (mod 17). -/
+theorem k4 : AllModProdEqualsOne 17 ![1, 2, 6, 12, 16] := by
+  unfold AllModProdEqualsOne; decide +kernel
+
+/-- k = 5, p = 23: 0!,1!,4!,8!,11!,21! ≡ 1 (mod 23). -/
+theorem k5 : AllModProdEqualsOne 23 ![1, 2, 5, 9, 12, 22] := by
+  unfold AllModProdEqualsOne; decide +kernel
+
+/-- k = 6, p = 71: 7!,9!,19!,51!,61!,63!,70! ≡ 70 ≡ -1 (mod 71). -/
+theorem k6 : AllModProdEqualsOne 71 ![8, 10, 20, 52, 62, 64, 71] := by
+  unfold AllModProdEqualsOne; decide +kernel
+
+/-- k = 8, p = 599: nine factorials ≡ 175 (mod 599). -/
+theorem k8 : AllModProdEqualsOne 599 ![29, 51, 123, 184, 251, 290, 501, 540, 556] := by
+  unfold AllModProdEqualsOne; decide +kernel
+
+theorem prime_599 : Nat.Prime 599 := by norm_num
+
+/-- k = 10, p = 3011: eleven factorials ≡ 1 (mod 3011). -/
+theorem k10 : AllModProdEqualsOne 3011 ![1, 2, 612, 724, 750, 806, 2206, 2262, 2288, 2400, 3010] := by
+  unfold AllModProdEqualsOne; decide +kernel
+
+/-- k = 12, p = 52163: thirteen factorials ≡ 1 (mod 52163). -/
+theorem k12 : AllModProdEqualsOne 52163
+    ![1, 2, 3925, 7292, 7428, 18520, 24932, 26082, 27232, 33644, 44736, 44872, 52162] := by
+  unfold AllModProdEqualsOne; decide +kernel
+
+theorem prime_52163 : Nat.Prime 52163 := by norm_num
+theorem prime_3011 : Nat.Prime 3011 := by norm_num
+
+/-- (p-2)! ≡ 1 (mod p) for every prime p (from Wilson's theorem). -/
+lemma factorial_sub_two_modEq_one {p : ℕ} (hp : p.Prime) : (p - 2)! ≡ 1 [MOD p] := by
+  have h2 : 2 ≤ p := hp.two_le
+  have hw : ((p - 1)! : ZMod p) = -1 := by
+    haveI := Fact.mk hp
+    exact ZMod.wilsons_lemma p
+  have h1 : (p - 1)! = (p - 1) * (p - 2)! := by
+    have : p - 1 = (p - 2) + 1 := by omega
+    rw [this, Nat.factorial_succ]
+  haveI := Fact.mk hp
+  rw [← ZMod.natCast_eq_natCast_iff]
+  push_cast
+  have hpm1 : ((p - 1 : ℕ) : ZMod p) = -1 := by
+    rw [Nat.cast_sub (by omega), ZMod.natCast_self]; simp
+  rw [h1] at hw
+  push_cast at hw
+  rw [hpm1, neg_one_mul, neg_inj] at hw
+  exact hw
+
+/-- Every prime p ≥ 5 gives k = 2: blocks {1} and {2, …, p-2}. -/
+theorem k2_all_primes {p : ℕ} (hp : p.Prime) (h5 : 5 ≤ p) :
+    AllModProdEqualsOne p ![1, 2, p - 1] := by
+  intro i
+  fin_cases i
+  · simp; rfl
+  · have hb : ∏ n ∈ Finset.Ico ((![1, 2, p - 1] : Fin 3 → ℕ) (Fin.castSucc (1 : Fin 2)))
+        ((![1, 2, p - 1] : Fin 3 → ℕ) (Fin.castSucc (1 : Fin 2) + 1)), n
+        = ∏ n ∈ Finset.Ico 2 (p - 1), n := by
+      rfl
+    show ∏ n ∈ Finset.Ico ((![1, 2, p - 1] : Fin 3 → ℕ) (Fin.castSucc (1 : Fin 2)))
+        ((![1, 2, p - 1] : Fin 3 → ℕ) (Fin.castSucc (1 : Fin 2) + 1)), n ≡ 1 [MOD p]
+    rw [hb]
+    have h := factorial_sub_two_modEq_one hp
+    have hprod : ∏ n ∈ Finset.Ico 2 (p - 1), n = (p - 2)! := by
+      have e1 : (p - 2)! = ∏ n ∈ Finset.Ico 1 (p - 1), n := by
+        rw [← Finset.prod_Ico_id_eq_factorial]
+        congr 1
+      rw [e1, ← Finset.prod_Ico_consecutive _ (show 1 ≤ 2 by norm_num) (show 2 ≤ p - 1 by omega)]
+      simp
+    rw [hprod]; exact h
+

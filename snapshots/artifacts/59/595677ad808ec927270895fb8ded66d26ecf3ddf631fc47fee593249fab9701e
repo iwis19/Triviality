@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""
+Same enumeration as erdos376_tree.py (all n < 3^A with gcd(C(2n,n),105)=1, i.e. base-3
+digits in {0,1}, base-5 digits <=2, base-7 digits <=3) but with incremental digit checks:
+a node stores, for p in {5,7}, the set (<=2 values) of q = floor(n/p^b) (p^b >= 3^L minimal)
+that survive; a child only needs to check membership of floor(q'/p^{b-b'}) in the parent
+set plus at most one new low digit of q'.  Exactly equivalent to the full check.
+Also prints the number of surviving nodes per depth (empirical test of the 3^{0.026 d} law).
+"""
+import sys, time
+
+def enumerate_solutions(A):
+    pow3 = [3**i for i in range(A + 1)]
+    B = {}; PB = {}
+    for p in (5, 7):
+        bl = []; pl = []
+        for L in range(A + 1):
+            b = 0
+            while p**b < pow3[L]:
+                b += 1
+            bl.append(b); pl.append(p**b)
+        B[p] = bl; PB[p] = pl
+    half = {5: 2, 7: 3}
+    sols = []
+    nodes_per_depth = [0] * (A + 1)
+    # root: interval [0, 3^A); candidates q in {0} (q = 0 passes)
+    stack = [(0, A, (0,), (0,))]
+    while stack:
+        P, L, c5, c7 = stack.pop()
+        nodes_per_depth[A - L] += 1
+        if L == 0:
+            sols.append(P)
+            continue
+        Lc = L - 1
+        for d in (0, 1):
+            Pc = 3 * P + d
+            lo = Pc * pow3[Lc]
+            hi = lo + pow3[Lc] - 1
+            newc = []
+            ok = True
+            for p, cpar in ((5, c5), (7, c7)):
+                pb = PB[p][Lc]
+                shift = B[p][L] - B[p][Lc]     # 0 or 1
+                qlo = lo // pb; qhi = hi // pb
+                cs = []
+                for q in ((qlo,) if qlo == qhi else (qlo, qhi)):
+                    if shift == 0:
+                        if q in cpar:
+                            cs.append(q)
+                    else:
+                        qq, r = divmod(q, p)
+                        if r <= half[p] and qq in cpar:
+                            cs.append(q)
+                if not cs:
+                    ok = False
+                    break
+                newc.append(tuple(cs))
+            if ok:
+                stack.append((Pc, Lc, newc[0], newc[1]))
+    return sorted(sols), nodes_per_depth
+
+if __name__ == "__main__":
+    A = int(sys.argv[1]) if len(sys.argv) > 1 else 60
+    t = time.time()
+    sols, npd = enumerate_solutions(A)
+    dt = time.time() - t
+    print(f"A={A}  3^A ~ 10^{A*0.4771:.1f}  solutions={len(sols)}  nodes={sum(npd)}  time={dt:.1f}s", file=sys.stderr)
+    with open(f"nodes_per_depth_{A}.txt", "w") as f:
+        for d, c in enumerate(npd):
+            f.write(f"{d} {c}\n")
+    for s in sols:
+        print(s)

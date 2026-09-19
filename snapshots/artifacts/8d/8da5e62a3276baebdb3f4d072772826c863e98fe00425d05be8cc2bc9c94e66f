@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""
+Lonely runner: pairwise/triple overlap measures and Bonferroni/Hunter-type lower bounds on ML(v).
+
+Setting: k runners, one stationary WLOG, n = k-1 distinct positive integer speeds v_1..v_n.
+For threshold d (rational), B_i = { t in [0,1) : ||v_i t|| < d } (open), mu(B_i) = 2d (for d <= 1/2).
+If mu(union B_i) < 1 then some t has ||v_i t|| >= d for all i, so ML(v) >= d.
+
+Upper bounds on mu(union):
+  U1 (union bound):    S1 = 2 d n                       -> ML >= 1/(2n) = 1/(2k-2)
+  Hunter (1976):       S1 - max_{spanning tree T} sum_{ij in T} mu(B_i cap B_j)   (pairwise overlaps only)
+  Bonferroni order 3:  S1 - S2 + S3                     (needs triple overlaps)
+All measures are computed EXACTLY in integer arithmetic on a common denominator D = M * lcm(v),
+for d = j/M on a grid.  For each bound we report the largest grid d with bound < 1.
+
+Exact ML(v): the function f(t)=min_i ||v_i t|| is piecewise linear; its local maxima lie at
+t = p/(v_i+v_j) (i<=j; i=j gives the peaks of a single ||v_i t||).  ML = max over these
+finitely many rationals, computed with Fractions.
+"""
+import sys, itertools, random, math
+from fractions import Fraction
+from math import gcd
+
+def lcm(a, b): return a*b//gcd(a, b)
+def lcm_list(xs):
+    L = 1
+    for x in xs: L = lcm(L, x)
+    return L
+
+def bad_intervals(v, dnum, D):
+    """Open intervals {t : ||v t|| < d} on [0,D) scaled by D, d = dnum/D. Returns sorted disjoint list."""
+    # centres p*D/v, half-width dnum. D divisible by v.
+    step = D//v
+    hw = dnum//v  # half-width d/v (exact: v | dnum since v | lcm)
+    assert hw*v == dnum
+    ivs = []
+    for p in range(v):
+        c = p*step
+        a, b = c-hw, c+hw
+        if a < 0:
+            ivs.append((a+D, D)); ivs.append((0, b))
+        else:
+            ivs.append((a, min(b, D)))
+            if b > D: ivs.append((0, b-D))
+    ivs.sort()
+    merged = []
+    for a, b in ivs:
+        if merged and a <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], b))
+        else:
+            merged.append((a, b))
+    return merged
+
+def intersect(A, B):
+    out = []; i = j = 0
+    while i < len(A) and j < len(B):
+        a = max(A[i][0], B[j][0]); b = min(A[i][1], B[j][1])
+        if a < b: out.append((a, b))
+        if A[i][1] < B[j][1]: i += 1
+        else: j += 1
+    return out
+
+def measure(A): return sum(b-a for a, b in A)
+
+def max_spanning_tree(n, w):
+    """w[(i,j)] weights; Kruskal maximum spanning tree total weight."""
+    parent = list(range(n))
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]; x = parent[x]
+        return x
+    tot = 0
+    for (i, j), wt in sorted(w.items(), key=lambda kv: -kv[1]):
+        ri, rj = find(i), find(j)
+        if ri != rj:
+            parent[ri] = rj; tot += wt
+    return tot
+
+def bounds_at(v, j, M):
+    """Return (S1, Hunter, Bonf3) as Fractions (upper bounds on mu(union)) for d=j/M."""
+    n = len(v); L = lcm_list(v); D = M*L; dnum = j*L
+    ivs = [bad_intervals(vi, dnum, D) for vi in v]
+    S1 = Fraction(sum(measure(I) for I in ivs), D)
+    pair = {}
+    pairivs = {}
+    for a, b in itertools.combinations(range(n), 2):
+        P = intersect(ivs[a], ivs[b]); pairivs[(a, b)] = P; pair[(a, b)] = measure(P)
+    S2 = Fraction(sum(pair.values()), D)
+    T = Fraction(max_spanning_tree(n, pair), D)
+    S3n = 0
+    for a, b, c in itertools.combinations(range(n), 3):
+        S3n += measure(intersect(pairivs[(a, b)], ivs[c]))
+    S3 = Fraction(S3n, D)
+    return S1, S1 - T, S1 - S2 + S3
+
+def best_threshold(v, M, which):
+    """Largest d=j/M (j from 0..M/2) with bound(which) < 1. Scans upward from union-bound value."""
+    n = len(v)
+    j0 = (M//(2*n))  # union bound threshold on grid (floor)
+    ok = lambda j: bounds_at(v, j, M)[which] < 1
+    # coarse scan (step 32 grid points) upward from just below the union-bound value until 20 consecutive misses
+    step = 32; misses = 0; lastok = None
+    j = max(j0-step, 1)
+    while j <= M//2:
+        if ok(j): lastok = j; misses = 0
+        else:
+            misses += 1
+            if misses >= 20: break
+        j += step
+    if lastok is None: return Fraction(0)
+    # fine scan from lastok upward
+    j = lastok; best = lastok; misses = 0
+    while j <= M//2:
+        if ok(j): best = j; misses = 0
+        else:
+            misses += 1
+            if misses >= 40: break
+        j += 1
+    return Fraction(best, M)
+
+def exact_ML(v):
+    best = Fraction(0)
+    for a in range(len(v)):
+        for b in range(a, len(v)):
+            q = v[a]+v[b]
+            for p in range(q):
+                t = Fraction(p, q)
+                f = min(min((vi*t) % 1, 1-((vi*t) % 1)) for vi in v)
+                if f > best: best = f
+    return best
+
+def analyze(v, M):
+    n = len(v)
+    dU = Fraction(1, 2*n)
+    dH = best_threshold(v, M, 1)
+    dB = best_threshold(v, M, 2)
+    ml = exact_ML(v)
+    return dU, dH, dB, ml
+
+def main():
+    random.seed(20260919)
+    M = 2520*8  # grid denominator (divisible by 2n for n<=9 and by 8)
+    out = []
+    print("mode k n v dU dH dB ML  gainH*n^2 gainB*n^2 (gain = d - 1/(2n))")
+    summary = {}
+    for k in range(3, 9):
+        n = k-1
+        sets = []
+        Nex = {3: 30, 4: 20, 5: 14, 6: 12, 7: 11, 8: 11}[k]
+        for v in itertools.combinations(range(1, Nex+1), n):
+            if math.gcd(*v) == 1: sets.append(('exh', v))
+        # random sets with larger speeds
+        for _ in range({3: 200, 4: 200, 5: 150, 6: 100, 7: 60, 8: 40}[k]):
+            while True:
+                v = tuple(sorted(random.sample(range(1, 60), n)))
+                if math.gcd(*v) == 1: break
+            sets.append(('rnd', v))
+        minH = minB = None; violH = violB = 0; cnt = 0
+        for mode, v in sets:
+            dU, dH, dB, ml = analyze(v, M)
+            gH = (dH-dU)*n*n; gB = (dB-dU)*n*n
+            cnt += 1
+            if dH > ml or dB > ml:  # would contradict validity of bounds
+                print("!!! BOUND EXCEEDS TRUE ML", v, dH, dB, ml)
+            if minH is None or gH < minH[0]: minH = (gH, v, dH, ml)
+            if minB is None or gB < minB[0]: minB = (gB, v, dB, ml)
+            out.append((mode, k, n, v, str(dU), str(dH), str(dB), str(ml), float(gH), float(gB)))
+        summary[k] = (cnt, minH, minB, Nex)
+        print(f"k={k} n={n}: {cnt} sets (exhaustive gcd-1 {n}-subsets of [1..{Nex}] + random from [1..59]); grid M={M}")
+        print(f"   min Hunter gain*n^2 = {float(minH[0]):.4f} at v={minH[1]} (dH={minH[2]}~{float(minH[2]):.5f}, ML={minH[3]}~{float(minH[3]):.5f}); 1/(2n)={1/(2*n):.5f}")
+        print(f"   min Bonf3  gain*n^2 = {float(minB[0]):.4f} at v={minB[1]} (dB={minB[2]}~{float(minB[2]):.5f}, ML={minB[3]}~{float(minB[3]):.5f})")
+        sys.stdout.flush()
+    with open('/home/ubuntu/lrc_bonferroni_results.tsv', 'w') as f:
+        f.write("mode\tk\tn\tv\tdU\tdH\tdB\tML\tgainH_n2\tgainB_n2\n")
+        for r in out: f.write("\t".join(map(str, r))+"\n")
+
+if __name__ == '__main__':
+    main()

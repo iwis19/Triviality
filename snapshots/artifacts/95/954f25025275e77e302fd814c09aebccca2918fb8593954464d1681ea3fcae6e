@@ -1,0 +1,10 @@
+[A] smallest n with sum_{first n primes} 1/p > 2: n0=59, p0=277, sum=2.002350
+[A] hence |P u Q| >= 59, max(P u Q) >= 277, XY >= prod(first 59 primes) ~ 10^112.9
+[A] if [2] not in P u Q: need max prime >= 11789, |P u Q| >= 1412
+[A] if [3] not in P u Q: need max prime >= 2741, |P u Q| >= 399
+[A] if [2, 3] not in P u Q: need max prime >= 483281, |P u Q| >= 40259
+[B] pairs checked=18660, (S_P S_Q=1) <-> (X'=Y and Y'=X) mismatches=0, solutions=0, U'=X^2+Y^2 hits=0
+[D] x=300: #primes=62, W=prod(1+2/p)=exp(3.41)=30.2; Pr_mu[compatible]~1.00e-05 (hits=20), Pr_mu[1/2<S_P S_Q<2]~1.15e-05; heuristic E(x)~W*Pr ~ 0.000302 (loose: 0.000348)
+[D] x=1000: #primes=168, W=prod(1+2/p)=exp(3.78)=43.8; Pr_mu[compatible]~6.50e-06 (hits=13), Pr_mu[1/2<S_P S_Q<2]~1.10e-05; heuristic E(x)~W*Pr ~ 0.000284 (loose: 0.000481)
+[D] x=3000: #primes=430, W=prod(1+2/p)=exp(4.07)=58.6; Pr_mu[compatible]~1.00e-05 (hits=20), Pr_mu[1/2<S_P S_Q<2]~8.50e-06; heuristic E(x)~W*Pr ~ 0.000586 (loose: 0.000498)
+[C] U = primes<=x minus <=1 hole for x<=5000, minus <=2 holes for x<=1000 (only U with S_U>2): tested=920159, hits=[], time=28.9s

@@ -1,0 +1,85 @@
+"""Index-first search (idea I5): fix small factorial indices, let the prime be arbitrarily large.
+
+For 2 <= a < b <= N compute g = gcd(a!-1, b!-1).  Every prime p | g satisfies p > b and
+a! ≡ b! ≡ 1 (mod p), so {0, 1, a, b, p-2} already gives k = 4 (Wilson: (p-2)! ≡ 1), and by the
+reflection n!(p-1-n)! ≡ (-1)^(n+1) every ODD q in the set contributes the extra index p-1-q.
+Primes are collected across all pairs; for each prime p we record Q_p = {q <= N : p | q!-1}.
+Resulting k(p) = |{0,1,p-2} ∪ Q_p ∪ {p-1-q : q ∈ Q_p odd}| - 1  (+1 if p ≡ 3 mod 4 and ((p-1)/2)! ≡ 1,
+which is Mordell's criterion h(-p) ≡ 3 (mod 4); we test the congruence directly when p is small
+enough).  Heuristic expected number of primes with |Q_p| >= m is ~ N/(m!(m-1) log N)  (own estimate).
+Usage: python3 gcd_search.py N
+"""
+import sys, math
+from math import gcd
+from sympy import factorint, isprime
+
+N = int(sys.argv[1]) if len(sys.argv) > 1 else 300
+F = [1] * (N + 1)
+for i in range(1, N + 1):
+    F[i] = F[i - 1] * i
+A = [F[q] - 1 for q in range(N + 1)]
+
+primes_q = {}  # p -> set of q
+for a in range(2, N + 1):
+    for b in range(a + 1, N + 1):
+        g = gcd(A[a], A[b])
+        if g == 1:
+            continue
+        if isprime(g):
+            fac = {g: 1}
+        else:
+            fac = factorint(g, limit=10**7)
+        for p in fac:
+            if not isprime(p):
+                continue  # unfactored cofactor; skipped (recorded as a gap)
+            primes_q.setdefault(p, set()).update((a, b))
+
+def fact_mod(n, p):
+    f = 1
+    for i in range(2, n + 1):
+        f = f * i % p
+    return f
+
+rows = []
+for p, Q in primes_q.items():
+    idx = {0, 1, p - 2} | Q | {p - 1 - q for q in Q if q % 2 == 1}
+    idx = {n for n in idx if 0 <= n <= p - 2}
+    mord = None
+    if p % 4 == 3 and p < 3 * 10**7:
+        mord = fact_mod((p - 1) // 2, p) == 1
+        if mord:
+            idx.add((p - 1) // 2)
+    # sanity check of all indices when p is small enough to scan
+    ok = all(fact_mod(n, p) == 1 for n in idx) if p < 3 * 10**7 else None
+    rows.append((len(idx) - 1, p, sorted(Q), mord, ok))
+
+rows.sort(reverse=True)
+print(f"N={N}: {len(primes_q)} primes found from pairwise gcds; distribution of |Q_p|:",
+      {m: sum(1 for r in rows if len(r[2]) == m) for m in range(2, 8)})
+print("top witnesses (k, p, Q_p, Mordell-sixth-index?, all-indices-checked?):")
+for r in rows[:12]:
+    print(r)
+print("expected #primes with |Q_p|>=m (own heuristic N/(m!(m-1)log N)):",
+      {m: round(N / (math.factorial(m) * (m - 1) * math.log(N)), 3) for m in range(2, 6)})
+
+# ---- output (python3 gcd_search.py 1000) ----
+# N=1000: 160 primes found from pairwise gcds; distribution of |Q_p|: {2: 86, 3: 42, 4: 20, 5: 8, 6: 4, 7: 0}
+# top witnesses (k, p, Q_p, Mordell-sixth-index?, all-indices-checked?):
+# (10, 3011, [611, 723, 749, 805], False, True)
+# (8, 4093, [557, 575, 871], None, True)
+# (7, 5171, [21, 867], True, True)
+# (7, 4639, [291, 905], True, True)
+# (7, 2287, [218, 415, 841], False, True)
+# (7, 1753, [8, 221, 510, 672], None, True)
+# (7, 971, [361, 465, 485, 505, 609, 969], True, True)
+# (7, 883, [43, 96, 264, 441, 839, 881], True, True)
+# (7, 823, [49, 97, 660, 725, 773, 821], False, True)
+# (7, 619, [111, 189, 294, 429, 507, 617], False, True)
+# (6, 156967, [28, 727], True, True)
+# (6, 17401, [760, 925, 996], None, True)
+# expected #primes with |Q_p|>=m (own heuristic N/(m!(m-1)log N)): {2: 72.382, 3: 12.064, 4: 2.011, 5: 0.302}
+# 
+# real	0m8.482s
+# user	0m8.408s
+# sys	0m0.081s
+# 

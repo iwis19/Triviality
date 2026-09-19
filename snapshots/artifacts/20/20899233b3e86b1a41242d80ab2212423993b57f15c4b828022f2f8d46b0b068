@@ -1,0 +1,56 @@
+"""Coincidences among 'Gauss factorials' ((p-1)a/N)! mod p for small N.
+Also tests the derived claim: for p ≡ 1 (mod 4),
+  ((p-1)/4)! ≡ ((p-1)/2)! (mod p)  ⟹  p = 4a^2+1 with 3a^2+1 a perfect square.
+And Mordell: for p ≡ 3 (mod 4), ((p-1)/2)! ≡ ±1; count sign +1 (h(-p) ≡ 3 mod 4)."""
+import sys
+from sympy import primerange
+from math import isqrt
+
+N = int(sys.argv[1]) if len(sys.argv) > 1 else 200000
+coinc = {}
+mordell_plus = mordell_minus = 0
+quarter_half = []
+for p in primerange(5, N):
+    # factorials at the needed cut points, computed incrementally
+    cuts = set()
+    for M in (2, 3, 4, 5, 6, 8, 12):
+        if (p - 1) % M == 0:
+            for a in range(1, M):
+                cuts.add((a * (p - 1) // M, a, M))
+    want = {}
+    for (n, a, M) in cuts:
+        want.setdefault(n, []).append((a, M))
+    f = 1
+    vals = {}
+    for n in range(1, p - 1):
+        f = f * n % p
+        if n in want:
+            vals[n] = f
+    if p % 4 == 3:
+        h = vals[(p - 1) // 2]
+        assert h in (1, p - 1)
+        if h == 1: mordell_plus += 1
+        else: mordell_minus += 1
+    if p % 4 == 1:
+        if vals[(p - 1) // 4] == vals[(p - 1) // 2]:
+            quarter_half.append(p)
+    # generic coincidences among distinct cut points (reduced fractions)
+    items = sorted(vals.items())
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            if items[i][1] == items[j][1]:
+                fr = lambda n: min((a, M) for (a, M) in want[n])
+                coinc.setdefault((fr(items[i][0]), fr(items[j][0])), []).append(p)
+
+print(f"primes 5<=p<{N}")
+print("Mordell sign counts for p ≡ 3 mod 4: ((p-1)/2)! ≡ +1:", mordell_plus, " ≡ -1:", mordell_minus)
+print("p ≡ 1 mod 4 with ((p-1)/4)! ≡ ((p-1)/2)!:", quarter_half)
+for p in quarter_half:
+    a2 = (p - 1) // 4
+    a = isqrt(a2)
+    b2 = 3 * a2 + 1
+    print("  p =", p, "4a^2+1 with a^2 =", a2, "square:", a * a == a2, " 3a^2+1 square:", isqrt(b2) ** 2 == b2)
+print("coincidences ((p-1)a/M)! ≡ ((p-1)a'/M')! (fractions a/M, a'/M'), listing primes (first 10):")
+for key in sorted(coinc):
+    ps = coinc[key]
+    print(" ", key, "count", len(ps), ps[:10])

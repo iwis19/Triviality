@@ -1,0 +1,74 @@
+#!/usr/bin/env python3
+"""Erdos #677 experiments.
+M(n,k) = lcm(n+1,...,n+k).
+(1) collision search: any n<m with m-n>=k and M(n,k)==M(m,k), for n,m<=N.
+    Coverage is complete for all pairs with n <= N/2.83 - k because of the bound
+    m+1 < (n+k)*lcm(1..k)^(1/k) < 2.83 (n+k)  (claim C2, itself checked in (2)).
+(2) check C1: C(n+k,k) | M(n,k) and M(n,k) | C(n+k,k)*lcm(1..k).
+(3) check C4 on the *overlapping* equalities M(n,k)=M(n+d,k), 1<=d<k:
+    n+i | prod_{j=1..k} (d+j-i) whenever d+j-i != 0 for all j, i.e. for i<=d.
+"""
+import sys
+from math import gcd, comb, lcm
+from collections import defaultdict
+
+def M(n, k):
+    v = 1
+    for x in range(n + 1, n + k + 1):
+        v = v * x // gcd(v, x)
+    return v
+
+def L(k):
+    v = 1
+    for x in range(1, k + 1):
+        v = v * x // gcd(v, x)
+    return v
+
+def run(kmax, N):
+    total_coll = 0
+    for k in range(1, kmax + 1):
+        Lk = L(k)
+        seen = defaultdict(list)
+        c1_fail = 0
+        c4_fail = 0
+        c4_tests = 0
+        vals = []
+        for n in range(0, N + 1):
+            v = M(n, k)
+            vals.append(v)
+            c = comb(n + k, k)
+            if v % c != 0 or (c * Lk) % v != 0:
+                c1_fail += 1
+            seen[v].append(n)
+        coll = []
+        overl = 0
+        for v, ns in seen.items():
+            if len(ns) > 1:
+                for a in range(len(ns)):
+                    for b in range(a + 1, len(ns)):
+                        n, m = ns[a], ns[b]
+                        if m - n >= k:
+                            coll.append((n, m))
+                        else:
+                            overl += 1
+                            d = m - n
+                            for i in range(1, d + 1):
+                                P = 1
+                                for j in range(1, k + 1):
+                                    P *= (d + j - i)
+                                c4_tests += 1
+                                if P % (n + i) != 0:
+                                    c4_fail += 1
+        # max ratio bound check: for all n<m<=N with m-n>=k, M(m,k)/M(n,k) > 1 ? (monotone-ish)
+        # cheaper: record min over n of M(m,k)/M(n,k) with m=n+k
+        minratio = min((vals[n + k] / vals[n]) for n in range(0, N - k)) if k <= N else None
+        total_coll += len(coll)
+        print(f"k={k:2d} N={N} disjoint collisions={len(coll)} {coll[:5]} overlapping equalities={overl} "
+              f"C1 failures={c1_fail} C4 tests={c4_tests} failures={c4_fail} min M(n+k)/M(n)={minratio:.4g}",
+              flush=True)
+    return total_coll
+
+if __name__ == "__main__":
+    kmax = int(sys.argv[1]) if len(sys.argv) > 1 else 20
+    N = int(sys.argv[2]) if len(sys.argv) > 2 else 20000
+    run(kmax, N)

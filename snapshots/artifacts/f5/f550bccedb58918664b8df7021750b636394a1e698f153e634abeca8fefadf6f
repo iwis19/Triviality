@@ -1,0 +1,66 @@
+"""
+Prototype of the C1-based exhaustive search (idea I3).
+For each n and each i with no prime in (n-i, n] (otherwise that prime rescues),
+let p* be the largest prime >= i dividing the block n(n-1)...(n-i+1), e = v_{p*}(C(n,i)).
+C1 forces d = n-2j  ≡  (n mod p*) - 2*j0  (mod p*^e) for some j0 in [0, n mod p*],
+so at most (n mod p* + 1) * (n / p*^e + 1) values of j need the exact test.
+We compare the number of exact tests against the brute-force count sum_i (n/2 - i)
+and confirm the exact test never finds a counterexample.
+"""
+import sys
+from experiments2 import primes_upto, vp_binom
+
+def run(NMAX):
+    primes = primes_upto(NMAX + 10)
+    spf = list(range(NMAX + 1))
+    for p in primes:
+        if p * p > NMAX: break
+        for k in range(p * p, NMAX + 1, p):
+            if spf[k] == k: spf[k] = p
+    def pf(m):
+        out = {}
+        while m > 1:
+            out[spf[m]] = out.get(spf[m], 0) + 1; m //= spf[m]
+        return out
+    import bisect
+    exact_tests = brute = 0
+    max_i_seen = 0
+    bad = []
+    for n in range(6, NMAX + 1):
+        P_le_n = primes[bisect.bisect_right(primes, n) - 1]
+        gap = n - P_le_n                       # i must be <= gap
+        facs = [pf(n - k) for k in range(gap + 1)]
+        for i in range(1, min(gap, n // 2) + 1):
+            brute += max(n // 2 - i, 0)
+            if n // 2 <= i: continue
+            max_i_seen = max(max_i_seen, i)
+            P = {}
+            for k in range(i):
+                for p in facs[k]:
+                    if p >= i and vp_binom(n, i, p) > 0:
+                        P[p] = vp_binom(n, i, p)
+            if not P:
+                # no prime >= i divides C(n,i): impossible by Sylvester-Schur; flag
+                bad.append(("noprime", n, i)); continue
+            ps = max(P); e = P[ps]; q = ps ** e; k0 = n % ps
+            # near-middle d < i handled by the same loop (d ranges over all residues)
+            cands = set()
+            for j0 in range(0, k0 + 1):
+                r = (k0 - 2 * j0) % q
+                d = r
+                while d <= n - 2 * (i + 1):
+                    if (n - d) % 2 == 0:
+                        cands.add((n - d) // 2)
+                    d += q
+            for j in cands:
+                exact_tests += 1
+                if all(vp_binom(n, j, p) == 0 for p in P):
+                    bad.append((n, i, j))
+    print(f"n <= {NMAX}: brute-force (i,j) pairs with i<=gap: {brute}, exact tests after C1 filter: {exact_tests}, "
+          f"ratio {exact_tests/brute:.4f}, max i needed: {max_i_seen}, counterexamples/flags: {bad}")
+
+if __name__ == "__main__":
+    run(int(sys.argv[1]) if len(sys.argv) > 1 else 5000)
+
+# OUTPUT:
+# n <= 300000: brute-force (i,j) pairs with i<=gap: 211603359011, exact tests after C1 filter: 127400930, ratio 0.0006, max i needed: 85, counterexamples/flags: []

@@ -1,0 +1,50 @@
+// Count runs of k consecutive primes in arithmetic progression (CPAP-k) below N,
+// broken down by common difference d, and record the smallest CPAP-k for k=3..8.
+// Usage: ./cpap_count N   (N up to ~4e9 ok with 32-bit indices, memory N/16 bytes)
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+
+int main(int argc, char **argv) {
+  uint64_t N = argc > 1 ? strtoull(argv[1], 0, 10) : 1000000000ULL;
+  uint64_t M = N / 2 + 1;                 // index i <-> odd number 2i+1
+  uint8_t *comp = calloc(M / 8 + 1, 1);   // bit set => composite
+#define ISC(i) (comp[(i) >> 3] & (1u << ((i) & 7)))
+#define SETC(i) (comp[(i) >> 3] |= (1u << ((i) & 7)))
+  SETC(0);                                // 1 is not prime
+  for (uint64_t i = 1; (2 * i + 1) * (2 * i + 1) <= N; i++) {
+    if (ISC(i)) continue;
+    uint64_t p = 2 * i + 1;
+    for (uint64_t j = (p * p) / 2; j < M; j += p) SETC(j);
+  }
+  // scan consecutive primes
+  enum { KMAX = 8, DMAX = 4096 };
+  static uint64_t cnt[KMAX + 1][DMAX];    // cnt[k][d] : number of CPAP-k (maximal or not) with difference d
+  static uint64_t first[KMAX + 1];
+  uint64_t prev = 2, gapbuf[KMAX]; int ng = 0;
+  // treat 2 -> 3 gap 1 as well (only relevant to 2,3,5? not AP with 3 terms since 3,5,7 has d=2)
+  for (uint64_t i = 1; i < M; i++) {
+    if (ISC(i)) continue;
+    uint64_t p = 2 * i + 1;
+    if (p > N) break;
+    uint64_t g = p - prev;
+    if (ng < KMAX - 1) gapbuf[ng++] = g; else { memmove(gapbuf, gapbuf + 1, (KMAX - 2) * sizeof(uint64_t)); gapbuf[KMAX - 2] = g; }
+    // run of equal gaps ending here
+    int run = 1;
+    while (run < ng && gapbuf[ng - 1 - run] == g) run++;
+    // run equal gaps => run+1 consecutive primes in AP, terms: p - run*g, ..., p
+    for (int k = 3; k <= run + 1 && k <= KMAX; k++) {
+      if (g < DMAX) cnt[k][g]++;
+      if (!first[k]) first[k] = p - (uint64_t)(k - 1) * g;
+    }
+    prev = p;
+  }
+  printf("N=%llu\n", (unsigned long long)N);
+  for (int k = 3; k <= KMAX; k++) {
+    uint64_t tot = 0; for (int d = 0; d < DMAX; d++) tot += cnt[k][d];
+    printf("k=%d total=%llu smallest_start=%llu\n", k, (unsigned long long)tot, (unsigned long long)first[k]);
+    for (int d = 0; d < DMAX; d++) if (cnt[k][d]) printf("  d=%d count=%llu\n", d, (unsigned long long)cnt[k][d]);
+  }
+  return 0;
+}

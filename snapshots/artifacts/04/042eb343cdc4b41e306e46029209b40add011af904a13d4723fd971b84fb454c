@@ -1,0 +1,62 @@
+// Test polynomial families for Erdős #727 using the carry criterion.
+// family 1 (k=2):  n = x^2 - 2,  n+1 = (x-1)(x+1), n+2 = x^2,  x = 2..X
+// family 2 (k=3):  n = 210 t^2 + 391 t + 179  (Johan Land's forum family; unverified claim):
+//                  n+1 = (6t+5)(35t+36), n+2 = (t+1)(210t+181), n+3 = (14t+13)(15t+14), t = 0..T
+// family 3 (k=3):  n = 4 x^4 - 2:  n+1 = (2x^2-1)(2x^2+1), n+2 = 4x^4, n+3 = (2x^2-2x+1)(2x^2+2x+1)
+// Reports how many parameters give (n+k)!^2 | (2n)! (and, for k=3 families, also the k=2 sub-condition).
+#include <stdio.h>
+#include <stdlib.h>
+typedef unsigned long long u64;
+static unsigned *spf;
+
+static int carries(u64 n, u64 p) {
+    int c = 0; u64 pj = p;
+    while (pj <= 2*n) { if (2*(n % pj) >= pj) c++; if (pj > (u64)4e18 / p) break; pj *= p; }
+    return c;
+}
+static u64 ps[128]; static int vs[128]; static int np;
+static void addfactors(u64 m) {
+    while (m > 1) {
+        u64 p = spf[m]; int v = 0;
+        while (m % p == 0) { m /= p; v++; }
+        int f = -1; for (int t = 0; t < np; t++) if (ps[t] == p) { f = t; break; }
+        if (f < 0) { ps[np] = p; vs[np] = v; np++; } else vs[f] += v;
+    }
+}
+static int check(u64 n) { for (int t = 0; t < np; t++) if (carries(n, ps[t]) < 2 * vs[t]) return 0; return 1; }
+
+int main(int argc, char **argv) {
+    int fam = atoi(argv[1]); u64 B = strtoull(argv[2], 0, 10);
+    u64 M;
+    if (fam == 1) M = B + 2; else if (fam == 2) M = 210 * B + 200; else M = 2 * B * B + 2 * B + 2; if (M > 4000000000ULL) { fprintf(stderr, "too big\n"); return 1; };
+    spf = calloc(M + 1, sizeof(unsigned));
+    for (u64 i = 2; i <= M; i++) if (!spf[i]) for (u64 j = i; j <= M; j += i) if (!spf[j]) spf[j] = (unsigned)i;
+    u64 cnt = 0, cnt2 = 0, tot = 0, shown = 0;
+    for (u64 x = 1; x <= B; x++) {
+        u64 n; int ok2 = 0, ok = 0;
+        if (fam == 1) {
+            if (x < 2) continue;
+            n = x * x - 2; np = 0; addfactors(x - 1); addfactors(x + 1); addfactors(x); addfactors(x);
+            ok = check(n);
+        } else if (fam == 2) {
+            u64 t = x - 1; n = 210 * t * t + 391 * t + 179; np = 0;
+            addfactors(6*t+5); addfactors(35*t+36); addfactors(t+1); addfactors(210*t+181);
+            ok2 = check(n);
+            addfactors(14*t+13); addfactors(15*t+14);
+            ok = check(n);
+        } else {
+            n = 4 * x * x * x * x - 2; np = 0;
+            addfactors(2*x*x-1); addfactors(2*x*x+1); addfactors(2*x*x); addfactors(2*x*x);
+            ok2 = check(n);
+            addfactors(2*x*x-2*x+1); addfactors(2*x*x+2*x+1);
+            ok = check(n);
+        }
+        tot++;
+        if (ok2) cnt2++;
+        if (ok) { cnt++; if (shown < 25) { printf("  param=%llu n=%llu\n", x, n); shown++; } }
+    }
+    printf("family %d: parameters tested=%llu, full solutions=%llu", fam, tot, cnt);
+    if (fam != 1) printf(", k=2-subcondition solutions=%llu", cnt2);
+    printf("\n");
+    return 0;
+}

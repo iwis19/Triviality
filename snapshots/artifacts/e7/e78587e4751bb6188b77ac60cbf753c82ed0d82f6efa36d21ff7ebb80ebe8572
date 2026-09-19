@@ -1,0 +1,26 @@
+#!/usr/bin/env python3
+"""Numerical checks of the elementary p-adic claims C2-C4 used in idea I1 (Kummer/Legendre)."""
+from exp2 import Vp, cp, spf_sieve
+NMAX = 3000
+spf = spf_sieve(2 * NMAX + 2)
+primes = [p for p in range(2, 2 * NMAX + 2) if spf[p] == p]
+bad2 = bad3 = bad4 = 0
+for N in range(2, NMAX):
+    for m in range(1, 13):
+        if m > N: break
+        for p in primes:
+            if p <= m: continue
+            if p > 2 * N: break
+            c = cp(m, N, p)
+            hit = any((2 * N - r) % p == 0 for r in range(m))
+            # C2: for p>m, v_p(C(2N,m)) = 1 if p | (2N)_m (falling factorial) else 0
+            if c != (1 if hit else 0): bad2 += 1
+            # C3: p odd, p>m, p | 2N-r with r odd  =>  v_p(C(2N,N)) >= 1
+            if p != 2 and any((2 * N - r) % p == 0 for r in range(1, m, 2)) and Vp(N, p) < 1: bad3 += 1
+    # C4: p > sqrt(2N), p | N-i, (N-i)/p < p/2 and i < p/2  =>  v_p(C(2N,N)) = 0
+    for p in primes:
+        if p * p <= 2 * N: continue
+        if p > N: break
+        for i in range(0, min(6, N)):
+            if (N - i) % p == 0 and 2 * ((N - i) // p) < p and 2 * i < p and Vp(N, p) != 0: bad4 += 1
+print("C2 violations:", bad2, "C3 violations:", bad3, "C4 violations:", bad4)

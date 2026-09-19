@@ -1,0 +1,28 @@
+import Mathlib
+
+/-!
+Key lemma behind approach I1 for Erdős #287 (statement only, proof deferred).
+
+If `∑_{n ∈ S} 1/n = 1`, `p` is prime, `e ≥ 1` is the maximal `p`-adic valuation of an
+element of `S`, then the sum of `1/(n / p^e)` over the elements of `S` of valuation exactly
+`e` has positive `p`-adic valuation (its reduced numerator is divisible by `p`).
+Consequence used computationally: if `p^2 > max S` and `p` divides some element of `S`,
+then `T = {m : m*p ∈ S}` satisfies `p ∣ numerator (∑_{m∈T} 1/m)`.
+-/
+
+open Finset
+
+theorem erdos287_padic_top_level (S : Finset ℕ) (hS : ∀ n ∈ S, 0 < n)
+    (hsum : ∑ n ∈ S, (1 : ℚ) / n = 1) (p : ℕ) (hp : p.Prime) (e : ℕ) (he : 1 ≤ e)
+    (hmax : ∀ n ∈ S, padicValNat p n ≤ e) (hatt : ∃ n ∈ S, padicValNat p n = e) :
+    1 ≤ padicValRat p
+      (∑ n ∈ S.filter (fun n => padicValNat p n = e), (1 : ℚ) / ((n / p ^ e : ℕ) : ℚ)) := by
+  sorry
+
+/-- The gap-2 reformulation of Erdős #287 as a set statement: no finite set `S ⊆ [n₁, N]`
+of integers `> 1`, containing `n₁` and `N`, missing no two consecutive integers, has
+reciprocal sum `1`. -/
+def NoGapTwoRepresentation : Prop :=
+  ∀ (S : Finset ℕ), (∀ n ∈ S, 1 < n) → 2 ≤ S.card →
+    (∀ n ∈ S, ∀ m ∈ S, n < m → (∀ k ∈ S, ¬ (n < k ∧ k < m)) → m - n ≤ 2) →
+    ∑ n ∈ S, (1 : ℚ) / n ≠ 1

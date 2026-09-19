@@ -1,0 +1,15 @@
+
+Claim C4 (restriction/fibre lemma; own reasoning, elementary). Let G = ⊔ a_iG_i be an exact covering of a finite
+group, n_1 ≤ … ≤ n_k, and WLOG a_1 = 1. For b ∉ G_1 the coset bG_1 is partitioned by the nonempty sets
+a_jG_j ∩ bG_1 = x_j (G_1 ∩ G_j) (x_j any element of the intersection), so
+      G_1 = ⊔_{j ∈ J_b} (b^{-1}x_j)(G_1 ∩ G_j),  J_b = { j : a_jG_j ∩ bG_1 ≠ ∅ },
+is an exact coset covering of the smaller group G_1 with induced indices
+      e_j = [G_1 : G_1 ∩ G_j] = |G_1G_j|/|G_j| = n_j · t_j / n_1,   t_j = [G_j : G_1 ∩ G_j] = #(G_1-cosets met by a_jG_j).
+If |G_j| < |G_1| for all j ≥ 2 (true when the indices are distinct), then |J_b| ≥ 2 for every b. Hence, if HS holds
+for all groups of order < |G| (minimal-counterexample induction), for EVERY b ∉ G_1 there are j ≠ j' in J_b with
+      n_j t_j = n_{j'} t_{j'}.
+Special case G_1 ⊴ G: the pieces are uniformly distributed over fibres, and pushing forward along π: G → Q = G/G_1
+gives a weighted exact cover of Q \ {π(1)} by the cosets π(a_j)·(G_1G_j/G_1) with weights 1/e_j (weights at every
+point sum to 1). Special case [G:G_1] = 2: t_j = 1 is forced (a coset meeting both G_1-cosets cannot avoid G_1), so
+G_j ⊆ G_1 for j ≥ 2 and G_1 inherits a distinct-index covering with indices n_j/2 — a minimal counterexample has no
+subgroup of index 2 among the G_i, hence n_1 ≥ 3.

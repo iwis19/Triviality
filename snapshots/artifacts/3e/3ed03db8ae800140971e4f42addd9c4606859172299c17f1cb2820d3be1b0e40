@@ -1,0 +1,142 @@
+import Mathlib
+import MathLab.Basic
+
+
+open Nat
+
+/-- Low-digit form of the "no carries" condition. -/
+lemma two_mul_mod_pow_lt_of_digits {p : ℕ} (hp : 2 ≤ p) :
+    ∀ n : ℕ, (∀ d ∈ Nat.digits p n, 2 * d < p) → ∀ i : ℕ, 2 * (n % p ^ i) < p ^ i := by
+  intro n
+  induction n using Nat.strong_induction_on with
+  | _ n ih =>
+    intro hdig i
+    rcases Nat.eq_zero_or_pos n with hn | hn
+    · subst hn
+      simp only [Nat.zero_mod, mul_zero]
+      exact Nat.pow_pos (by omega)
+    · rw [Nat.digits_def' (by omega) hn] at hdig
+      have ha : 2 * (n % p) < p := hdig _ List.mem_cons_self
+      have hq : ∀ d ∈ Nat.digits p (n / p), 2 * d < p := fun d hd => hdig d (List.mem_cons_of_mem _ hd)
+      have hlt : n / p < n := Nat.div_lt_self hn (by omega)
+      have hrec := ih (n / p) hlt hq
+      cases i with
+      | zero => simp [Nat.mod_one]
+      | succ i =>
+        have hc := hrec i
+        rw [_root_.pow_succ', Nat.mod_mul]
+        set a := n % p with ha_def
+        set c := n / p % p ^ i with hc_def
+        set P := p ^ i with hP_def
+        have hc' : 2 * c + 1 ≤ P := hc
+        have hmul := Nat.mul_le_mul_left p hc'
+        nlinarith
+
+lemma digits_lt_of_two_mul_mod_pow_lt {p : ℕ} (hp : 2 ≤ p) :
+    ∀ n : ℕ, (∀ i : ℕ, 2 * (n % p ^ i) < p ^ i) → ∀ d ∈ Nat.digits p n, 2 * d < p := by
+  intro n
+  induction n using Nat.strong_induction_on with
+  | _ n ih =>
+    intro hmod
+    rcases Nat.eq_zero_or_pos n with hn | hn
+    · subst hn
+      simp
+    · rw [Nat.digits_def' (by omega) hn]
+      intro d hd
+      rcases List.mem_cons.mp hd with hd | hd
+      · subst hd
+        have := hmod 1
+        simpa using this
+      · have hlt : n / p < n := Nat.div_lt_self hn (by omega)
+        refine ih (n / p) hlt ?_ d hd
+        intro i
+        have h := hmod (i + 1)
+        rw [_root_.pow_succ', Nat.mod_mul] at h
+        set a := n % p with ha_def
+        set c := n / p % p ^ i with hc_def
+        set P := p ^ i with hP_def
+        have e : p * (2 * c) = 2 * (p * c) := by ring
+        have : p * (2 * c) < p * P := by rw [e]; omega
+        exact Nat.lt_of_mul_lt_mul_left this
+
+/-- Kummer's theorem for the central binomial coefficient, in "no carries" form. -/
+lemma not_dvd_centralBinom_iff_mod_pow {p : ℕ} (hp : p.Prime) (n : ℕ) :
+    ¬ p ∣ n.centralBinom ↔ ∀ i : ℕ, 2 * (n % p ^ i) < p ^ i := by
+  have hp1 : 1 < p := hp.one_lt
+  rw [Nat.centralBinom_eq_two_mul_choose, ← emultiplicity_eq_zero]
+  rw [hp.emultiplicity_choose (b := Nat.log p (2 * n) + 1) (by omega) (Nat.lt_succ_self _)]
+  have h2 : 2 * n - n = n := by omega
+  simp only [h2]
+  rw [Nat.cast_eq_zero, Finset.card_eq_zero, Finset.filter_eq_empty_iff]
+  constructor
+  · intro h i
+    rcases Nat.lt_or_ge i (Nat.log p (2 * n) + 1) with hi | hi
+    · rcases Nat.eq_zero_or_pos i with hi0 | hi0
+      · subst hi0; simp [Nat.mod_one]
+      · have := h (Finset.mem_Ico.mpr ⟨hi0, hi⟩)
+        omega
+    · have hbig : 2 * n < p ^ i := by
+        calc 2 * n < p ^ (Nat.log p (2 * n) + 1) := Nat.lt_pow_succ_log_self hp1 _
+          _ ≤ p ^ i := Nat.pow_le_pow_right (by omega) hi
+      rw [Nat.mod_eq_of_lt (by omega)]
+      exact hbig
+  · intro h i _
+    have := h i
+    omega
+
+/-- For a prime `p`, `binom(2n,n)` is coprime to `p` iff every base-`p` digit of `n`
+is at most `(p-1)/2`. -/
+theorem centralBinom_coprime_prime_iff_digits {p : ℕ} (hp : p.Prime) (n : ℕ) :
+    n.centralBinom.Coprime p ↔ ∀ d ∈ Nat.digits p n, 2 * d < p := by
+  rw [Nat.coprime_comm, hp.coprime_iff_not_dvd, not_dvd_centralBinom_iff_mod_pow hp]
+  exact ⟨digits_lt_of_two_mul_mod_pow_lt hp.two_le n, two_mul_mod_pow_lt_of_digits hp.two_le n⟩
+
+/-- Erdős #376 reduction: `binom(2n,n)` is coprime to `105` iff the base-3 digits of `n`
+are `≤ 1`, the base-5 digits are `≤ 2` and the base-7 digits are `≤ 3`. -/
+theorem centralBinom_coprime_105_iff (n : ℕ) :
+    n.centralBinom.Coprime 105 ↔
+      (∀ d ∈ Nat.digits 3 n, d ≤ 1) ∧ (∀ d ∈ Nat.digits 5 n, d ≤ 2) ∧
+        (∀ d ∈ Nat.digits 7 n, d ≤ 3) := by
+  have h105 : (105 : ℕ) = 3 * 5 * 7 := by norm_num
+  rw [h105, Nat.coprime_mul_iff_right, Nat.coprime_mul_iff_right, and_assoc,
+    centralBinom_coprime_prime_iff_digits (by norm_num : Nat.Prime 3),
+    centralBinom_coprime_prime_iff_digits (by norm_num : Nat.Prime 5),
+    centralBinom_coprime_prime_iff_digits (by norm_num : Nat.Prime 7)]
+  constructor
+  · rintro ⟨h3, h5, h7⟩
+    exact ⟨fun d hd => by have := h3 d hd; omega, fun d hd => by have := h5 d hd; omega,
+      fun d hd => by have := h7 d hd; omega⟩
+  · rintro ⟨h3, h5, h7⟩
+    exact ⟨fun d hd => by have := h3 d hd; omega, fun d hd => by have := h5 d hd; omega,
+      fun d hd => by have := h7 d hd; omega⟩
+
+/-- The set in Erdős #376 equals the digit-restricted set `T` used throughout. -/
+theorem setOf_centralBinom_coprime_105_eq :
+    { n : ℕ | n.centralBinom.Coprime 105 } =
+      { n : ℕ | (∀ d ∈ Nat.digits 3 n, d ≤ 1) ∧ (∀ d ∈ Nat.digits 5 n, d ≤ 2) ∧
+        (∀ d ∈ Nat.digits 7 n, d ≤ 3) } := by
+  ext n
+  exact centralBinom_coprime_105_iff n
+
+/-- Erdős #376 is equivalent to the infinitude of the digit-restricted set `T`. -/
+theorem erdos376_infinite_iff_digits :
+    { n : ℕ | n.centralBinom.Coprime 105 }.Infinite ↔
+      { n : ℕ | (∀ d ∈ Nat.digits 3 n, d ≤ 1) ∧ (∀ d ∈ Nat.digits 5 n, d ≤ 2) ∧
+        (∀ d ∈ Nat.digits 7 n, d ≤ 3) }.Infinite := by
+  rw [setOf_centralBinom_coprime_105_eq]
+
+/-- Bookkeeping for the assigned critique: the exponent `log_g(10g/t)` in Bloom–Croot's
+Lemma 6 exceeds `1` whenever `t < 10`, so the lemma is vacuous for `t ∈ {2,3,4}`. -/
+theorem bloomCroot_exponent_gt_one {g t : ℝ} (hg : 1 < g) (ht0 : 0 < t) (ht : t < 10) :
+    1 < Real.logb g (10 * g / t) := by
+  have hgpos : 0 < g := by linarith
+  have hx : g < 10 * g / t := by
+    rw [lt_div_iff₀ ht0]; nlinarith
+  calc (1:ℝ) = Real.logb g g := (Real.logb_self_eq_one hg).symm
+    _ < Real.logb g (10 * g / t) := Real.logb_lt_logb hg hgpos hx
+
+theorem bloomCroot_exponent_gt_one_357 :
+    1 < Real.logb 3 (10 * 3 / 2) ∧ 1 < Real.logb 5 (10 * 5 / 3) ∧ 1 < Real.logb 7 (10 * 7 / 4) :=
+  ⟨bloomCroot_exponent_gt_one (by norm_num) (by norm_num) (by norm_num),
+   bloomCroot_exponent_gt_one (by norm_num) (by norm_num) (by norm_num),
+   bloomCroot_exponent_gt_one (by norm_num) (by norm_num) (by norm_num)⟩

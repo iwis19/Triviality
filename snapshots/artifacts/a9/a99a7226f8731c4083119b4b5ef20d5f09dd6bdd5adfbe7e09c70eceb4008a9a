@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+"""Compare a naive density model for W_m = {N : C(2N,m) | C(2N,N)} with OEIS A375071.
+Model: density(W_{2j+2}) ~ d0 * r^j  (fitted from exp3 counts below 2e5); predicted minimal
+witness N_min(m) ~ 1/density.  Data for A375071 (min k for n) copied from OEIS (external)."""
+import math
+a375071 = {1:1,2:5,3:4,4:207,5:206,6:2475,7:984,8:8171,9:8170,10:45144,11:45143,12:3648830,
+           13:3648829,14:7979077,15:7979076,16:58068862,17:58068861,18:255278295,19:255278294,
+           20:1019547825,21:1019547824,22:17609764973,23:17609764972,24:1070858041562,
+           25:1070858041561,26:5048891644621,27:5048891644620}
+counts = {0:22958, 1:2283, 2:249, 3:23}   # |W_{2j+2} ∩ [1,2e5)| from exp3.py
+X = 2e5
+dens = {j: c / X for j, c in counts.items()}
+ratios = [dens[j] / dens[j + 1] for j in range(3)]
+print("densities:", {j: f"{d:.3e}" for j, d in dens.items()}, "successive ratios:", [f"{r:.2f}" for r in ratios])
+r = math.exp(sum(math.log(x) for x in ratios) / len(ratios))
+print(f"geometric-mean ratio r = {r:.3f}")
+print("j  n=2j+3  N_actual=n+k-1     N_model=1/(d0 r^-j)   log10 ratio")
+for j in range(0, 13):
+    n = 2 * j + 3
+    if n not in a375071:
+        break
+    Nact = n + a375071[n] - 1
+    Nmod = 1 / (dens[0] * r ** (-j))
+    print(f"{j:<2} {n:<6} {Nact:<18} {Nmod:<21.3e} {math.log10(Nact / Nmod):+.2f}")
+
+# ---- output ----
+# densities: {0: '1.148e-01', 1: '1.141e-02', 2: '1.245e-03', 3: '1.150e-04'} successive ratios: ['10.06', '9.17', '10.83']
+# geometric-mean ratio r = 9.994
+# j  n=2j+3  N_actual=n+k-1     N_model=1/(d0 r^-j)   log10 ratio
+# 0  3      6                  8.712e+00             -0.16
+# 1  5      210                8.706e+01             +0.38
+# 2  7      990                8.701e+02             +0.06
+# 3  9      8178               8.696e+03             -0.03
+# 4  11     45153              8.690e+04             -0.28
+# 5  13     3648841            8.685e+05             +0.62
+# 6  15     7979090            8.680e+06             -0.04
+# 7  17     58068877           8.674e+07             -0.17
+# 8  19     255278312          8.669e+08             -0.53
+# 9  21     1019547844         8.664e+09             -0.93
+# 10 23     17609764994        8.659e+10             -0.69
+# 11 25     1070858041585      8.653e+11             +0.09
+# 12 27     5048891644646      8.648e+12             -0.23

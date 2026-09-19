@@ -1,0 +1,170 @@
+# OUTPUT:
+# (A) k in 2..80 with Steiner divisibility for S(k-1,k,2k): [2, 4, 6, 10, 12, 16, 18, 22, 28, 30, 36, 40, 42, 46, 52, 58, 60, 66, 70, 72, 78]
+#     k+1 prime in same range:                           [2, 4, 6, 10, 12, 16, 18, 22, 28, 30, 36, 40, 42, 46, 52, 58, 60, 66, 70, 72, 78]
+# (B) n_0 (blocks equal to the complement of a block) for even k<=40: {2: Fraction(1, 1), 4: Fraction(1, 1), 6: Fraction(1, 1), 8: Fraction(1, 1), 10: Fraction(1, 1), 12: Fraction(1, 1), 14: Fraction(1, 1), 16: Fraction(1, 1), 18: Fraction(1, 1), 20: Fraction(1, 1), 22: Fraction(1, 1), 24: Fraction(1, 1), 26: Fraction(1, 1), 28: Fraction(1, 1), 30: Fraction(1, 1), 32: Fraction(1, 1), 34: Fraction(1, 1), 36: Fraction(1, 1), 38: Fraction(1, 1), 40: Fraction(1, 1)}
+# (C) k=2, 3 colours, colouring exists: True
+#     k=3, 4 colours, colouring exists: False
+# (D) SQS(8) / LS(3,4,8) needs 5 disjoint:
+#     SQS(8): 30 systems, disjoint pairs=120, max #mutually disjoint = 2; |S0 & S| spectrum = {0: 8, 2: 14, 6: 7, 14: 1}
+#     ternary Golay weight distribution: {0: 1, 6: 264, 9: 440, 12: 24}
+#     S(5,6,12) verified (132 hexads, every 5-set in exactly one).
+#     LS(5,6,12) needs 7 disjoint:
+#     S(5,6,12): 5040 systems, disjoint pairs=362880, max #mutually disjoint = 2; |S0 & S| spectrum = {0: 144, 12: 2574, 24: 1760, 36: 495, 60: 66, 132: 1}
+#     LS(4,5,11) needs 7 disjoint:
+#     S(4,5,11): 5040 systems, disjoint pairs=362880, max #mutually disjoint = 2; |S0 & S| spectrum = {0: 144, 6: 2574, 12: 1760, 18: 495, 30: 66, 66: 1}
+#     LS(3,4,10) needs 7 disjoint:
+#     SQS(10): 2520 systems, disjoint pairs=181440, max #mutually disjoint = 5; |S0 & S| spectrum = {0: 144, 2: 720, 4: 900, 6: 330, 8: 360, 12: 20, 14: 45, 30: 1}
+
+#!/usr/bin/env python3
+"""Erdős #835 computations.
+
+(A) divisibility: (k+1) | C(k+j, j) for all 1<=j<=k  <=> Steiner S(k-1,k,2k) admissible
+(B) self-complementarity count n_0 for S(k-1,k,2k)
+(C) brute force k=3: no (k+1)-colouring exists
+(D) disjoint-systems computations: SQS(8), S(5,6,12), S(4,5,11), SQS(10)
+"""
+import itertools, sys
+from math import comb
+from fractions import Fraction
+import networkx as nx
+
+def admissible(k):
+    return all(comb(k + j, j) % (k + 1) == 0 for j in range(1, k + 1))
+
+def isprime(n):
+    return n > 1 and all(n % d for d in range(2, int(n ** .5) + 1))
+
+print("(A) k in 2..80 with Steiner divisibility for S(k-1,k,2k):",
+      [k for k in range(2, 81) if admissible(k)])
+print("    k+1 prime in same range:                          ",
+      [k for k in range(2, 81) if isprime(k + 1)])
+
+def lam(k, j):  # blocks of S(k-1,k,2k) through a fixed j-set
+    return Fraction(comb(2 * k - j, k - 1 - j), k - j)
+
+def n0(k):  # blocks disjoint from a fixed block (inclusion-exclusion, n_{k-1}=0, n_k=1)
+    return sum((-1) ** j * comb(k, j) * (lam(k, j) if j < k else 1) for j in range(k + 1))
+
+print("(B) n_0 (blocks equal to the complement of a block) for even k<=40:",
+      {k: n0(k) for k in range(2, 41, 2)})
+
+# (C) k=3 brute force: 20 triples of [6], 4 colours, every 4-set rainbow
+def brute(k, ncol):
+    pts = range(2 * k)
+    ksets = list(itertools.combinations(pts, k))
+    idx = {s: i for i, s in enumerate(ksets)}
+    # constraint: for each (k-1)-set B the k+1 supersets get distinct colours
+    groups = []
+    for B in itertools.combinations(pts, k - 1):
+        groups.append([idx[tuple(sorted(B + (a,)))] for a in pts if a not in B])
+    nbr = [set() for _ in ksets]
+    for g in groups:
+        for a in g:
+            nbr[a].update(x for x in g if x != a)
+    col = [-1] * len(ksets)
+    def bt(i):
+        if i == len(ksets):
+            return True
+        used = {col[j] for j in nbr[i] if col[j] >= 0}
+        for c in range(ncol):
+            if c not in used:
+                col[i] = c
+                if bt(i + 1):
+                    return True
+        col[i] = -1
+        return False
+    return bt(0)
+
+print("(C) k=2, 3 colours, colouring exists:", brute(2, 3))
+print("    k=3, 4 colours, colouring exists:", brute(3, 4))
+
+# (D) Steiner systems and disjointness graphs
+def orbit_of_system(blocks, n):
+    """All distinct images of a block set under S_n (BFS with generators)."""
+    start = frozenset(frozenset(b) for b in blocks)
+    gens = [list(range(1, n)) + [0], [1, 0] + list(range(2, n))]
+    seen = {start}
+    stack = [start]
+    while stack:
+        S = stack.pop()
+        for g in gens:
+            T = frozenset(frozenset(g[x] for x in b) for b in S)
+            if T not in seen:
+                seen.add(T)
+                stack.append(T)
+    return list(seen)
+
+def max_disjoint(systems, label):
+    G = nx.Graph()
+    G.add_nodes_from(range(len(systems)))
+    for i in range(len(systems)):
+        for j in range(i + 1, len(systems)):
+            if systems[i].isdisjoint(systems[j]):
+                G.add_edge(i, j)
+    cl, w = nx.max_weight_clique(G, weight=None)
+    # intersection-size spectrum
+    spec = {}
+    S0 = systems[0]
+    for S in systems:
+        m = len(S0 & S)
+        spec[m] = spec.get(m, 0) + 1
+    print(f"    {label}: {len(systems)} systems, disjoint pairs={G.number_of_edges()}, "
+          f"max #mutually disjoint = {w}; |S0 & S| spectrum = {dict(sorted(spec.items()))}")
+    return w
+
+# SQS(8) = AG(3,2) planes
+pts8 = list(range(8))
+planes = []
+for a in range(1, 8):
+    for b in range(a + 1, 8):
+        if a ^ b > b:
+            sub = {0, a, b, a ^ b}
+            for c in range(8):
+                planes.append(frozenset(x ^ c for x in sub))
+planes = list(set(planes))
+assert len(planes) == 14
+sqs8 = orbit_of_system(planes, 8)
+assert len(sqs8) == 30
+print("(D) SQS(8) / LS(3,4,8) needs 5 disjoint:")
+max_disjoint(sqs8, "SQS(8)")
+
+# S(5,6,12) from the extended ternary Golay code
+Gm = [[1,0,0,0,0,0, 0,1,1,1,1,1],
+      [0,1,0,0,0,0, 1,0,1,2,2,1],
+      [0,0,1,0,0,0, 1,1,0,1,2,2],
+      [0,0,0,1,0,0, 1,2,1,0,1,2],
+      [0,0,0,0,1,0, 1,2,2,1,0,1],
+      [0,0,0,0,0,1, 1,1,2,2,1,0]]
+hexads = set()
+wts = {}
+for coeffs in itertools.product(range(3), repeat=6):
+    w = [sum(c * Gm[i][j] for i, c in enumerate(coeffs)) % 3 for j in range(12)]
+    wt = sum(1 for x in w if x)
+    wts[wt] = wts.get(wt, 0) + 1
+    if wt == 6:
+        hexads.add(frozenset(j for j in range(12) if w[j]))
+print("    ternary Golay weight distribution:", dict(sorted(wts.items())))
+hexads = list(hexads)
+assert len(hexads) == 132
+# check Steiner property
+for F in itertools.combinations(range(12), 5):
+    assert sum(1 for h in hexads if set(F) <= h) == 1
+print("    S(5,6,12) verified (132 hexads, every 5-set in exactly one).")
+s5612 = orbit_of_system(hexads, 12)
+assert len(s5612) == 5040
+print("    LS(5,6,12) needs 7 disjoint:")
+max_disjoint(s5612, "S(5,6,12)")
+
+# S(4,5,11): derived at point 11
+pent = [h - {11} for h in hexads if 11 in h]
+assert len(pent) == 66
+s4511 = orbit_of_system(pent, 11)
+print("    LS(4,5,11) needs 7 disjoint:")
+max_disjoint(s4511, "S(4,5,11)")
+
+# SQS(10): derived at points 10, 11
+quads = [h - {10, 11} for h in hexads if {10, 11} <= h]
+assert len(quads) == 30
+sqs10 = orbit_of_system(quads, 10)
+print("    LS(3,4,10) needs 7 disjoint:")
+max_disjoint(sqs10, "SQS(10)")

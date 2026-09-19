@@ -1,0 +1,114 @@
+===== cover.c (compile: gcc -O2 -DK=7 -o c8 cover.c ; run: ./c8 7 40) =====
+// Exact covering test for the lonely runner conjecture, k = 8 (7 positive integer speeds, one stationary).
+// delta = 1/8. Bad set of runner v: {t in [0,1) : ||v t|| < 1/8} = union_j ((8j-1)/(8v), (8j+1)/(8v)).
+// Scale to common denominator D = 8*lcm(v_i): endpoints are integers.
+//   open-cover test  : exists t with ||v_i t|| >= 1/8 for all i  <=> open intervals fail to cover  <=> ML(v) >= 1/8
+//   closed-cover test: closed intervals cover                    <=> ML(v) <= 1/8
+// Reports counts of sets with ML<1/8 (would be counterexamples), ML=1/8 (tight), ML>1/8.
+// Only gcd=1 sets are tested (ML is invariant under scaling the speed set).
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#ifndef K
+#define K 7
+#endif
+typedef long long ll;
+static ll gcdll(ll a, ll b){ while(b){ ll t=a%b; a=b; b=t;} return a; }
+
+typedef struct { ll s, e; } iv;
+static int cmp(const void*a,const void*b){ ll x=((iv*)a)->s, y=((iv*)b)->s; return (x<y)?-1:(x>y); }
+
+static iv buf[8*64+16];
+
+// returns 1 if [0,D] is covered (open=1: open intervals; open=0: closed intervals)
+static int covered(const int*v, int open){
+    ll L=1; for(int i=0;i<K;i++) L = L/gcdll(L,v[i])*v[i];
+    ll D=(K+1)*L; int m=0;
+    for(int i=0;i<K;i++){ ll u=D/((K+1)*v[i]); for(int j=0;j<=v[i];j++){ buf[m].s=((K+1)*j-1)*u; buf[m].e=((K+1)*j+1)*u; m++; } }
+    qsort(buf,m,sizeof(iv),cmp);
+    ll cur=0; // point to be covered next; buf[0].s<0 always
+    for(int i=0;i<m;i++){
+        if(open ? (buf[i].s>=cur) : (buf[i].s>cur)) return 0; // uncovered point at cur (open) or in (cur, s) (closed)
+        if(buf[i].e>cur) cur=buf[i].e;
+        if(cur>=D) return 1;
+    }
+    return cur>=D;
+}
+
+int main(int argc,char**argv){
+    int Nmin=atoi(argv[1]), Nmax=atoi(argv[2]);
+    for(int N=Nmin; N<=Nmax; N++){
+        clock_t t0=clock();
+        ll total=0, tested=0, lt=0, eq=0, gt=0;
+        int v[K];
+        // enumerate 7-subsets of {1..N} containing N (incremental: sets with max < N were counted at smaller N)
+        // so cumulative counts printed are for all subsets of {1..N}.
+        static ll clt=0,ceq=0,cgt=0,ctested=0,ctotal=0;
+        v[K-1]=N;
+        int idx[K-1]; for(int i=0;i<K-1;i++) idx[i]=i+1;
+        while(1){
+            for(int i=0;i<K-1;i++) v[i]=idx[i];
+            total++;
+            ll g=0; for(int i=0;i<K;i++) g=gcdll(g,v[i]);
+            if(g==1){
+                tested++;
+                int ge = !covered(v,1); // ML >= 1/8
+                int le =  covered(v,0); // ML <= 1/8
+                if(!ge){ lt++; printf("COUNTEREXAMPLE? "); for(int i=0;i<K;i++) printf("%d ",v[i]); printf("\n"); }
+                else if(le){ eq++; printf("TIGHT "); for(int i=0;i<K;i++) printf("%d ",v[i]); printf("\n"); }
+                else gt++;
+            }
+            int p=K-2; while(p>=0 && idx[p]==N-(K-1)+p) p--; // max value for idx[p] is N-1-(K-2-p)
+            if(p<0) break;
+            idx[p]++; for(int q=p+1;q<K-1;q++) idx[q]=idx[q-1]+1;
+        }
+        clt+=lt; ceq+=eq; cgt+=gt; ctested+=tested; ctotal+=total;
+        double dt=(double)(clock()-t0)/CLOCKS_PER_SEC;
+        printf("N=%d new_subsets=%lld new_gcd1=%lld new_lt=%lld new_eq=%lld new_gt=%lld | cumulative subsets=%lld gcd1=%lld lt=%lld eq=%lld gt=%lld | time=%.2fs\n",
+               N,total,tested,lt,eq,gt,ctotal,ctested,clt,ceq,cgt,dt);
+        fflush(stdout);
+    }
+    return 0;
+}
+
+
+===== results (k=8, N=7..40) =====
+TIGHT 1 2 3 4 5 6 7 
+N=7 new_subsets=1 new_gcd1=1 new_lt=0 new_eq=1 new_gt=0 | cumulative subsets=1 gcd1=1 lt=0 eq=1 gt=0 | time=0.00s
+N=8 new_subsets=7 new_gcd1=7 new_lt=0 new_eq=0 new_gt=7 | cumulative subsets=8 gcd1=8 lt=0 eq=1 gt=7 | time=0.00s
+N=9 new_subsets=28 new_gcd1=28 new_lt=0 new_eq=0 new_gt=28 | cumulative subsets=36 gcd1=36 lt=0 eq=1 gt=35 | time=0.00s
+N=10 new_subsets=84 new_gcd1=84 new_lt=0 new_eq=0 new_gt=84 | cumulative subsets=120 gcd1=120 lt=0 eq=1 gt=119 | time=0.00s
+N=11 new_subsets=210 new_gcd1=210 new_lt=0 new_eq=0 new_gt=210 | cumulative subsets=330 gcd1=330 lt=0 eq=1 gt=329 | time=0.00s
+TIGHT 1 2 3 4 5 7 12 
+N=12 new_subsets=462 new_gcd1=462 new_lt=0 new_eq=1 new_gt=461 | cumulative subsets=792 gcd1=792 lt=0 eq=2 gt=790 | time=0.00s
+TIGHT 1 4 5 6 7 11 13 
+N=13 new_subsets=924 new_gcd1=924 new_lt=0 new_eq=1 new_gt=923 | cumulative subsets=1716 gcd1=1716 lt=0 eq=3 gt=1713 | time=0.00s
+N=14 new_subsets=1716 new_gcd1=1715 new_lt=0 new_eq=0 new_gt=1715 | cumulative subsets=3432 gcd1=3431 lt=0 eq=3 gt=3428 | time=0.01s
+N=15 new_subsets=3003 new_gcd1=3003 new_lt=0 new_eq=0 new_gt=3003 | cumulative subsets=6435 gcd1=6434 lt=0 eq=3 gt=6431 | time=0.01s
+N=16 new_subsets=5005 new_gcd1=4998 new_lt=0 new_eq=0 new_gt=4998 | cumulative subsets=11440 gcd1=11432 lt=0 eq=3 gt=11429 | time=0.02s
+N=17 new_subsets=8008 new_gcd1=8008 new_lt=0 new_eq=0 new_gt=8008 | cumulative subsets=19448 gcd1=19440 lt=0 eq=3 gt=19437 | time=0.03s
+N=18 new_subsets=12376 new_gcd1=12348 new_lt=0 new_eq=0 new_gt=12348 | cumulative subsets=31824 gcd1=31788 lt=0 eq=3 gt=31785 | time=0.05s
+N=19 new_subsets=18564 new_gcd1=18564 new_lt=0 new_eq=0 new_gt=18564 | cumulative subsets=50388 gcd1=50352 lt=0 eq=3 gt=50349 | time=0.08s
+N=20 new_subsets=27132 new_gcd1=27048 new_lt=0 new_eq=0 new_gt=27048 | cumulative subsets=77520 gcd1=77400 lt=0 eq=3 gt=77397 | time=0.12s
+N=21 new_subsets=38760 new_gcd1=38759 new_lt=0 new_eq=0 new_gt=38759 | cumulative subsets=116280 gcd1=116159 lt=0 eq=3 gt=116156 | time=0.18s
+N=22 new_subsets=54264 new_gcd1=54054 new_lt=0 new_eq=0 new_gt=54054 | cumulative subsets=170544 gcd1=170213 lt=0 eq=3 gt=170210 | time=0.26s
+N=23 new_subsets=74613 new_gcd1=74613 new_lt=0 new_eq=0 new_gt=74613 | cumulative subsets=245157 gcd1=244826 lt=0 eq=3 gt=244823 | time=0.38s
+N=24 new_subsets=100947 new_gcd1=100478 new_lt=0 new_eq=0 new_gt=100478 | cumulative subsets=346104 gcd1=345304 lt=0 eq=3 gt=345301 | time=0.54s
+N=25 new_subsets=134596 new_gcd1=134596 new_lt=0 new_eq=0 new_gt=134596 | cumulative subsets=480700 gcd1=479900 lt=0 eq=3 gt=479897 | time=0.75s
+N=26 new_subsets=177100 new_gcd1=176176 new_lt=0 new_eq=0 new_gt=176176 | cumulative subsets=657800 gcd1=656076 lt=0 eq=3 gt=656073 | time=1.12s
+N=27 new_subsets=230230 new_gcd1=230202 new_lt=0 new_eq=0 new_gt=230202 | cumulative subsets=888030 gcd1=886278 lt=0 eq=3 gt=886275 | time=1.37s
+N=28 new_subsets=296010 new_gcd1=294294 new_lt=0 new_eq=0 new_gt=294294 | cumulative subsets=1184040 gcd1=1180572 lt=0 eq=3 gt=1180569 | time=1.82s
+N=29 new_subsets=376740 new_gcd1=376740 new_lt=0 new_eq=0 new_gt=376740 | cumulative subsets=1560780 gcd1=1557312 lt=0 eq=3 gt=1557309 | time=2.50s
+N=30 new_subsets=475020 new_gcd1=471933 new_lt=0 new_eq=0 new_gt=471933 | cumulative subsets=2035800 gcd1=2029245 lt=0 eq=3 gt=2029242 | time=3.15s
+N=31 new_subsets=593775 new_gcd1=593775 new_lt=0 new_eq=0 new_gt=593775 | cumulative subsets=2629575 gcd1=2623020 lt=0 eq=3 gt=2623017 | time=4.19s
+N=32 new_subsets=736281 new_gcd1=731276 new_lt=0 new_eq=0 new_gt=731276 | cumulative subsets=3365856 gcd1=3354296 lt=0 eq=3 gt=3354293 | time=5.21s
+N=33 new_subsets=906192 new_gcd1=905982 new_lt=0 new_eq=0 new_gt=905982 | cumulative subsets=4272048 gcd1=4260278 lt=0 eq=3 gt=4260275 | time=6.75s
+N=34 new_subsets=1107568 new_gcd1=1099560 new_lt=0 new_eq=0 new_gt=1099560 | cumulative subsets=5379616 gcd1=5359838 lt=0 eq=3 gt=5359835 | time=8.43s
+N=35 new_subsets=1344904 new_gcd1=1344903 new_lt=0 new_eq=0 new_gt=1344903 | cumulative subsets=1344904 gcd1=1344903 lt=0 eq=0 gt=1344903 | time=10.51s
+N=36 new_subsets=1623160 new_gcd1=1610322 new_lt=0 new_eq=0 new_gt=1610322 | cumulative subsets=2968064 gcd1=2955225 lt=0 eq=0 gt=2955225 | time=12.83s
+N=37 new_subsets=1947792 new_gcd1=1947792 new_lt=0 new_eq=0 new_gt=1947792 | cumulative subsets=4915856 gcd1=4903017 lt=0 eq=0 gt=4903017 | time=18.36s
+N=38 new_subsets=2324784 new_gcd1=2306220 new_lt=0 new_eq=0 new_gt=2306220 | cumulative subsets=7240640 gcd1=7209237 lt=0 eq=0 gt=7209237 | time=20.71s
+N=39 new_subsets=2760681 new_gcd1=2759757 new_lt=0 new_eq=0 new_gt=2759757 | cumulative subsets=10001321 gcd1=9968994 lt=0 eq=0 gt=9968994 | time=25.07s
+N=40 new_subsets=3262623 new_gcd1=3235484 new_lt=0 new_eq=0 new_gt=3235484 | cumulative subsets=13263944 gcd1=13204478 lt=0 eq=0 gt=13204478 | time=31.40s

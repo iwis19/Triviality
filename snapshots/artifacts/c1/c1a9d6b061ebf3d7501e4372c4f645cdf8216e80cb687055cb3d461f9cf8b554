@@ -1,0 +1,19 @@
+greedy first r=0 at P=4987; previous prime 4973 had r=1
+anneal P=1500 greedy_r=918 steps=4000000 T0=2.0 T1=0.05 seed=1 best_r=918 time=29s
+anneal P=1000 greedy_r=1208 steps=4000000 T0=2.0 T1=0.05 seed=1 best_r=1194 time=30s
+anneal P=1500 greedy_r=918 steps=4000000 T0=2.0 T1=0.05 seed=2 best_r=918 time=30s
+anneal P=2000 greedy_r=708 steps=4000000 T0=2.0 T1=0.05 seed=1 best_r=708 time=30s
+anneal P=2000 greedy_r=708 steps=4000000 T0=2.0 T1=0.05 seed=2 best_r=708 time=31s
+anneal P=3000 greedy_r=381 steps=4000000 T0=2.0 T1=0.05 seed=1 best_r=381 time=31s
+anneal P=1000 greedy_r=1208 steps=4000000 T0=2.0 T1=0.05 seed=2 best_r=1208 time=31s
+anneal P=3000 greedy_r=381 steps=4000000 T0=2.0 T1=0.05 seed=2 best_r=381 time=33s
+anneal P=1000 greedy_r=1208 steps=20000000 T0=4.0 T1=0.3 seed=8 best_r=1191 time=163s
+anneal P=1500 greedy_r=918 steps=20000000 T0=8.0 T1=0.1 seed=7 best_r=892 time=164s
+anneal P=2000 greedy_r=708 steps=20000000 T0=8.0 T1=0.1 seed=7 best_r=694 time=165s
+anneal P=1500 greedy_r=918 steps=20000000 T0=4.0 T1=0.3 seed=8 best_r=918 time=166s
+anneal P=3000 greedy_r=381 steps=20000000 T0=8.0 T1=0.1 seed=7 best_r=381 time=170s
+anneal P=3000 greedy_r=381 steps=20000000 T0=4.0 T1=0.3 seed=8 best_r=381 time=171s
+anneal P=1000 greedy_r=1208 steps=20000000 T0=8.0 T1=0.1 seed=7 best_r=1180 time=198s
+anneal P=2000 greedy_r=708 steps=20000000 T0=4.0 T1=0.3 seed=8 best_r=708 time=212s
+
+greedy P=227 r=2139; P=311 r=1947; P=1000 r=1208; P=1500 r=918; P=2000 r=708; P=3000 r=381; P=4001 r=143; P=5000 r=0
