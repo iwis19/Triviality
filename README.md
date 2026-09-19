@@ -159,10 +159,13 @@ work.
 
 ```bash
 cd backend && ruff check app tests && ruff format --check app tests && mypy app && pytest
-cd frontend && npm run typecheck && npm run build
+cd frontend && npm run typecheck && npm test && npm run build
 ```
 
 The backend suite includes a real Lean round-trip (skipped when the toolchain is absent).
+Frontend tests (vitest) cover the palette (evidence-status colouring, never worker self-reports)
+and the API clients (public calls carry no credentials; the private key travels only as
+`X-API-Key`).
 SQLite is the default database; set `MATHLAB_DATABASE_URL` to a PostgreSQL URL for deployment.
 
 ## API surface

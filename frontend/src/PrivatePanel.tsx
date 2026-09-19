@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PrivateApi, type Attempt, type Campaign, type Portfolio, type Problem, type SchedulerStatus } from "./api";
 
 const MODES = ["ultra", "fusion", "normal", "fast", "lite"];
+const PROBLEM_STATUSES = ["reported_open", "resolution_claimed", "resolved", "disputed", "unknown"];
 const ROLES = ["hypothesis_generation", "experiment", "critique", "formalization", "status_research"];
 const KEY_STORAGE = "mathlab.apiKey";
 
@@ -26,6 +27,7 @@ export default function PrivatePanel({ problems, selectedIdeaId, onChanged }: Pr
   const [newCampaign, setNewCampaign] = useState({ portfolio_id: "", problem_id: "", budget: 6, mode: "ultra" });
   const [assignment, setAssignment] = useState({ role: "hypothesis_generation", mode: "fusion", group: "pilot-A" });
   const [prompt, setPrompt] = useState<string | null>(null);
+  const [review, setReview] = useState({ problem_id: "", status: "reported_open", note: "" });
 
   const load = useCallback(
     async (a: PrivateApi) => {
@@ -110,6 +112,12 @@ export default function PrivatePanel({ problems, selectedIdeaId, onChanged }: Pr
         <button disabled={busy} onClick={() => run("seed", () => api.seed())}>
           Load seed atlas
         </button>
+        <button disabled={busy} onClick={() => run("wikipedia import (dry run)", () => api.importWikipedia(true))}>
+          Preview Wikipedia import
+        </button>
+        <button disabled={busy} onClick={() => run("wikipedia import", () => api.importWikipedia(false))}>
+          Import Wikipedia list
+        </button>
         <button
           onClick={() => {
             sessionStorage.removeItem(KEY_STORAGE);
@@ -143,6 +151,35 @@ export default function PrivatePanel({ problems, selectedIdeaId, onChanged }: Pr
         />
         <button disabled={busy} onClick={() => run("create portfolio", () => api.createPortfolio(newPortfolio.name, newPortfolio.max))}>
           New portfolio
+        </button>
+      </div>
+
+      <h4>Problem status review</h4>
+      <p>
+        <small>
+          Workers can only flag a claimed resolution; changing a problem's status is a collaborator decision and is published with your name.
+        </small>
+      </p>
+      <div className="form">
+        <select value={review.problem_id} onChange={(e) => setReview({ ...review, problem_id: e.target.value })} aria-label="problem to review">
+          <option value="">problem…</option>
+          {problems.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.title} ({p.status})
+            </option>
+          ))}
+        </select>
+        <select value={review.status} onChange={(e) => setReview({ ...review, status: e.target.value })} aria-label="new status">
+          {PROBLEM_STATUSES.map((s) => (
+            <option key={s}>{s}</option>
+          ))}
+        </select>
+        <input value={review.note} onChange={(e) => setReview({ ...review, note: e.target.value })} placeholder="what you checked" />
+        <button
+          disabled={busy || !review.problem_id}
+          onClick={() => run("status review", () => api.reviewProblem(review.problem_id, review.status, review.note))}
+        >
+          Record review
         </button>
       </div>
 

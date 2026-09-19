@@ -544,6 +544,21 @@ function DetailPanel({
             </li>
           ))}
         </ul>
+        {p.status_reviews && p.status_reviews.length > 0 && (
+          <>
+            <h4>Status review history</h4>
+            <ul className="sources">
+              {p.status_reviews.map((r, i) => (
+                <li key={i}>
+                  <small>
+                    {r.date} · {r.reviewer}: {r.from} → <b>{r.to}</b>
+                    {r.note ? ` — ${r.note}` : ""}
+                  </small>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
         <h4>Research tree</h4>
         <p>
           <small>

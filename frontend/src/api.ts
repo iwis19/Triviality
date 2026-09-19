@@ -32,6 +32,14 @@ export interface ProblemSource {
   review_state: string;
 }
 
+export interface StatusReview {
+  reviewer: string;
+  date: string;
+  from: string;
+  to: string;
+  note: string;
+}
+
 export interface Problem extends PublishedRecord {
   id: string;
   slug: string;
@@ -44,6 +52,9 @@ export interface Problem extends PublishedRecord {
   formal_target: string;
   areas: { slug: string; name: string }[];
   sources: ProblemSource[];
+  status_reviews?: StatusReview[];
+  status_checked_at?: string;
+  origin?: string;
 }
 
 export interface Idea extends PublishedRecord {
@@ -232,6 +243,10 @@ export class PrivateApi {
   status = () => this.send<SchedulerStatus>("GET", "/private/scheduler/status");
   tick = () => this.send<Record<string, number>>("POST", "/private/scheduler/tick");
   seed = () => this.send<Record<string, number>>("POST", "/private/seed");
+  importWikipedia = (dry_run: boolean) =>
+    this.send<Record<string, unknown>>("POST", "/private/atlas/import/wikipedia", { dry_run });
+  reviewProblem = (problemId: string, status: string, note: string) =>
+    this.send<{ status: string }>("POST", `/private/problems/${problemId}/review`, { status, note });
   portfolios = () => this.send<Portfolio[]>("GET", "/private/portfolios");
   createPortfolio = (name: string, max_concurrent_sessions: number) =>
     this.send<{ id: string }>("POST", "/private/portfolios", { name, max_concurrent_sessions });
