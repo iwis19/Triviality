@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -315,6 +315,20 @@ def pause_portfolio(portfolio_id: str, paused: bool = True, db: Session = Depend
     )
     db.commit()
     return {"paused": portfolio.paused}
+
+
+@router.post("/portfolios/{portfolio_id}/concurrency")
+def set_portfolio_concurrency(
+    portfolio_id: str,
+    max_concurrent_sessions: int = Query(ge=1, le=32),
+    db: Session = Depends(get_db),
+) -> dict:
+    portfolio = db.get(Portfolio, portfolio_id)
+    if portfolio is None:
+        raise HTTPException(404)
+    portfolio.max_concurrent_sessions = max_concurrent_sessions
+    db.commit()
+    return {"max_concurrent_sessions": portfolio.max_concurrent_sessions}
 
 
 @router.get("/campaigns")
