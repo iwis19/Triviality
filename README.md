@@ -77,7 +77,7 @@ Or with Docker: `docker compose up --build` (backend on :8000, frontend on :5173
 
 ## Turning on real Devin sessions
 
-Set these (environment or `backend/.env`; never commit the key):
+Set these (environment or `backend/.env`, see `backend/.env.example`; never commit the key):
 
 | Variable | Meaning |
 |---|---|

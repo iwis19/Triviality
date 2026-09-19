@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -35,6 +36,11 @@ class Settings(BaseSettings):
     default_max_concurrent_sessions: int = 2
 
     cors_origins: tuple[str, ...] = ("http://localhost:5173",)
+
+    @field_validator("devin_max_acu_limit", mode="before")
+    @classmethod
+    def _blank_is_none(cls, value: object) -> object:
+        return None if value == "" else value
 
 
 @lru_cache
