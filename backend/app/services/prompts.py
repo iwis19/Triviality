@@ -108,6 +108,9 @@ def build_prompt(
         "- Return reproducible artifacts (code, data, Lean files) inline in the structured output.",
         "- Fill `gaps` with what remains unresolved. Empty gaps on an open problem is a red flag.",
         "- Leave `self_reported_models` empty unless your environment explicitly states the model.",
+        "- Give every new idea and claim a `local_id` (I1, I2, C1, ...) and point each evidence "
+        "item's `target` at one of those, at an existing idea/claim id, or at 'self'/'problem'. "
+        "Evidence that names nothing attachable is kept but cannot be published against an idea.",
         "DELIVERABLE",
         "Call provide_structured_output with the required schema (ideas, evidence, gaps).",
         f"Optional progress reporting: POST {worker_api_base}/worker/attempts/{attempt.id}/submit "

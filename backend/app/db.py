@@ -1,6 +1,6 @@
 from collections.abc import Iterator
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -24,6 +24,21 @@ def make_engine(url: str | None = None) -> Engine:
             dbapi_connection.execute("PRAGMA foreign_keys=ON")
 
     return engine
+
+
+def create_schema(engine: Engine) -> None:
+    """create_all plus additive column migrations for tables that already exist (no Alembic;
+    every column added after first release must be nullable or defaulted)."""
+    Base.metadata.create_all(engine)
+    inspector = inspect(engine)
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            present = {c["name"] for c in inspector.get_columns(table.name)}
+            for column in table.columns:
+                if column.name in present:
+                    continue
+                ddl = column.type.compile(engine.dialect)
+                conn.execute(text(f'ALTER TABLE {table.name} ADD COLUMN "{column.name}" {ddl}'))
 
 
 engine = make_engine()

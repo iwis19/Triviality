@@ -8,6 +8,7 @@ Lean checker (and, later, collaborator review) can certify. A worker-reported re
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import Path
 
 from sqlalchemy.orm import Session
@@ -31,6 +32,9 @@ WORKER_STATUS_MAP: dict[tuple[str, str], str] = {
     ("lean_attempt", "inconclusive"): "lean_formalization_in_progress",
     ("lean_attempt", "refutes"): "lean_formalization_in_progress",
 }
+
+# `I1. Title`, `H2: title`, `(C3) title` -> I1 / H2 / C3
+_LEADING_LABEL = re.compile(r"^\(?([A-Za-z]{1,2}\d{1,3})\)?\s*[.:\-–)]\s*")
 
 # Evidence statuses ordered by strength; ingestion never downgrades certified statuses.
 STRENGTH = [
@@ -70,19 +74,27 @@ class Ingestor:
         assert campaign is not None
         created = {"ideas": 0, "claims": 0, "evidence": 0, "lean_checks": 0}
         id_map: dict[str, str] = {}
+        unattached: list[dict] = []
 
         for raw in output.get("ideas", []) or []:
-            idea = self._upsert_idea(db, attempt, campaign, raw)
+            idea, is_new = self._upsert_idea(db, attempt, campaign, raw)
             if idea is None:
                 continue
-            created["ideas"] += 1
-            id_map[raw.get("title", "")] = idea.id
+            created["ideas"] += int(is_new)
+            self._register_keys(id_map, raw, idea.id)
             for raw_claim in raw.get("claims", []) or []:
-                if self._upsert_claim(db, campaign, idea, raw_claim):
-                    created["claims"] += 1
+                claim, claim_new = self._upsert_claim(db, campaign, idea, raw_claim)
+                if claim is not None:
+                    created["claims"] += int(claim_new)
+                    self._register_keys(id_map, raw_claim, claim.id, title_key="statement")
 
         for raw in output.get("evidence", []) or []:
             outcome = self._upsert_evidence(db, attempt, campaign, raw, id_map)
+            if outcome is None:
+                unattached.append(
+                    {k: raw.get(k) for k in ("target", "check_type", "result", "summary")}
+                )
+                continue
             created["evidence"] += outcome[0]
             created["lean_checks"] += outcome[1]
 
@@ -91,6 +103,8 @@ class Ingestor:
                 "gaps": output.get("gaps", []),
                 "self_reported_models": output.get("self_reported_models", ""),
                 "counts": created,
+                "unattached_evidence": unattached,
+                "raw": output,
             }
             attempt.result_ingested = True
         emit(
@@ -102,22 +116,37 @@ class Ingestor:
         )
         return created
 
+    @staticmethod
+    def _register_keys(
+        id_map: dict[str, str], raw: dict, record_id: str, *, title_key: str = "title"
+    ) -> None:
+        """Index a record under every handle a worker plausibly uses as an evidence target:
+        its local_id, its full title, and a leading label such as `I1` in `I1. Sum lemma`."""
+        for key in (raw.get("local_id"), raw.get(title_key)):
+            if isinstance(key, str) and key.strip():
+                id_map.setdefault(key.strip().lower(), record_id)
+        title = raw.get(title_key)
+        if isinstance(title, str):
+            label = _LEADING_LABEL.match(title)
+            if label:
+                id_map.setdefault(label.group(1).lower(), record_id)
+
     # -- ideas -------------------------------------------------------------------------------
 
     def _upsert_idea(
         self, db: Session, attempt: Attempt, campaign: Campaign, raw: dict
-    ) -> Idea | None:
+    ) -> tuple[Idea | None, bool]:
         title = (raw.get("title") or "").strip()
         approach = (raw.get("approach") or "").strip()
         if not title or not approach:
-            return None
+            return None, False
         existing = (
             db.query(Idea)
             .filter(Idea.produced_by_attempt_id == attempt.id, Idea.title == title)
             .one_or_none()
         )
         if existing:
-            return existing
+            return existing, False
         parent_ids = [p for p in raw.get("parent_idea_ids", []) or [] if isinstance(p, str)]
         parents = [
             p
@@ -185,16 +214,21 @@ class Ingestor:
             record_id=idea.id,
             payload={"campaign_id": campaign.id, "generation": idea.generation},
         )
-        return idea
+        return idea, True
 
-    def _upsert_claim(self, db: Session, campaign: Campaign, idea: Idea, raw: dict) -> bool:
+    def _upsert_claim(
+        self, db: Session, campaign: Campaign, idea: Idea, raw: dict
+    ) -> tuple[Claim | None, bool]:
         statement = (raw.get("statement") or "").strip()
         if not statement:
-            return False
+            return None, False
         lean_decl = (raw.get("lean_declaration") or "").strip()
         digest = content_hash(statement, raw.get("scope", "") or "", lean_decl)
-        if db.query(Claim).filter(Claim.idea_id == idea.id, Claim.content_hash == digest).first():
-            return False
+        existing = (
+            db.query(Claim).filter(Claim.idea_id == idea.id, Claim.content_hash == digest).first()
+        )
+        if existing:
+            return existing, False
         claim = Claim(
             campaign_id=campaign.id,
             idea_id=idea.id,
@@ -224,7 +258,7 @@ class Ingestor:
             record_id=claim.id,
             payload={"campaign_id": campaign.id},
         )
-        return True
+        return claim, True
 
     # -- evidence ----------------------------------------------------------------------------
 
@@ -233,8 +267,14 @@ class Ingestor:
     ) -> tuple[Idea | None, Claim | None]:
         if target == "self" and attempt.idea_id:
             return db.get(Idea, attempt.idea_id), None
-        if target in id_map:
-            return db.get(Idea, id_map[target]), None
+        key = target.strip().lower()
+        if key in id_map:
+            idea = db.get(Idea, id_map[key])
+            if idea is not None:
+                return idea, None
+            claim = db.get(Claim, id_map[key])
+            if claim is not None:
+                return claim.idea, claim
         idea = db.get(Idea, target)
         if idea is not None and idea.campaign_id == attempt.campaign_id:
             return idea, None
@@ -245,7 +285,10 @@ class Ingestor:
 
     def _upsert_evidence(
         self, db: Session, attempt: Attempt, campaign: Campaign, raw: dict, id_map: dict[str, str]
-    ) -> tuple[int, int]:
+    ) -> tuple[int, int] | None:
+        """Returns (evidence_created, lean_checks_created), or None when the evidence names a
+        target this lab cannot attach it to; the caller keeps it. `problem`, and `self` on an
+        attempt without an assigned idea, attach to the campaign's problem."""
         check_type = raw.get("check_type", "")
         result = raw.get("result", "")
         summary = (raw.get("summary") or "").strip()
@@ -253,9 +296,14 @@ class Ingestor:
             return 0, 0
         if result not in {"supports", "refutes", "inconclusive"} or not summary:
             return 0, 0
-        idea, claim = self._resolve_target(db, attempt, raw.get("target", "self"), id_map)
+        target = str(raw.get("target") or "self")
+        idea, claim = self._resolve_target(db, attempt, target, id_map)
+        problem_id: str | None = None
         if idea is None and claim is None:
-            return 0, 0
+            if target.strip().lower() == "problem" or (target == "self" and not attempt.idea_id):
+                problem_id = campaign.problem_id
+            else:
+                return None
         existing = (
             db.query(Evidence)
             .filter(
@@ -283,6 +331,7 @@ class Ingestor:
         evidence = Evidence(
             idea_id=idea.id if idea else None,
             claim_id=claim.id if claim else None,
+            problem_id=problem_id,
             claim_version=claim.version if claim else 0,
             check_type=check_type,
             result=result,

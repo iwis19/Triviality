@@ -96,6 +96,7 @@ def get_problem(slug: str, db: Session = Depends(get_db)) -> dict:
                 _serialize(e)
                 for e in _latest_publications(db, "evidence")
                 if e.public_payload.get("idea_id") in idea_ids
+                or e.public_payload.get("problem_id") == problem_id
             ]
             return {
                 "problem": problem,

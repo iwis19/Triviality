@@ -227,6 +227,7 @@ class Publisher:
             "id": evidence.id,
             "idea_id": evidence.idea_id,
             "claim_id": evidence.claim_id,
+            "problem_id": evidence.problem_id,
             "claim_version": evidence.claim_version,
             "check_type": evidence.check_type,
             "result": evidence.result,

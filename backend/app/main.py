@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api import private, public, worker
 from .auth import ensure_owner
 from .config import get_settings
-from .db import Base, SessionLocal, engine
+from .db import SessionLocal, create_schema, engine
 from .deps import get_scheduler
 
 log = logging.getLogger("mathlab")
@@ -31,7 +31,7 @@ async def _scheduler_loop(interval: int) -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
-    Base.metadata.create_all(engine)
+    create_schema(engine)
     with SessionLocal() as db:
         ensure_owner(db)
     task = None

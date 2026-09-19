@@ -264,6 +264,8 @@ class Evidence(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     idea_id: Mapped[str | None] = mapped_column(ForeignKey("ideas.id"), nullable=True)
     claim_id: Mapped[str | None] = mapped_column(ForeignKey("claims.id"), nullable=True)
+    # problem-level evidence (status/literature checks) attaches here instead of to an idea
+    problem_id: Mapped[str | None] = mapped_column(ForeignKey("problems.id"), nullable=True)
     claim_version: Mapped[int] = mapped_column(Integer, default=0)
     check_type: Mapped[str] = mapped_column(String(40))
     result: Mapped[str] = mapped_column(

@@ -33,6 +33,10 @@ RESEARCH_OUTPUT_SCHEMA: dict = {
             "items": {
                 "type": "object",
                 "properties": {
+                    "local_id": {
+                        "type": "string",
+                        "description": "Short label (e.g. 'I1') used as evidence `target`.",
+                    },
                     "title": {"type": "string"},
                     "approach": {"type": "string"},
                     "mechanism": {"type": "string"},
@@ -45,6 +49,7 @@ RESEARCH_OUTPUT_SCHEMA: dict = {
                         "items": {
                             "type": "object",
                             "properties": {
+                                "local_id": {"type": "string"},
                                 "statement": {"type": "string"},
                                 "scope": {"type": "string"},
                                 "lean_declaration": {"type": "string"},
@@ -61,7 +66,11 @@ RESEARCH_OUTPUT_SCHEMA: dict = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "target": {"type": "string", "description": "idea id, claim id, or 'self'"},
+                    "target": {
+                        "type": "string",
+                        "description": "local_id or title of an idea/claim in this output, an "
+                        "existing idea/claim id, 'self' for the assigned idea, or 'problem'.",
+                    },
                     "check_type": {
                         "type": "string",
                         "enum": [

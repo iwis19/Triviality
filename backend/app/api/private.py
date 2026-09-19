@@ -345,6 +345,24 @@ def cancel_attempt(attempt_id: str, db: Session = Depends(get_db)) -> dict:
     return _attempt_view(attempt)
 
 
+@router.post("/attempts/{attempt_id}/reingest")
+def reingest_attempt(attempt_id: str, db: Session = Depends(get_db)) -> dict:
+    """Re-run ingestion of a completed attempt's structured output (from the stored raw
+    payload, else fetched from the provider). Idempotent: only records missed earlier are added."""
+    attempt = db.get(Attempt, attempt_id)
+    if attempt is None:
+        raise HTTPException(404)
+    output = (attempt.result or {}).get("raw")
+    if not output and attempt.provider_session_id:
+        output = get_scheduler().client.get_session(attempt.provider_session_id).structured_output
+    if not output:
+        raise HTTPException(409, "no structured output available for this attempt")
+    counts = get_scheduler().ingestor.ingest(db, attempt, output)
+    db.commit()
+    get_scheduler().publisher.process_outbox(db)
+    return {"added": counts, "result": attempt.result}
+
+
 # -- ideas, evidence, review ---------------------------------------------------------------------
 
 
