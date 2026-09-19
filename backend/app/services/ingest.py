@@ -308,6 +308,8 @@ class Ingestor:
             db.query(Evidence)
             .filter(
                 Evidence.produced_by_attempt_id == attempt.id,
+                Evidence.idea_id == (idea.id if idea else None),
+                Evidence.claim_id == (claim.id if claim else None),
                 Evidence.check_type == check_type,
                 Evidence.summary == summary,
             )

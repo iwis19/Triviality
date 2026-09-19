@@ -18,9 +18,10 @@ ROLE_INSTRUCTIONS: dict[str, str] = {
         "and raw results as an artifact. A passing experiment is evidence, not a proof."
     ),
     "critic": (
-        "Find gaps, hidden assumptions, circularity, and invalid composition steps in the "
-        "assigned idea and its claims. Check whether the key lemma is already known and cite the "
-        "source if so. Report `supports` only if you found no gap after a genuine attempt."
+        "Find gaps, hidden assumptions, circularity, and invalid composition steps in each idea "
+        "under review and its claims. Check whether the key lemma is already known and cite the "
+        "source if so. Return one `critique` evidence item per idea, `target` = that idea's id; "
+        "report `supports` only if you found no gap after a genuine attempt."
     ),
     "prover_formalizer": (
         "Produce a Lean 4 proof the lab's checker accepts. The lab project pins the toolchain in "
@@ -73,6 +74,7 @@ def build_prompt(
     parents: list[Idea],
     worker_api_base: str,
     idea: Idea | None = None,
+    review: list[Idea] | None = None,
 ) -> str:
     sources = (
         "\n".join(
@@ -120,6 +122,11 @@ def build_prompt(
         sections.append(
             f"ASSIGNED IDEA (id {idea.id}; use target 'self' for its evidence)\n"
             + describe_idea(idea)
+        )
+    if review:
+        sections.append(
+            "IDEAS UNDER REVIEW (one critique each, target = the idea id)\n"
+            + "\n".join(map(describe_idea, review))
         )
     sections += [
         "RULES",

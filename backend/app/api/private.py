@@ -507,6 +507,7 @@ def _attempt_view(a: Attempt) -> dict:
         "id": a.id,
         "campaign_id": a.campaign_id,
         "idea_id": a.idea_id,
+        "review_idea_ids": (a.model_metadata or {}).get("review_idea_ids", []),
         "role": a.role,
         "requested_mode": a.requested_mode,
         "reported_mode": a.reported_mode,

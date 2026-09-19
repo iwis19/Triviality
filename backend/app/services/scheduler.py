@@ -234,9 +234,13 @@ class Scheduler:
                 mode=policy["default_mode"],
             )
             return 1
-        for idea in sorted(active, key=lambda i: (i.pinned is False, -i.score)):
-            role = self._next_role(idea)
-            if role:
+        ranked = sorted(active, key=lambda i: (i.pinned is False, -i.score))
+        next_roles = [(idea, self._next_role(idea)) for idea in ranked]
+        # Critiques wait until the generation's other work is done and then run as one
+        # session over every idea; culling needs all of them critiqued, and per-idea critic
+        # sessions would spend the budget before that point.
+        for idea, role in next_roles:
+            if role and role != "critic":
                 self.enqueue(
                     db,
                     campaign,
@@ -246,6 +250,28 @@ class Scheduler:
                     mode=mode_for_role(policy, role),
                 )
                 return 1
+        needing_critique = [idea for idea, role in next_roles if role == "critic"]
+        if len(needing_critique) > 1:
+            self.enqueue(
+                db,
+                campaign,
+                role="critic",
+                idea=None,
+                parents=[],
+                mode=mode_for_role(policy, "critic"),
+                review=needing_critique,
+            )
+            return 1
+        if needing_critique:
+            self.enqueue(
+                db,
+                campaign,
+                role="critic",
+                idea=needing_critique[0],
+                parents=[],
+                mode=mode_for_role(policy, "critic"),
+            )
+            return 1
         return 0
 
     @staticmethod
@@ -304,9 +330,11 @@ class Scheduler:
         parents: list[Idea],
         mode: str,
         comparison_group: str = "",
+        review: list[Idea] | None = None,
     ) -> Attempt:
         if mode not in DEVIN_MODES:
             raise ValueError(f"unknown devin mode {mode!r}")
+        review = review or []
         attempt = Attempt(
             campaign_id=campaign.id,
             idea_id=idea.id if idea else None,
@@ -315,7 +343,10 @@ class Scheduler:
             provider=self.client.provider_name,
             status="queued",
             comparison_group=comparison_group,
-            model_metadata={"parent_idea_ids": [p.id for p in parents[:6]]},
+            model_metadata={
+                "parent_idea_ids": [p.id for p in parents[:6]],
+                "review_idea_ids": [r.id for r in review],
+            },
         )
         db.add(attempt)
         db.flush()
@@ -329,6 +360,7 @@ class Scheduler:
             parents=parents[:6],
             worker_api_base=self.settings.public_base_url,
             idea=idea,
+            review=review,
         )
         attempt.prompt_hash = hashlib.sha256(attempt.prompt.encode()).hexdigest()
         emit(

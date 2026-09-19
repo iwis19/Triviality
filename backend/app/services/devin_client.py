@@ -368,22 +368,27 @@ class MockDevinClient:
             }
         # Verdict follows the idea family so a campaign always ends with a mix of supported,
         # inconclusive and refuted branches regardless of which families were drawn.
-        assigned = prompt.split("ASSIGNED IDEA", 1)[-1]
-        result = "supports"
-        if "Probabilistic construction" in assigned:
-            result = "refutes"
-        elif "Spectral/Fourier" in assigned:
-            result = "inconclusive"
         check_type = {
             "experimenter": "numerical_experiment",
             "critic": "critique",
         }[role]
-        content = json.dumps({"checked_range": 1000, "result": result})
-        return {
-            "ideas": [],
-            "evidence": [
+        if "IDEAS UNDER REVIEW" in prompt:
+            reviewed = prompt.split("IDEAS UNDER REVIEW", 1)[1].split("\n\nRULES", 1)[0]
+            blocks = [b for b in reviewed.split("- id: ")[1:]]
+            targets = [(b.split("\n", 1)[0].strip(), b) for b in blocks]
+        else:
+            targets = [("self", prompt.split("ASSIGNED IDEA", 1)[-1])]
+        evidence = []
+        for target, text in targets:
+            result = "supports"
+            if "Probabilistic construction" in text:
+                result = "refutes"
+            elif "Spectral/Fourier" in text:
+                result = "inconclusive"
+            content = json.dumps({"checked_range": 1000, "result": result})
+            evidence.append(
                 {
-                    "target": "self",
+                    "target": target,
                     "check_type": check_type,
                     "result": result,
                     "summary": f"[mock] {check_type} finished with result {result}",
@@ -391,9 +396,8 @@ class MockDevinClient:
                     "assumptions": [],
                     "artifact": {"filename": "result.json", "content": content},
                 }
-            ],
-            "gaps": ["mock provider: no real research"],
-        }
+            )
+        return {"ideas": [], "evidence": evidence, "gaps": ["mock provider: no real research"]}
 
 
 def build_client(settings: Settings) -> DevinClient:

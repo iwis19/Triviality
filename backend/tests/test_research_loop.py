@@ -76,6 +76,17 @@ def test_full_generation_cycle_with_mock_provider(client: TestClient) -> None:
     assert campaign["ideas"] >= 3
     assert campaign["sessions_used"] <= campaign["session_budget"]
 
+    # the generation's critique is one batched session, and each reviewed idea got its verdict
+    batch = [a for a in attempts if a["role"] == "critic" and a["idea_id"] is None]
+    assert len(batch) == 1 and len(batch[0]["review_idea_ids"]) >= 2
+    reviewed = set(batch[0]["review_idea_ids"])
+    critiqued = {
+        ev["idea_id"]
+        for ev in client.get("/public/problems/goldbach-conjecture").json()["evidence"]
+        if ev["check_type"] == "critique"
+    }
+    assert reviewed <= critiqued
+
     problem = client.get("/public/problems/goldbach-conjecture").json()
     ideas = problem["ideas"]
     assert len(ideas) >= 3
