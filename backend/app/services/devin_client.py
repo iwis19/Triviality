@@ -1,0 +1,344 @@
+"""Provider adapter for Devin research sessions.
+
+`DevinApiClient` targets the documented v3 cloud API
+(https://docs.devin.ai/api-reference/v3/sessions/post-organizations-sessions).
+`MockDevinClient` is a deterministic local stand-in so the lab can run end-to-end without
+consuming Devin usage. Both return the same `SessionInfo` shape.
+
+Mode provenance: the requested `devin_mode` is stored on the Attempt; the mode the provider
+reports back (`devin_mode` on GET) is stored separately as `reported_mode`. Underlying model
+identities are recorded only when the provider exposes them; otherwise they remain "unknown".
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import random
+from dataclasses import dataclass, field
+from typing import Protocol
+
+import httpx
+
+from ..config import Settings
+
+DEVIN_MODES = ("normal", "fast", "lite", "ultra", "fusion")
+
+# JSON Schema (Draft 7) the research session must satisfy with provide_structured_output.
+RESEARCH_OUTPUT_SCHEMA: dict = {
+    "type": "object",
+    "properties": {
+        "ideas": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "approach": {"type": "string"},
+                    "mechanism": {"type": "string"},
+                    "next_experiment": {"type": "string"},
+                    "method_tags": {"type": "array", "items": {"type": "string"}},
+                    "parent_idea_ids": {"type": "array", "items": {"type": "string"}},
+                    "novelty_rationale": {"type": "string"},
+                    "claims": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "statement": {"type": "string"},
+                                "scope": {"type": "string"},
+                                "lean_declaration": {"type": "string"},
+                            },
+                            "required": ["statement"],
+                        },
+                    },
+                },
+                "required": ["title", "approach"],
+            },
+        },
+        "evidence": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "target": {"type": "string", "description": "idea id, claim id, or 'self'"},
+                    "check_type": {
+                        "type": "string",
+                        "enum": [
+                            "counterexample_search",
+                            "numerical_experiment",
+                            "construction",
+                            "proof_sketch",
+                            "informal_proof",
+                            "critique",
+                            "lean_attempt",
+                            "literature_check",
+                        ],
+                    },
+                    "result": {"type": "string", "enum": ["supports", "refutes", "inconclusive"]},
+                    "summary": {"type": "string"},
+                    "coverage": {"type": "string"},
+                    "assumptions": {"type": "array", "items": {"type": "string"}},
+                    "artifact": {
+                        "type": "object",
+                        "properties": {
+                            "filename": {"type": "string"},
+                            "content": {"type": "string"},
+                            "media_type": {"type": "string"},
+                        },
+                        "required": ["filename", "content"],
+                    },
+                },
+                "required": ["target", "check_type", "result", "summary"],
+            },
+        },
+        "gaps": {"type": "array", "items": {"type": "string"}},
+        "self_reported_models": {
+            "type": "string",
+            "description": "Optional. Leave empty unless the environment states the model(s).",
+        },
+    },
+    "required": ["ideas", "evidence", "gaps"],
+}
+
+
+@dataclass
+class SessionInfo:
+    session_id: str
+    url: str
+    status: str  # new|claimed|running|exit|error|suspended|resuming
+    status_detail: str = ""
+    devin_mode: str | None = None
+    structured_output: dict | None = None
+    acus_consumed: float | None = None
+    user_id: str | None = None
+    raw: dict = field(default_factory=dict)
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status in {"exit", "error"} or (
+            self.status == "running" and self.status_detail == "finished"
+        )
+
+    @property
+    def is_blocked(self) -> bool:
+        return self.status == "suspended" or self.status_detail in {
+            "waiting_for_user",
+            "waiting_for_approval",
+        }
+
+
+class DevinClient(Protocol):
+    provider_name: str
+
+    def create_session(
+        self,
+        *,
+        prompt: str,
+        devin_mode: str,
+        tags: list[str],
+        title: str,
+        session_secrets: dict[str, str],
+        max_acu_limit: int | None,
+    ) -> SessionInfo: ...
+
+    def get_session(self, session_id: str) -> SessionInfo: ...
+
+    def terminate_session(self, session_id: str) -> None: ...
+
+
+def _parse_session(data: dict) -> SessionInfo:
+    return SessionInfo(
+        session_id=str(data.get("session_id", "")),
+        url=str(data.get("url", "")),
+        status=str(data.get("status", "")),
+        status_detail=str(data.get("status_detail") or ""),
+        devin_mode=data.get("devin_mode"),
+        structured_output=data.get("structured_output"),
+        acus_consumed=data.get("acus_consumed"),
+        user_id=data.get("user_id"),
+        raw=data,
+    )
+
+
+class DevinApiClient:
+    provider_name = "devin-api"
+
+    def __init__(self, settings: Settings, client: httpx.Client | None = None):
+        if not settings.devin_api_key or not settings.devin_org_id:
+            raise ValueError("MATHLAB_DEVIN_API_KEY and MATHLAB_DEVIN_ORG_ID are required")
+        self._org = settings.devin_org_id
+        self._create_as = settings.devin_create_as_user_id or None
+        self._client = client or httpx.Client(
+            base_url=settings.devin_api_base,
+            headers={"Authorization": f"Bearer {settings.devin_api_key}"},
+            timeout=60,
+        )
+
+    def create_session(
+        self,
+        *,
+        prompt: str,
+        devin_mode: str,
+        tags: list[str],
+        title: str,
+        session_secrets: dict[str, str],
+        max_acu_limit: int | None,
+    ) -> SessionInfo:
+        if devin_mode not in DEVIN_MODES:
+            raise ValueError(f"Unsupported devin_mode {devin_mode!r}")
+        body: dict = {
+            "prompt": prompt,
+            "title": title,
+            "tags": tags,
+            "devin_mode": devin_mode,
+            "structured_output_schema": RESEARCH_OUTPUT_SCHEMA,
+            "structured_output_required": True,
+            "resumable": False,
+            "session_secrets": [
+                {"key": k, "value": v, "sensitive": True} for k, v in session_secrets.items()
+            ],
+        }
+        if max_acu_limit is not None:
+            body["max_acu_limit"] = max_acu_limit
+        if self._create_as:
+            body["create_as_user_id"] = self._create_as
+        response = self._client.post(f"/v3/organizations/{self._org}/sessions", json=body)
+        response.raise_for_status()
+        return _parse_session(response.json())
+
+    def get_session(self, session_id: str) -> SessionInfo:
+        response = self._client.get(f"/v3/organizations/{self._org}/sessions/{session_id}")
+        response.raise_for_status()
+        return _parse_session(response.json())
+
+    def terminate_session(self, session_id: str) -> None:
+        response = self._client.delete(f"/v3/organizations/{self._org}/sessions/{session_id}")
+        response.raise_for_status()
+
+
+class MockDevinClient:
+    """Deterministic stand-in. Sessions finish on the second poll with plausible structured
+    output derived from the prompt hash, so scheduler/ingestion/publication can be exercised
+    without Devin usage. Nothing it produces is treated as verified."""
+
+    provider_name = "mock"
+
+    def __init__(self) -> None:
+        self._sessions: dict[str, dict] = {}
+
+    def create_session(
+        self,
+        *,
+        prompt: str,
+        devin_mode: str,
+        tags: list[str],
+        title: str,
+        session_secrets: dict[str, str],
+        max_acu_limit: int | None,
+    ) -> SessionInfo:
+        digest = hashlib.sha256(prompt.encode()).hexdigest()
+        session_id = f"mock-{digest[:16]}"
+        self._sessions[session_id] = {
+            "polls": 0,
+            "mode": devin_mode,
+            "prompt": prompt,
+            "seed": int(digest[:8], 16),
+        }
+        return SessionInfo(
+            session_id=session_id, url=f"mock://{session_id}", status="new", devin_mode=devin_mode
+        )
+
+    def get_session(self, session_id: str) -> SessionInfo:
+        state = self._sessions[session_id]
+        state["polls"] += 1
+        if state["polls"] < 2:
+            return SessionInfo(
+                session_id=session_id,
+                url=f"mock://{session_id}",
+                status="running",
+                status_detail="working",
+                devin_mode=state["mode"],
+            )
+        return SessionInfo(
+            session_id=session_id,
+            url=f"mock://{session_id}",
+            status="running",
+            status_detail="finished",
+            devin_mode=state["mode"],
+            structured_output=self._fake_output(state),
+            acus_consumed=round(0.4 + (state["seed"] % 100) / 100, 2),
+        )
+
+    def terminate_session(self, session_id: str) -> None:
+        self._sessions.pop(session_id, None)
+
+    @staticmethod
+    def _fake_output(state: dict) -> dict:
+        rng = random.Random(state["seed"])
+        prompt: str = state["prompt"]
+        role = "hypothesis_generator"
+        for candidate in ("experimenter", "critic", "prover_formalizer", "hypothesis_generator"):
+            if f"ROLE: {candidate}" in prompt:
+                role = candidate
+                break
+        if role == "hypothesis_generator":
+            families = [
+                ("Density increment", ["additive-combinatorics", "density-increment"]),
+                ("Probabilistic construction", ["probabilistic-method", "construction"]),
+                ("Spectral/Fourier bound", ["fourier-analysis", "spectral"]),
+                ("Structural reduction", ["reduction", "structure-theory"]),
+                ("Computational search for small cases", ["computation", "counterexample-search"]),
+            ]
+            rng.shuffle(families)
+            ideas = [
+                {
+                    "title": f"{name} approach",
+                    "approach": f"Attempt a {name.lower()} argument for the stated problem.",
+                    "mechanism": "Identify the key lemma whose failure would falsify the approach.",
+                    "next_experiment": "Check the lemma on small cases; record the first failure.",
+                    "method_tags": tags,
+                    "parent_idea_ids": [],
+                    "novelty_rationale": "Mock output; novelty unchecked.",
+                    "claims": [{"statement": f"[mock] key lemma for {name.lower()}"}],
+                }
+                for name, tags in families[:3]
+            ]
+            return {"ideas": ideas, "evidence": [], "gaps": ["mock provider: no real research"]}
+        result = rng.choice(["supports", "inconclusive", "refutes"])
+        check_type = {
+            "experimenter": "numerical_experiment",
+            "critic": "critique",
+            "prover_formalizer": "lean_attempt",
+        }[role]
+        content = (
+            "theorem mock_lemma : 1 + 1 = 2 := by norm_num\n"
+            if check_type == "lean_attempt"
+            else json.dumps({"checked_range": 1000, "result": result})
+        )
+        return {
+            "ideas": [],
+            "evidence": [
+                {
+                    "target": "self",
+                    "check_type": check_type,
+                    "result": result,
+                    "summary": f"[mock] {check_type} finished with result {result}",
+                    "coverage": "mock coverage",
+                    "assumptions": [],
+                    "artifact": {
+                        "filename": "result.lean"
+                        if check_type == "lean_attempt"
+                        else "result.json",
+                        "content": content,
+                    },
+                }
+            ],
+            "gaps": ["mock provider: no real research"],
+        }
+
+
+def build_client(settings: Settings) -> DevinClient:
+    if settings.devin_provider == "api":
+        return DevinApiClient(settings)
+    return MockDevinClient()

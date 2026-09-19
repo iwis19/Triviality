@@ -1,0 +1,9 @@
+name = "mathlab"
+defaultTargets = ["MathLab"]
+
+# Mathlib is the intended long-term dependency. It is not pinned here yet because the
+# first checked artifacts only need core Lean; add it with `lake update` once the pinned
+# revision is chosen and recorded in docs/plan.md.
+
+[[lean_lib]]
+name = "MathLab"

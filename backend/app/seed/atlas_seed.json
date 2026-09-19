@@ -1,0 +1,272 @@
+{
+  "retrieved_date": "2026-09-19",
+  "note": "Initial atlas seed. Statements are paraphrased from the cited sources and are UNREVIEWED: a reviewer must confirm each statement, attribution, and reported status before it is treated as authoritative. Status assertions are dated claims by sources, not proofs that a problem is open.",
+  "areas": [
+    {"slug": "algebra", "name": "Algebra", "children": [
+      {"slug": "commutative-algebra", "name": "Commutative algebra and algebraic geometry"},
+      {"slug": "ring-theory", "name": "Ring theory"},
+      {"slug": "galois-theory", "name": "Field and Galois theory"}
+    ]},
+    {"slug": "number-theory", "name": "Number theory", "children": [
+      {"slug": "additive-number-theory", "name": "Additive and combinatorial number theory"},
+      {"slug": "prime-distribution", "name": "Distribution of primes"},
+      {"slug": "analytic-number-theory", "name": "Analytic number theory"}
+    ]},
+    {"slug": "geometry-topology", "name": "Geometry and topology", "children": [
+      {"slug": "discrete-geometry", "name": "Discrete geometry"},
+      {"slug": "geometric-measure-theory", "name": "Geometric measure theory"},
+      {"slug": "low-dimensional-topology", "name": "Low-dimensional topology"}
+    ]},
+    {"slug": "analysis", "name": "Analysis", "children": [
+      {"slug": "operator-theory", "name": "Operator theory"},
+      {"slug": "pde", "name": "Partial differential equations"}
+    ]},
+    {"slug": "combinatorics", "name": "Combinatorics and discrete mathematics", "children": [
+      {"slug": "extremal-set-theory", "name": "Extremal set theory"},
+      {"slug": "graph-theory", "name": "Graph theory"},
+      {"slug": "diophantine-approximation", "name": "Diophantine approximation and view-obstruction"}
+    ]},
+    {"slug": "probability-statistics", "name": "Probability and statistics", "children": [
+      {"slug": "percolation", "name": "Percolation and statistical mechanics"},
+      {"slug": "random-structures", "name": "Random structures and phase transitions"}
+    ]},
+    {"slug": "logic-foundations", "name": "Logic and foundations", "children": [
+      {"slug": "model-theory", "name": "Model theory"},
+      {"slug": "set-theory", "name": "Set theory"},
+      {"slug": "decidability", "name": "Decidability"}
+    ]},
+    {"slug": "optimization-applied", "name": "Optimization and applied mathematics", "children": [
+      {"slug": "polyhedral-combinatorics", "name": "Polyhedral combinatorics and linear programming"},
+      {"slug": "packing", "name": "Sphere packing and kissing configurations"}
+    ]},
+    {"slug": "theoretical-cs", "name": "Theoretical computer science", "children": [
+      {"slug": "complexity-theory", "name": "Computational complexity"},
+      {"slug": "approximation-hardness", "name": "Hardness of approximation"}
+    ]}
+  ],
+  "problems": [
+    {
+      "slug": "jacobian-conjecture",
+      "title": "Jacobian conjecture",
+      "statement": "Let F : C^n -> C^n be a polynomial map whose Jacobian determinant is a nonzero constant. Then F has a polynomial inverse.",
+      "areas": ["algebra", "commutative-algebra"],
+      "attribution": "O.-H. Keller (1939)",
+      "sources": [{"title": "Wikipedia: Jacobian conjecture", "url": "https://en.wikipedia.org/wiki/Jacobian_conjecture", "asserted_status": "open"}]
+    },
+    {
+      "slug": "koethe-conjecture",
+      "title": "Köthe conjecture",
+      "statement": "If a ring R has no nonzero nil two-sided ideals, then R has no nonzero nil one-sided ideals.",
+      "areas": ["algebra", "ring-theory"],
+      "attribution": "G. Köthe (1930)",
+      "sources": [{"title": "Wikipedia: Köthe conjecture", "url": "https://en.wikipedia.org/wiki/K%C3%B6the_conjecture", "asserted_status": "open"}]
+    },
+    {
+      "slug": "inverse-galois-problem",
+      "title": "Inverse Galois problem over Q",
+      "statement": "Every finite group is isomorphic to the Galois group of some finite Galois extension of the rational numbers Q.",
+      "areas": ["algebra", "galois-theory", "number-theory"],
+      "attribution": "classical; see Hilbert (1892) and Shafarevich (1954) for solvable groups",
+      "sources": [{"title": "Wikipedia: Inverse Galois problem", "url": "https://en.wikipedia.org/wiki/Inverse_Galois_problem", "asserted_status": "open"}]
+    },
+    {
+      "slug": "goldbach-conjecture",
+      "title": "Goldbach's conjecture",
+      "statement": "Every even integer greater than 2 is the sum of two primes.",
+      "areas": ["number-theory", "additive-number-theory", "prime-distribution"],
+      "attribution": "C. Goldbach, letter to Euler (1742)",
+      "formal_target": "theorem goldbach (n : Nat) (h2 : 2 < n) (heven : n % 2 = 0) : ∃ p q, Nat.Prime p ∧ Nat.Prime q ∧ p + q = n",
+      "sources": [{"title": "Wikipedia: Goldbach's conjecture", "url": "https://en.wikipedia.org/wiki/Goldbach%27s_conjecture", "asserted_status": "open"}]
+    },
+    {
+      "slug": "twin-prime-conjecture",
+      "title": "Twin prime conjecture",
+      "statement": "There are infinitely many primes p such that p + 2 is also prime.",
+      "areas": ["number-theory", "prime-distribution"],
+      "attribution": "classical; named by Stäckel; see de Polignac (1849)",
+      "formal_target": "theorem twin_primes : ∀ N : Nat, ∃ p, N < p ∧ Nat.Prime p ∧ Nat.Prime (p + 2)",
+      "sources": [{"title": "Wikipedia: Twin prime", "url": "https://en.wikipedia.org/wiki/Twin_prime", "asserted_status": "open"}]
+    },
+    {
+      "slug": "erdos-1-distinct-subset-sums",
+      "title": "Erdős problem #1: sets with distinct subset sums",
+      "statement": "If A ⊆ {1, …, N} with |A| = n is such that the subset sums Σ_{a∈S} a are distinct for all S ⊆ A, then N ≫ 2^n (i.e., N ≥ c·2^n for an absolute constant c > 0).",
+      "definitions": "The notation N ≫ 2^n means N ≥ c·2^n for some absolute constant c > 0.",
+      "areas": ["number-theory", "additive-number-theory", "combinatorics"],
+      "attribution": "P. Erdős (1931); $500 prize problem",
+      "sources": [{"title": "Erdős Problems #1 (T. F. Bloom)", "url": "https://www.erdosproblems.com/1", "location": "problem page, last edited 06 April 2026", "asserted_status": "open"}]
+    },
+    {
+      "slug": "hadwiger-nelson-problem",
+      "title": "Hadwiger–Nelson problem (chromatic number of the plane)",
+      "statement": "Determine the minimum number of colors χ needed to color the points of the Euclidean plane so that no two points at distance exactly 1 receive the same color. It is known that 5 ≤ χ ≤ 7.",
+      "areas": ["geometry-topology", "discrete-geometry", "combinatorics", "graph-theory"],
+      "attribution": "E. Nelson (1950); H. Hadwiger; lower bound 5 by A. de Grey (2018)",
+      "sources": [{"title": "Wikipedia: Hadwiger–Nelson problem", "url": "https://en.wikipedia.org/wiki/Hadwiger%E2%80%93Nelson_problem", "asserted_status": "open"}]
+    },
+    {
+      "slug": "kakeya-conjecture-high-dimension",
+      "title": "Kakeya set conjecture in dimension n ≥ 4",
+      "statement": "Every Besicovitch (Kakeya) set in R^n — a compact set containing a unit line segment in every direction — has Hausdorff dimension n. The case n = 3 was resolved by Wang and Zahl (2025); the cases n ≥ 4 remain open.",
+      "areas": ["geometry-topology", "geometric-measure-theory", "analysis"],
+      "attribution": "conjecture attributed to the Kakeya needle problem tradition; Besicovitch (1919, 1928)",
+      "sources": [{"title": "Wikipedia: Kakeya set", "url": "https://en.wikipedia.org/wiki/Kakeya_set", "asserted_status": "open"}]
+    },
+    {
+      "slug": "smooth-4d-poincare-conjecture",
+      "title": "Smooth four-dimensional Poincaré conjecture",
+      "statement": "Every smooth 4-manifold that is homotopy equivalent to the 4-sphere S^4 is diffeomorphic to S^4.",
+      "areas": ["geometry-topology", "low-dimensional-topology"],
+      "attribution": "open case of the generalized Poincaré conjecture in the smooth category",
+      "sources": [{"title": "Wikipedia: Generalized Poincaré conjecture", "url": "https://en.wikipedia.org/wiki/Generalized_Poincar%C3%A9_conjecture", "asserted_status": "open"}]
+    },
+    {
+      "slug": "invariant-subspace-problem-hilbert",
+      "title": "Invariant subspace problem for separable Hilbert spaces",
+      "statement": "Every bounded linear operator on a complex, separable, infinite-dimensional Hilbert space has a non-trivial closed invariant subspace.",
+      "areas": ["analysis", "operator-theory"],
+      "attribution": "attributed to von Neumann and Beurling; a proof was announced by P. Enflo (2023) and is under review",
+      "status_override": "resolution_claimed",
+      "sources": [{"title": "Wikipedia: Invariant subspace problem", "url": "https://en.wikipedia.org/wiki/Invariant_subspace_problem", "asserted_status": "disputed", "notes": "Enflo's 2023 preprint claims a proof for Hilbert spaces; community acceptance not established as of retrieval."}]
+    },
+    {
+      "slug": "navier-stokes-existence-smoothness",
+      "title": "Navier–Stokes existence and smoothness",
+      "statement": "For the three-dimensional incompressible Navier–Stokes equations with smooth, divergence-free initial data (on R^3 with decay conditions, or on the torus T^3), prove that smooth, globally defined solutions exist — or exhibit initial data for which they do not.",
+      "areas": ["analysis", "pde", "optimization-applied"],
+      "attribution": "Clay Mathematics Institute Millennium Prize Problem; official statement by C. Fefferman",
+      "sources": [{"title": "Clay Mathematics Institute: Navier–Stokes Equation", "url": "https://www.claymath.org/millennium/navier-stokes-equation/", "asserted_status": "open"}]
+    },
+    {
+      "slug": "riemann-hypothesis",
+      "title": "Riemann hypothesis",
+      "statement": "Every non-trivial zero of the Riemann zeta function ζ(s) has real part 1/2.",
+      "areas": ["number-theory", "analytic-number-theory", "analysis"],
+      "attribution": "B. Riemann (1859); Clay Mathematics Institute Millennium Prize Problem",
+      "sources": [{"title": "Clay Mathematics Institute: Riemann Hypothesis", "url": "https://www.claymath.org/millennium/riemann-hypothesis/", "asserted_status": "open"}]
+    },
+    {
+      "slug": "union-closed-sets-conjecture",
+      "title": "Union-closed sets conjecture (Frankl)",
+      "statement": "For every finite family F of finite sets, other than the family consisting only of the empty set, that is closed under unions, there is an element that belongs to at least half of the sets in F. (A constant-fraction version, with 1/2 replaced by about 0.38, was proved by Gilmer in 2022 and improved since; the constant 1/2 remains open.)",
+      "areas": ["combinatorics", "extremal-set-theory"],
+      "attribution": "P. Frankl (1979)",
+      "sources": [{"title": "Wikipedia: Union-closed sets conjecture", "url": "https://en.wikipedia.org/wiki/Union-closed_sets_conjecture", "asserted_status": "open"}]
+    },
+    {
+      "slug": "hadwiger-conjecture-graphs",
+      "title": "Hadwiger conjecture (graph coloring)",
+      "statement": "For every integer t ≥ 1, every graph with no K_t minor is (t−1)-colorable. Known for t ≤ 6; open for t ≥ 7.",
+      "areas": ["combinatorics", "graph-theory"],
+      "attribution": "H. Hadwiger (1943)",
+      "sources": [{"title": "Wikipedia: Hadwiger conjecture (graph theory)", "url": "https://en.wikipedia.org/wiki/Hadwiger_conjecture_(graph_theory)", "asserted_status": "open"}]
+    },
+    {
+      "slug": "lonely-runner-conjecture",
+      "title": "Lonely runner conjecture",
+      "statement": "Suppose k runners start at the same point on a circular track of unit length and run with pairwise distinct constant speeds. Then for each runner there is a time at which that runner is at distance at least 1/k from every other runner. Proved for k ≤ 7; open for k ≥ 8.",
+      "areas": ["combinatorics", "diophantine-approximation", "number-theory"],
+      "attribution": "J. M. Wills (1967); T. Cusick (1973); named by L. Goddyn (1998)",
+      "sources": [{"title": "Wikipedia: Lonely runner conjecture", "url": "https://en.wikipedia.org/wiki/Lonely_runner_conjecture", "asserted_status": "open"}]
+    },
+    {
+      "slug": "percolation-critical-cluster-intermediate-dimensions",
+      "title": "No infinite cluster at criticality for percolation on Z^d, 3 ≤ d ≤ 10",
+      "statement": "For Bernoulli bond percolation on the hypercubic lattice Z^d at the critical probability p_c(d), the probability θ(p_c) that the origin belongs to an infinite open cluster equals zero. Known for d = 2 and for d ≥ 11; open for 3 ≤ d ≤ 10.",
+      "areas": ["probability-statistics", "percolation"],
+      "attribution": "folklore conjecture in percolation theory; high-dimensional cases by Hara–Slade and Fitzner–van der Hofstad",
+      "sources": [
+        {"title": "H. Duminil-Copin, Sixty years of percolation (arXiv:1712.04651)", "url": "https://arxiv.org/abs/1712.04651", "location": "survey of open challenges; reviewer must confirm the exact statement and dimension range", "asserted_status": "open"},
+        {"title": "Wikipedia: Percolation theory", "url": "https://en.wikipedia.org/wiki/Percolation_theory", "location": "background only; this page does not state the intermediate-dimension conjecture explicitly", "asserted_status": "unknown"}
+      ]
+    },
+    {
+      "slug": "random-3-sat-threshold",
+      "title": "Existence of the random 3-SAT satisfiability threshold",
+      "statement": "For random 3-SAT with n variables and αn clauses, prove that there is a constant α_3 such that a random formula is satisfiable with probability tending to 1 for α < α_3 and unsatisfiable with probability tending to 1 for α > α_3. (Friedgut proved a sharp threshold sequence; Ding–Sly–Sun proved the conjecture for all sufficiently large k; k = 3 remains open.)",
+      "areas": ["probability-statistics", "random-structures", "theoretical-cs"],
+      "attribution": "satisfiability threshold conjecture, 1990s; Friedgut (1999); Ding–Sly–Sun (2015)",
+      "sources": [{"title": "Wikipedia: Boolean satisfiability problem (random 3-SAT)", "url": "https://en.wikipedia.org/wiki/Boolean_satisfiability_problem", "asserted_status": "open"}]
+    },
+    {
+      "slug": "self-avoiding-walk-2d-exponent",
+      "title": "Mean-square displacement exponent of the planar self-avoiding walk",
+      "statement": "For the self-avoiding walk on the square lattice Z^2, prove that the mean-square displacement exponent ν equals 3/4, i.e., the typical end-to-end distance of an n-step walk grows like n^{3/4}.",
+      "areas": ["probability-statistics", "percolation", "combinatorics"],
+      "attribution": "P. Flory (1949) conjecture; B. Nienhuis (1982) via Coulomb-gas arguments",
+      "sources": [{"title": "Wikipedia: Self-avoiding walk", "url": "https://en.wikipedia.org/wiki/Self-avoiding_walk", "asserted_status": "open"}]
+    },
+    {
+      "slug": "vaught-conjecture",
+      "title": "Vaught's conjecture",
+      "statement": "Every complete first-order theory in a countable language has either at most countably many or exactly continuum many non-isomorphic countable models.",
+      "areas": ["logic-foundations", "model-theory"],
+      "attribution": "R. Vaught (1961)",
+      "sources": [{"title": "Wikipedia: Vaught conjecture", "url": "https://en.wikipedia.org/wiki/Vaught_conjecture", "asserted_status": "open"}]
+    },
+    {
+      "slug": "reinhardt-cardinal-consistency",
+      "title": "Consistency of Reinhardt cardinals with ZF",
+      "statement": "Is the existence of a Reinhardt cardinal — a critical point of a non-trivial elementary embedding j : V → V — consistent with ZF (without the axiom of choice)? Kunen proved inconsistency with ZFC.",
+      "areas": ["logic-foundations", "set-theory"],
+      "attribution": "W. Reinhardt (1967); K. Kunen (1971)",
+      "sources": [{"title": "Wikipedia: Reinhardt cardinal", "url": "https://en.wikipedia.org/wiki/Reinhardt_cardinal", "asserted_status": "open"}]
+    },
+    {
+      "slug": "tarski-exponential-function-problem",
+      "title": "Tarski's exponential function problem",
+      "statement": "Is the first-order theory of the real numbers with addition, multiplication, and the exponential function x ↦ e^x decidable? (Macintyre–Wilkie showed decidability follows from Schanuel's conjecture.)",
+      "areas": ["logic-foundations", "decidability", "number-theory"],
+      "attribution": "A. Tarski (1950s); Macintyre–Wilkie (1996)",
+      "sources": [{"title": "Wikipedia: Tarski's exponential function problem", "url": "https://en.wikipedia.org/wiki/Tarski%27s_exponential_function_problem", "asserted_status": "open"}]
+    },
+    {
+      "slug": "polynomial-hirsch-conjecture",
+      "title": "Polynomial Hirsch conjecture",
+      "statement": "The combinatorial diameter of the vertex–edge graph of any d-dimensional convex polytope with n facets is bounded above by a polynomial in n and d. (The original Hirsch bound n − d was disproved by Santos in 2010.)",
+      "areas": ["optimization-applied", "polyhedral-combinatorics", "combinatorics"],
+      "attribution": "W. Hirsch (1957); F. Santos (2010)",
+      "sources": [{"title": "Wikipedia: Hirsch conjecture", "url": "https://en.wikipedia.org/wiki/Hirsch_conjecture", "asserted_status": "open"}]
+    },
+    {
+      "slug": "strongly-polynomial-linear-programming",
+      "title": "Strongly polynomial algorithm for linear programming (Smale's 9th problem)",
+      "statement": "Is there a strongly polynomial-time algorithm for linear programming, i.e., one whose number of arithmetic operations is bounded by a polynomial in the number of variables and constraints, independent of the bit size of the input?",
+      "areas": ["optimization-applied", "polyhedral-combinatorics", "theoretical-cs"],
+      "attribution": "S. Smale (1998), problem 9",
+      "sources": [{"title": "Wikipedia: Smale's problems", "url": "https://en.wikipedia.org/wiki/Smale%27s_problems", "asserted_status": "open"}]
+    },
+    {
+      "slug": "kissing-number-dimension-5",
+      "title": "Kissing number in dimension 5",
+      "statement": "Determine the maximum number κ(5) of non-overlapping unit balls in R^5 that can simultaneously touch a central unit ball. Currently 40 ≤ κ(5) ≤ 44.",
+      "areas": ["optimization-applied", "packing", "geometry-topology", "discrete-geometry"],
+      "attribution": "classical; bounds from lattice constructions and semidefinite programming",
+      "sources": [{"title": "Wikipedia: Kissing number", "url": "https://en.wikipedia.org/wiki/Kissing_number", "asserted_status": "open"}]
+    },
+    {
+      "slug": "p-vs-np",
+      "title": "P versus NP",
+      "statement": "Is P = NP? That is, can every decision problem whose yes-instances have polynomial-time verifiable certificates also be solved in polynomial time?",
+      "areas": ["theoretical-cs", "complexity-theory", "logic-foundations"],
+      "attribution": "S. Cook (1971), L. Levin (1973); Clay Mathematics Institute Millennium Prize Problem",
+      "sources": [{"title": "Clay Mathematics Institute: P vs NP", "url": "https://www.claymath.org/millennium/p-vs-np/", "asserted_status": "open"}]
+    },
+    {
+      "slug": "unique-games-conjecture",
+      "title": "Unique games conjecture",
+      "statement": "For every ε > 0 there is a k such that, given a unique label-cover instance with alphabet size k, it is NP-hard to distinguish instances where at least a 1−ε fraction of constraints can be satisfied from instances where at most an ε fraction can. (The 2-to-2 games theorem of Khot–Minzer–Safra (2018) proves a weaker variant.)",
+      "areas": ["theoretical-cs", "approximation-hardness"],
+      "attribution": "S. Khot (2002)",
+      "sources": [{"title": "Wikipedia: Unique games conjecture", "url": "https://en.wikipedia.org/wiki/Unique_games_conjecture", "asserted_status": "open"}]
+    },
+    {
+      "slug": "graph-isomorphism-in-p",
+      "title": "Graph isomorphism in polynomial time",
+      "statement": "Is there a polynomial-time algorithm deciding whether two finite graphs are isomorphic? Babai (2015–2017) gave a quasi-polynomial-time algorithm.",
+      "areas": ["theoretical-cs", "complexity-theory", "combinatorics", "graph-theory"],
+      "attribution": "classical; L. Babai (2016)",
+      "sources": [{"title": "Wikipedia: Graph isomorphism problem", "url": "https://en.wikipedia.org/wiki/Graph_isomorphism_problem", "asserted_status": "open"}]
+    }
+  ]
+}
