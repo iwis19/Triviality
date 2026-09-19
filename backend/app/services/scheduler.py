@@ -40,6 +40,8 @@ from .selection import Candidate, select_generation
 RUNNING = {"queued", "dispatching", "running", "blocked"}
 DEFAULT_POLICY = {
     "default_mode": "ultra",
+    # per-role overrides; see docs/pilot-fusion-vs-ultra.md for why tool-heavy roles get fusion
+    "role_modes": {"experimenter": "fusion", "status_researcher": "fusion"},
     "ideas_per_generation": 3,
     "keep_total": 6,
     "keep_per_cluster": 2,
@@ -51,6 +53,11 @@ DEFAULT_POLICY = {
 
 def policy_of(campaign: Campaign) -> dict:
     return {**DEFAULT_POLICY, **(campaign.policy or {})}
+
+
+def mode_for_role(policy: dict, role: str) -> str:
+    mode = (policy.get("role_modes") or {}).get(role, policy["default_mode"])
+    return str(mode) if mode in DEVIN_MODES else str(policy["default_mode"])
 
 
 class Scheduler:
@@ -192,7 +199,12 @@ class Scheduler:
             role = self._next_role(idea)
             if role:
                 self.enqueue(
-                    db, campaign, role=role, idea=idea, parents=[], mode=policy["default_mode"]
+                    db,
+                    campaign,
+                    role=role,
+                    idea=idea,
+                    parents=[],
+                    mode=mode_for_role(policy, role),
                 )
                 return 1
         return 0
