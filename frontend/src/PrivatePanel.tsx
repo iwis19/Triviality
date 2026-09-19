@@ -118,6 +118,12 @@ export default function PrivatePanel({ problems, selectedIdeaId, onChanged }: Pr
         <button disabled={busy} onClick={() => run("wikipedia import", () => api.importWikipedia(false))}>
           Import Wikipedia list
         </button>
+        <button disabled={busy} onClick={() => run("erdős import (dry run)", () => api.importErdos(true))}>
+          Preview Erdős import
+        </button>
+        <button disabled={busy} onClick={() => run("erdős import", () => api.importErdos(false))}>
+          Import Erdős problems
+        </button>
         <button
           onClick={() => {
             sessionStorage.removeItem(KEY_STORAGE);

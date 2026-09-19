@@ -99,6 +99,14 @@ def build_prompt(
     ]
     if problem.formal_target:
         sections.append(f"approved formal target:\n{problem.formal_target}")
+    reference = problem.coverage.get("reference_formalization")
+    if reference:
+        sections.append(
+            "reference formalization (external library "
+            f"{reference.get('library', '')}, {reference.get('url', '')}; not compilable in the "
+            "lab project verbatim, use it to fix the intended meaning):\n"
+            f"{reference.get('statement', '')}"
+        )
     if parents:
         sections.append(
             "PARENT IDEAS TO REFINE OR RECOMBINE\n" + "\n".join(map(describe_idea, parents))

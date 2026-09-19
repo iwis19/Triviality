@@ -163,6 +163,7 @@ class Publisher:
                 {k: r.get(k) for k in ("reviewer", "date", "from", "to", "note")}
                 for r in problem.coverage.get("status_reviews", [])
             ],
+            "reference_formalization": problem.coverage.get("reference_formalization"),
         }
         return payload, PROBLEM_STATUS_LABELS.get(problem.status, "Status unknown")
 

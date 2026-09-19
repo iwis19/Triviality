@@ -28,6 +28,7 @@ from ..models import (
     utcnow,
 )
 from ..seed import load_atlas_document, load_seed
+from ..services import erdos_import
 from ..services.atlas_import import (
     DEFAULT_PAGE,
     fetch_wikitext,
@@ -99,6 +100,26 @@ class WikipediaImportIn(BaseModel):
     )
 
 
+class ErdosImportIn(BaseModel):
+    dry_run: bool = False
+    limit: int | None = Field(default=None, ge=1)
+    include_resolved: bool = False
+    status_table: str | None = Field(
+        default=None, description="pre-fetched problems.yaml; skips the network fetch"
+    )
+    formal_sources: dict[str, str] | None = Field(
+        default=None,
+        description="pre-fetched formal-conjectures Lean sources by number; skips the fetch",
+    )
+    site_statements: dict[str, str] | None = Field(
+        default=None,
+        description="pre-fetched erdosproblems.com statements by number; skips the fetch",
+    )
+    fetch_site_statements: bool = Field(
+        default=True, description="fetch each problem's statement from its erdosproblems.com page"
+    )
+
+
 class ReviewIn(BaseModel):
     result: str  # confirmed | confirmed_refutation | disputed
     note: str = ""
@@ -167,6 +188,59 @@ def import_wikipedia_list(body: WikipediaImportIn, db: Session = Depends(get_db)
         }
     counts = load_atlas_document(db, document)
     counts["parsed"] = len(listed)
+    counts["published"] = get_scheduler().publisher.process_outbox(db)
+    return counts
+
+
+@router.post("/atlas/import/erdos")
+def import_erdos_problems(body: ErdosImportIn, db: Session = Depends(get_db)) -> dict:
+    """Import the Erdős problems the community status table still reports open, with their
+    statements (and reference Lean statements) from formal-conjectures. Both datasets are
+    Apache-2.0; every state is stored as a dated, unreviewed assertion."""
+    try:
+        table = (
+            body.status_table
+            if body.status_table is not None
+            else erdos_import.fetch_status_table()
+        )
+    except Exception as exc:
+        raise HTTPException(502, f"could not fetch the Erdős status table: {exc}") from exc
+    entries = erdos_import.parse_status_table(table)
+    if not body.include_resolved:
+        entries = [e for e in entries if e.is_open]
+    if body.limit:
+        entries = entries[: body.limit]
+    try:
+        sources = (
+            body.formal_sources
+            if body.formal_sources is not None
+            else erdos_import.fetch_formal_conjectures([e.number for e in entries])
+        )
+    except Exception as exc:
+        raise HTTPException(502, f"could not fetch formal-conjectures sources: {exc}") from exc
+    erdos_import.attach_formalizations(entries, sources)
+    if body.site_statements is not None:
+        erdos_import.attach_site_statements(entries, body.site_statements)
+    elif body.fetch_site_statements:
+        try:
+            erdos_import.attach_site_statements(
+                entries, erdos_import.fetch_site_statements([e.number for e in entries])
+            )
+        except Exception as exc:
+            raise HTTPException(502, f"could not fetch erdosproblems.com pages: {exc}") from exc
+    document = erdos_import.to_atlas_document(entries, include_resolved=body.include_resolved)
+    if body.dry_run:
+        return {
+            "dry_run": True,
+            "parsed": len(entries),
+            "with_statement": sum(1 for e in entries if e.statement),
+            "importable": len(document["problems"]),
+            "sample": document["problems"][:5],
+            "areas": document["areas"],
+        }
+    counts = load_atlas_document(db, document)
+    counts["parsed"] = len(entries)
+    counts["without_statement"] = sum(1 for e in entries if not e.statement)
     counts["published"] = get_scheduler().publisher.process_outbox(db)
     return counts
 

@@ -86,7 +86,18 @@ listed is a dated claim, not a verified status; the `status_researcher` role and
 `POST /private/problems/{id}/review` exist to check it. Entries whose article URL is already
 asserted for an existing problem are skipped as duplicates, so re-running is idempotent and
 the hand-checked seed records win. `POST /private/atlas/import` accepts any document in the
-seed JSON format for other sources (Open Problem Garden, Erdős problems, …).
+seed JSON format for other sources (Open Problem Garden, …).
+
+`POST /private/atlas/import/erdos` imports the Erdős problems from the status table in
+[teorth/erdosproblems](https://github.com/teorth/erdosproblems) (`data/problems.yaml`,
+Apache-2.0): by default the ~640 open-like entries (`open`, `falsifiable`, `verifiable`,
+`decidable`, …; `include_resolved` adds the rest as `resolved`). Every source state string is
+preserved verbatim as an assertion, dated with the table's `last_update`. The statement is the
+problem's own erdosproblems.com page text; where google-deepmind/formal-conjectures has a file,
+its main declaration (research-open part preferred over textbook/solved variants) is stored as
+`reference_formalization` — an *external* reference, never MathLab's approved `formal_target`.
+Re-running refreshes the text/reference of bulk-imported records without touching status,
+assertions or reviews.
 
 Status review is two-tier. A `status_researcher` session that returns a problem-level
 `literature_check` with `result: "refutes"` only *flags* the problem as `resolution_claimed`;

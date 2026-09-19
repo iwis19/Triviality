@@ -245,6 +245,8 @@ export class PrivateApi {
   seed = () => this.send<Record<string, number>>("POST", "/private/seed");
   importWikipedia = (dry_run: boolean) =>
     this.send<Record<string, unknown>>("POST", "/private/atlas/import/wikipedia", { dry_run });
+  importErdos = (dry_run: boolean) =>
+    this.send<Record<string, unknown>>("POST", "/private/atlas/import/erdos", { dry_run });
   reviewProblem = (problemId: string, status: string, note: string) =>
     this.send<{ status: string }>("POST", `/private/problems/${problemId}/review`, { status, note });
   portfolios = () => this.send<Portfolio[]>("GET", "/private/portfolios");
