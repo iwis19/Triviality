@@ -21,7 +21,11 @@ def test_terminal_and_blocked_states() -> None:
     assert SessionInfo("s", "u", "running", "finished").is_terminal
     assert SessionInfo("s", "u", "exit", "usage_limit_exceeded").is_terminal
     assert SessionInfo("s", "u", "error", "error").is_terminal
-    assert SessionInfo("s", "u", "suspended", "").is_blocked
+    idle = SessionInfo("s", "u", "suspended", "inactivity")
+    assert idle.is_blocked and not idle.is_terminal
+    assert SessionInfo(
+        "s", "u", "suspended", "inactivity", structured_output={"ideas": []}
+    ).is_terminal
     assert not SessionInfo("s", "u", "claimed", "").is_terminal
 
 

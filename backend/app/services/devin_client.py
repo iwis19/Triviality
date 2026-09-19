@@ -126,10 +126,13 @@ class SessionInfo:
 
     @property
     def is_terminal(self) -> bool:
-        """Devin idles in `running/waiting_for_user` after delivering; with the deliverable
-        (structured output) present that counts as done rather than blocked."""
+        """Devin idles in `running/waiting_for_user` after delivering and is later suspended
+        for inactivity; with the deliverable (structured output) present either counts as
+        done rather than blocked."""
         if self.status in {"exit", "error"}:
             return True
+        if self.status == "suspended":
+            return self.structured_output is not None
         if self.status != "running":
             return False
         return self.status_detail == "finished" or (
