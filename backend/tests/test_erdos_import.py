@@ -75,7 +75,8 @@ theorem erdos_10 (p : ℕ) (hp : p.Prime) : True := by
 SITE_999 = """
 <div class="problem-text" id="open">
     <div id="content">
-Let $A$ be an infinite set such that $b,c&#62;a$. Is\\[\\sum_{n\\in A}\\frac{1}{n}&#60;\\infty?\\]
+Let $A$ be an infinite set with $a_1&lt;a_2&lt;\\cdots$ such that $b,c&#62;a$.<br><br>
+Is\\[\\sum_{n\\in A}\\frac{1}{n}&#60;\\infty?\\]
     </div>
     <div id="problem_id"><a href="/999">#999</a></div>
 </div>
@@ -84,8 +85,10 @@ Let $A$ be an infinite set such that $b,c&#62;a$. Is\\[\\sum_{n\\in A}\\frac{1}{
 
 def test_site_statement_is_a_fallback_with_its_own_provenance() -> None:
     statement = parse_site_statement(SITE_999)
-    assert statement.startswith("Let $A$ be an infinite set such that $b,c>a$.")
-    assert "\\sum_{n\\in A}\\frac{1}{n}<\\infty?" in statement
+    assert statement.startswith(
+        "Let $A$ be an infinite set with $a_1<a_2<\\cdots$ such that $b,c>a$. Is $\\sum"
+    )
+    assert "\\frac{1}{n}<\\infty?$" in statement
     entries = parse_status_table(TABLE)
     attach_formalizations(entries, {"3": LEAN_3})
     attach_site_statements(entries, {"3": "Canonical page text for #3.", "999": statement})

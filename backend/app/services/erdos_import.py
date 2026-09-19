@@ -24,7 +24,7 @@ from datetime import date
 import httpx
 import yaml
 
-from .atlas_import import TOP_AREA_NAMES, clean_wikitext
+from .atlas_import import TOP_AREA_NAMES
 
 STATUS_TABLE_URL = "https://raw.githubusercontent.com/teorth/erdosproblems/main/data/problems.yaml"
 STATUS_TABLE_PAGE = "https://github.com/teorth/erdosproblems/blob/main/data/problems.yaml"
@@ -158,9 +158,11 @@ def parse_status_table(text: str) -> list[ErdosEntry]:
 
 
 def _plain_math(text: str) -> str:
+    """Light LaTeX cleanup that leaves `<`, `>` and TeX macros intact (they are maths here,
+    not markup)."""
     text = _LATEX_CMD.sub(lambda m: m.group(2), text)
-    text = text.replace("\\[", " ").replace("\\]", " ")
-    return _WS.sub(" ", clean_wikitext(text)).strip()
+    text = text.replace("\\[", " $").replace("\\]", "$ ")
+    return _WS.sub(" ", text).strip(" .;,")
 
 
 def _theorem_rank(name: str, category: str, number: str) -> tuple[int, int, int]:
