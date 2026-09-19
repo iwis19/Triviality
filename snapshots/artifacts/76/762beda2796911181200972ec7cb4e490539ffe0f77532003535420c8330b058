@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+"""Independent re-implementation of the galloping intersection for
+T = {n : base-3 digits <=1, base-5 digits <=2, base-7 digits <=3}
+(Kummer: gcd(C(2n,n),105)=1).  Used to spot-check claims in ideas
+7cec77b2 (counts, clusters) and f040cbd7 (exact count below 3^15).
+"""
+import sys, time, hashlib
+
+BASES = [(3, 1), (5, 2), (7, 3)]  # (p, max digit)
+
+def digits(n, p):
+    d = []
+    while n:
+        d.append(n % p); n //= p
+    return d  # least significant first
+
+def next_good(x, p, dmax):
+    """least y >= x with all base-p digits <= dmax"""
+    d = digits(x, p)
+    # most significant bad digit
+    bad = -1
+    for i in range(len(d) - 1, -1, -1):
+        if d[i] > dmax:
+            bad = i; break
+    if bad < 0:
+        return x
+    # find lowest position j > bad with d[j] < dmax (can be incremented)
+    j = bad + 1
+    while j < len(d) and d[j] >= dmax:
+        j += 1
+    if j == len(d):
+        return p ** len(d)          # new leading digit 1
+    d[j] += 1
+    for i in range(j):
+        d[i] = 0
+    y = 0
+    for i in range(len(d) - 1, -1, -1):
+        y = y * p + d[i]
+    return y
+
+def in_T(n):
+    return all(all(c <= dm for c in digits(n, p)) for p, dm in BASES)
+
+def enumerate_T(limit):
+    out = []
+    x = 0
+    while x < limit:
+        changed = True
+        while changed:
+            changed = False
+            for p, dm in BASES:
+                y = next_good(x, p, dm)
+                if y != x:
+                    x = y; changed = True
+        if x >= limit:
+            break
+        assert in_T(x)
+        out.append(x)
+        x += 1
+    return out
+
+def clusters(T, ratio=1.001):
+    cl = []
+    cur = [T[0]]
+    for a, b in zip(T, T[1:]):
+        if a > 0 and b < a * ratio:
+            cur.append(b)
+        else:
+            cl.append(cur); cur = [b]
+    cl.append(cur)
+    return cl
+
+if __name__ == '__main__':
+    E = int(sys.argv[1]) if len(sys.argv) > 1 else 30
+    t0 = time.time()
+    T = enumerate_T(10 ** E)
+    print(f"|T cap [0,10^{E})| = {len(T)}  (incl. 0)   time {time.time()-t0:.1f}s")
+    for e in range(5, E + 1, 5):
+        c = sum(1 for n in T if 1 <= n < 10 ** e)
+        heur = (10 ** e) ** 0.02595
+        print(f"  A(10^{e}) = {c:6d}   heuristic x^0.02595 = {heur:8.2f}   ratio {c/heur:6.2f}")
+    print("  |T cap [0,3^15)| =", sum(1 for n in T if n < 3 ** 15))
+    h = hashlib.sha256(("\n".join(map(str, T)) + "\n").encode()).hexdigest()
+    print("  sha256 of list:", h)
+    cl = clusters([n for n in T if n >= 1])
+    print(f"  clusters (ratio<1.001) below 10^{E}: {len(cl)}")
+    for e in (10, 20, 30, 40, 50, 60, 70):
+        if e <= E:
+            print(f"    clusters below 10^{e}: {sum(1 for c in cl if c[0] < 10**e)}")
+    open(f'T_1e{E}.txt', 'w').write("\n".join(map(str, T)) + "\n")
+
+# ---- observed output of `python3 isect_check.py 130` ----
+# |T cap [0,10^130)| = 107858  (incl. 0)   time 180.7s
+#   A(10^5) =     12   heuristic x^0.02595 =     1.35   ratio   8.90
+#   A(10^10) =     14   heuristic x^0.02595 =     1.82   ratio   7.70
+#   A(10^15) =     17   heuristic x^0.02595 =     2.45   ratio   6.94
+#   A(10^20) =     61   heuristic x^0.02595 =     3.30   ratio  18.46
+#   A(10^25) =     80   heuristic x^0.02595 =     4.45   ratio  17.96
+#   A(10^30) =    134   heuristic x^0.02595 =     6.00   ratio  22.32
+#   A(10^35) =    175   heuristic x^0.02595 =     8.10   ratio  21.62
+#   A(10^40) =    175   heuristic x^0.02595 =    10.91   ratio  16.03
+#   A(10^45) =    299   heuristic x^0.02595 =    14.71   ratio  20.32
+#   A(10^50) =    357   heuristic x^0.02595 =    19.84   ratio  18.00
+#   A(10^55) =    405   heuristic x^0.02595 =    26.75   ratio  15.14
+#   A(10^60) =    698   heuristic x^0.02595 =    36.06   ratio  19.36
+#   A(10^65) =    698   heuristic x^0.02595 =    48.61   ratio  14.36
+#   A(10^70) =   1373   heuristic x^0.02595 =    65.54   ratio  20.95
+#   A(10^75) =   4772   heuristic x^0.02595 =    88.36   ratio  54.01
+#   A(10^80) =   4833   heuristic x^0.02595 =   119.12   ratio  40.57
+#   A(10^85) =  10000   heuristic x^0.02595 =   160.60   ratio  62.27
+#   A(10^90) =  10214   heuristic x^0.02595 =   216.52   ratio  47.17
+#   A(10^95) =  10214   heuristic x^0.02595 =   291.91   ratio  34.99
+#   A(10^100) =  14273   heuristic x^0.02595 =   393.55   ratio  36.27
+#   A(10^105) =  17041   heuristic x^0.02595 =   530.58   ratio  32.12
+#   A(10^110) =  24130   heuristic x^0.02595 =   715.32   ratio  33.73
+#   A(10^115) =  31207   heuristic x^0.02595 =   964.38   ratio  32.36
+#   A(10^120) =  95860   heuristic x^0.02595 =  1300.17   ratio  73.73
+#   A(10^125) = 103470   heuristic x^0.02595 =  1752.87   ratio  59.03
+#   A(10^130) = 107857   heuristic x^0.02595 =  2363.20   ratio  45.64
+#   |T cap [0,3^15)| = 13
+#   sha256 of list: 86c90ac3e4f7c91a17d13b1b635e35c32893b11f1d8b641963c8ae2be5a89241
+#   clusters (ratio<1.001) below 10^130: 51
+#     clusters below 10^10: 11
+#     clusters below 10^20: 15
+#     clusters below 10^30: 19
+#     clusters below 10^40: 22
+#     clusters below 10^50: 25
+#     clusters below 10^60: 27
+#     clusters below 10^70: 28

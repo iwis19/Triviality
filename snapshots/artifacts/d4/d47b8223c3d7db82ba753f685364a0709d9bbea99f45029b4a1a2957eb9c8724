@@ -1,0 +1,109 @@
+// Further analyses over all union-closed families on [n] (n<=5).
+//  T5 Matching strengthening: exists x such that there is an injection f: F_{not x} -> F_x with A subset f(A).
+//  T6 Down-compression D_y: A with y in A becomes A-y if A-y not in F. Does some y give a union-closed D_y(F) != F?
+//     Families with no such y (and not equal to a power set 2^U) are printed (the "D-stable core").
+//  T7 Equality cases: is (F, union) a Boolean lattice?
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+
+static int n, N;
+
+static int is_uc(uint32_t fam) {
+    int sets[32], k = 0;
+    for (int s = 0; s < N; s++) if ((fam >> s) & 1) sets[k++] = s;
+    for (int i = 0; i < k; i++) for (int j = i + 1; j < k; j++)
+        if (!((fam >> (sets[i] | sets[j])) & 1)) return 0;
+    return 1;
+}
+static void print_fam(uint32_t fam) {
+    printf("{");
+    for (int s = 0; s < N; s++) if ((fam >> s) & 1) {
+        printf("{");
+        for (int x = 0; x < n; x++) if ((s >> x) & 1) printf("%d", x + 1);
+        printf("}");
+    }
+    printf("}");
+}
+// bipartite matching: left = L[0..nl), right = R[0..nr), edge if L[i] subset R[j]
+static int nl, nr, L[32], R[32], matchR[32], vis[32];
+static int aug(int i) {
+    for (int j = 0; j < nr; j++) {
+        if ((L[i] & ~R[j]) != 0 || vis[j]) continue;
+        vis[j] = 1;
+        if (matchR[j] < 0 || aug(matchR[j])) { matchR[j] = i; return 1; }
+    }
+    return 0;
+}
+static int has_saturating_matching(void) {
+    for (int j = 0; j < nr; j++) matchR[j] = -1;
+    for (int i = 0; i < nl; i++) { memset(vis, 0, sizeof(vis)); if (!aug(i)) return 0; }
+    return 1;
+}
+static int is_boolean(int *sets, int k) {
+    // (F, union) Boolean lattice iff |F| = 2^m, and with bottom b = min set, atoms a_1..a_m (minimal sets above b),
+    // every set equals b | (union of a subset of atoms) and the atoms are "independent": all 2^m unions distinct.
+    int m = 0; while ((1 << m) < k) m++; if ((1 << m) != k) return 0;
+    int b = sets[0]; for (int i = 1; i < k; i++) b &= sets[i]; // b = bottom? bottom is the intersection only if it is in F
+    int hasb = 0; for (int i = 0; i < k; i++) if (sets[i] == b) hasb = 1; if (!hasb) return 0;
+    int atoms[32], na = 0;
+    for (int i = 0; i < k; i++) { int A = sets[i]; if (A == b) continue; int minimal = 1;
+        for (int j = 0; j < k; j++) { int B = sets[j]; if (B != b && B != A && (B & ~A) == 0) { minimal = 0; break; } }
+        if (minimal) atoms[na++] = A; }
+    if (na != m) return 0;
+    uint32_t seen = 0; int cnt = 0;
+    for (int mask = 0; mask < (1 << m); mask++) { int u = b; for (int t = 0; t < m; t++) if ((mask >> t) & 1) u |= atoms[t];
+        if (!((seen >> u) & 1)) { seen |= 1u << u; cnt++; } }
+    return cnt == k;
+}
+int main(int argc, char **argv) {
+    n = atoi(argv[1]); N = 1 << n;
+    FILE *f = fopen(argv[2], "rb");
+    uint32_t fam;
+    long total = 0, t5_fail = 0, t5_printed = 0, t6_pairs = 0, t6_uc = 0, t6_nontriv = 0, t6_nontriv_uc = 0;
+    long t6_stable = 0, t6_printed = 0, powersets = 0, eq_cases = 0, eq_nonbool = 0, eqprint = 0;
+    while (fread(&fam, 4, 1, f) == 1) {
+        if (fam == 0 || fam == 1) continue;
+        total++;
+        int sets[32], k = 0;
+        for (int s = 0; s < N; s++) if ((fam >> s) & 1) sets[k++] = s;
+        int cnt[8] = {0};
+        for (int i = 0; i < k; i++) for (int x = 0; x < n; x++) if ((sets[i] >> x) & 1) cnt[x]++;
+        int mx = 0; for (int x = 0; x < n; x++) if (cnt[x] > mx) mx = cnt[x];
+        // T5
+        int ok5 = 0;
+        for (int x = 0; x < n && !ok5; x++) {
+            if (2 * cnt[x] < k) continue;
+            nl = nr = 0;
+            for (int i = 0; i < k; i++) { if ((sets[i] >> x) & 1) R[nr++] = sets[i]; else L[nl++] = sets[i]; }
+            if (has_saturating_matching()) ok5 = 1;
+        }
+        if (!ok5) { t5_fail++; if (t5_printed < 10) { t5_printed++; printf("T5 no x with saturating superset-matching: |F|=%d maxfreq=%d ", k, mx); print_fam(fam); printf("\n"); } }
+        // T6
+        int U = 0; for (int i = 0; i < k; i++) U |= sets[i];
+        if (k == (1 << __builtin_popcount(U))) { powersets++; }
+        else {
+            int good = 0;
+            for (int y = 0; y < n; y++) {
+                if (cnt[y] == 0) continue;
+                t6_pairs++;
+                uint32_t g = 0; int changed = 0;
+                for (int i = 0; i < k; i++) { int A = sets[i];
+                    if (((A >> y) & 1) && !((fam >> (A & ~(1 << y))) & 1)) { g |= 1u << (A & ~(1 << y)); changed = 1; }
+                    else g |= 1u << A; }
+                int uc = is_uc(g); if (uc) t6_uc++;
+                if (changed) { t6_nontriv++; if (uc) { t6_nontriv_uc++; good = 1; } }
+            }
+            if (!good) { t6_stable++; if (t6_printed < 40) { t6_printed++; printf("T6 D-stable non-powerset: |F|=%d maxfreq=%d ", k, mx); print_fam(fam); printf("\n"); } }
+        }
+        // T7
+        if (2 * mx == k) { eq_cases++; if (!is_boolean(sets, k)) { eq_nonbool++; if (eqprint < 20) { eqprint++; printf("T7 equality case, not Boolean: |F|=%d ", k); print_fam(fam); printf("\n"); } } }
+    }
+    printf("n=%d families tested: %ld (power sets of some U: %ld)\n", n, total, powersets);
+    printf("T5 families with no x admitting a saturating superset-matching F_notx -> F_x: %ld\n", t5_fail);
+    printf("T6 (non-powerset) (F,y) pairs: %ld ; D_y(F) union-closed: %ld ; nontrivial: %ld ; nontrivial & UC: %ld ; D-stable non-powerset families: %ld\n",
+           t6_pairs, t6_uc, t6_nontriv, t6_nontriv_uc, t6_stable);
+    printf("T7 equality cases: %ld ; not Boolean lattices: %ld\n", eq_cases, eq_nonbool);
+    return 0;
+}

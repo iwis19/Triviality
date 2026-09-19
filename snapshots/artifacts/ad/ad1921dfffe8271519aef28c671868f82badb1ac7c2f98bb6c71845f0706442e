@@ -1,0 +1,123 @@
+"""
+Experiment C: how much 'height' h can a base admissible pair have?
+
+In the erdosproblems.com/1 sketch the iteration gives, in dimension d=b^s,
+    Delta_s = covol(Gamma_1)^{(b^s-1)/(b-1)} / h_1^s ,
+so the decay exponent is governed by h_1 (height) and covol(Gamma_1) must be 1+O(b/d).
+The sketch's base pair is Gamma_1 = (I + P/2) Z^b (P = cyclic shift), h_1 = 3/2, covol = 1+2^{-b}.
+
+Here we scan Gamma = M Z^b with M = I + c1 P + c2 P^2 (odd b), which has all column sums
+h = 1+c1+c2, covol = |det M| = prod_k |1 + c1 w^k + c2 w^{2k}|, and test admissibility of
+(Lambda, v) = (Gamma ∩ V_b, M e_0):
+   (i)  Gamma ∩ (-1,1)^b = {0}   (implies Lambda ∩ (-1,1)^b = {0}),
+   (ii) for real t: (t v + Lambda) ∩ (-1,1)^b nonempty  =>  |t| < 1.
+Both are decided exactly by depth-first enumeration of the (finitely many) integer z with
+|(Mz)_i| < 1 (banded structure, bounded via |z_i| < (1 + |c1||z_{i-1}| + |c2||z_{i-2}|)).
+Output: for each b, the admissible (c1,c2) with largest h, and the implied Delta_s.
+"""
+import cmath, math, itertools, sys
+
+def det_cyc(b, c1, c2):
+    p = 1.0
+    for k in range(b):
+        w = cmath.exp(2j*math.pi*k/b)
+        p *= abs(1 + c1*w + c2*w*w)
+    return p
+
+def cube_points(b, c1, c2, zmax):
+    """all integer z != 0 with |z_i + c1 z_{i-1} + c2 z_{i-2}| < 1 for all i (cyclic). DFS with pruning
+    on the non-wrapping rows; wrap rows checked at the end."""
+    sols = []
+    def row_ok(zi, zim1, zim2):
+        return abs(zi + c1*zim1 + c2*zim2) < 1 - 1e-12
+    def rec(z):
+        i = len(z)
+        if i == b:
+            if row_ok(z[0], z[b-1], z[b-2]) and row_ok(z[1], z[0], z[b-1]) and any(z):
+                sols.append(tuple(z))
+            return
+        for zi in range(-zmax, zmax+1):
+            if i >= 2 and not row_ok(zi, z[i-1], z[i-2]): continue
+            rec(z + [zi])
+    rec([])
+    return sols
+
+def zbound(c1, c2):
+    # |z_i| < 1 + |c1||z_{i-1}| + |c2||z_{i-2}|  => sup |z| <= 1/(1-|c1|-|c2|) if |c1|+|c2|<1
+    s = abs(c1) + abs(c2)
+    if s >= 1: return None
+    return int(1/(1-s)) + 1
+
+def admissible(b, c1, c2):
+    zm = zbound(c1, c2)
+    if zm is None: return False, "unbounded"
+    if cube_points(b, c1, c2, zm): return False, "cube point"
+    # condition (ii): y = z + t e_0, z in Z^b with sum z = 0; rows i>=2 (not involving y_0 when c2=0
+    # only rows 0,1 involve y_0; with c2 != 0 rows 0,1,2 do). Enumerate integer z_1..z_{b-1}
+    # satisfying the rows that don't involve z_0, then z_0 = -sum, then feasible t-interval.
+    rows_with_0 = {0, 1, 2} if c2 != 0 else {0, 1}
+    bad = []
+    def rec(z):  # z holds z_1..z_{i-1}
+        i = len(z) + 1
+        if i == b:
+            zz = [-sum(z)] + z
+            # feasible t: for rows r in rows_with_0, |(M(zz + t e_0))_r| < 1 ; linear in t
+            lo, hi = -math.inf, math.inf
+            for r in range(b):
+                coef = (1 if r == 0 else 0) + (c1 if (r-1) % b == 0 else 0) + (c2 if (r-2) % b == 0 else 0)
+                val = zz[r] + c1*zz[(r-1) % b] + c2*zz[(r-2) % b]
+                if abs(coef) < 1e-15:
+                    if abs(val) >= 1 - 1e-12: return
+                else:
+                    a, bnd = (-1 - val)/coef, (1 - val)/coef
+                    lo, hi = max(lo, min(a, bnd)), min(hi, max(a, bnd))
+            if lo < hi and (hi > 1 + 1e-9 or lo < -1 - 1e-9):
+                bad.append((zz, lo, hi))
+            return
+        for zi in range(-zm, zm+1):
+            # row i uses z_i, z_{i-1}, z_{i-2}; only check when indices >= 1 (don't involve z_0)
+            if i >= 3 and abs(zi + c1*z[-1] + c2*z[-2]) >= 1 - 1e-12: continue
+            if c2 == 0 and i >= 2 and abs(zi + c1*z[-1]) >= 1 - 1e-12: continue
+            rec(z + [zi])
+            if bad: return
+    rec([])
+    if bad: return False, f"t-condition fails, e.g. z={bad[0][0]}, t in ({bad[0][1]:.3f},{bad[0][2]:.3f})"
+    return True, "ok"
+
+def delta_s(b, h, cov, s):
+    return cov**((b**s - 1)/(b - 1)) / h**s
+
+if __name__ == "__main__":
+    bs = [3, 5, 7] if len(sys.argv) < 2 else [int(x) for x in sys.argv[1:]]
+    for b in bs:
+        print(f"\n=== b={b}")
+        # one-parameter family M = I + c P
+        best1 = None
+        for k in range(1, 100):
+            c = k/100
+            ok, why = admissible(b, c, 0.0)
+            if ok: best1 = c
+            else:
+                print(f"  I+cP: largest admissible c on grid = {best1}; first failure c={c}: {why}")
+                break
+        if best1 is not None:
+            h, cov = 1 + best1, det_cyc(b, best1, 0)
+            print(f"  I+cP best: c={best1}, h={h:.3f}, covol={cov:.6f}, covol/h={cov/h:.4f}")
+        # sketch's pair for reference
+        print(f"  reference c=1/2: admissible={admissible(b, 0.5, 0.0)}, h=1.5, covol={1+2**-b:.6f}")
+        # two-parameter family
+        best2 = None
+        for k1 in range(0, 100, 2):
+            for k2 in range(0, 100, 2):
+                c1, c2 = k1/100, k2/100
+                if c1 + c2 >= 1: continue
+                ok, _ = admissible(b, c1, c2)
+                if ok:
+                    h = 1 + c1 + c2
+                    cov = det_cyc(b, c1, c2)
+                    if best2 is None or h > best2[0]: best2 = (h, c1, c2, cov)
+        if best2:
+            h, c1, c2, cov = best2
+            print(f"  I+c1P+c2P^2 best height: c1={c1}, c2={c2}, h={h:.3f}, covol={cov:.6f}, covol/h={cov/h:.4f}")
+            for s in [2, 3, 4]:
+                print(f"     Delta_s (s={s}, d={b**s}) = {delta_s(b, h, cov, s):.4f}   vs sketch pair {delta_s(b, 1.5, 1+2**-b, s):.4f}")

@@ -1,0 +1,38 @@
+"""Check for idea ae3f4437 (HL/Cramer model for CPAP-k): how much does the
+'mean-field' factor exp(-E_c[Lambda_c]) underestimate the class-averaged factor
+E_c[exp(-Lambda_c)] (Jensen), where c runs over the admissible residue classes
+of the first term mod P# and Lambda_c = q0 * N_c, N_c = number of intermediate
+window positions coprime to P#?  Assumptions: Cramer independence for primes
+> P; q0 = prod_{p<=P}(1-1/p)^{-1} / ln t (Mertens-free exact product).
+"""
+import math, numpy as np
+from sympy import primerange
+rng = np.random.default_rng(1)
+
+def run(k, d, P, log10t, samples=200000):
+    W = (k - 1) * d
+    pos = np.array([i for i in range(1, W) if i % d])
+    primes = list(primerange(2, P + 1))
+    N = np.zeros(samples, dtype=np.int32)
+    alive = np.ones((samples, len(pos)), dtype=bool)
+    for p in primes:
+        forb = {(-j * d) % p for j in range(k)}
+        allowed = np.array([r for r in range(p) if r not in forb])
+        c = allowed[rng.integers(0, len(allowed), samples)]
+        alive &= ((c[:, None] + pos[None, :]) % p) != 0
+    N = alive.sum(axis=1)
+    lnt = log10t * math.log(10)
+    q0 = 1.0 / (math.prod(1 - 1 / p for p in primes) * lnt)
+    lam = q0 * N
+    mean_field = math.exp(-lam.mean())
+    avg = np.exp(-lam).mean()
+    print("k=%d d=%d P=%d log10 t=%.1f: E[N_c]=%.1f sd=%.1f q0=%.4f  E[Lambda]=%.2f"
+          " exp(-E Lambda)=%.3e  E[exp(-Lambda)]=%.3e  ratio=%.2f  min N_c=%d"
+          % (k, d, P, log10t, N.mean(), N.std(), q0, lam.mean(), mean_field, avg, avg / mean_field, N.min()))
+
+run(5, 30, 60, 7.0)
+run(6, 30, 60, 8.5)
+run(7, 210, 200, 20.0, 100000)
+run(10, 210, 200, 26.7, 100000)
+run(10, 210, 400, 26.7, 50000)
+run(11, 2310, 400, 76.2, 5000)

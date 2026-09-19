@@ -1,0 +1,70 @@
+"""Random search for union-closed families on [n] (n=6..8) with max frequency exactly |F|/2,
+and test whether (F, union) is a Boolean lattice.  Also record the minimum of 2*maxcnt-|F| over
+non-Boolean families found.  Families are generated as union-closures of random generator sets."""
+import random, sys
+from itertools import combinations
+
+def closure(gens):
+    F = set(gens)
+    frontier = list(F)
+    while frontier:
+        new = []
+        for a in frontier:
+            for b in list(F):
+                u = a | b
+                if u not in F:
+                    F.add(u); new.append(u)
+        frontier = new
+    return F
+
+def is_boolean(F):
+    k = len(F)
+    if k & (k - 1): return False
+    m = k.bit_length() - 1
+    b = 0
+    for A in F: b = b & A if b or True else A
+    b = None
+    for A in F: b = A if b is None else (b & A)
+    if b not in F: return False
+    atoms = [A for A in F if A != b and not any(B != b and B != A and (B & ~A) == 0 for B in F)]
+    if len(atoms) != m: return False
+    seen = set()
+    for mask in range(1 << m):
+        u = b
+        for t in range(m):
+            if mask >> t & 1: u |= atoms[t]
+        seen.add(u)
+    return len(seen) == k
+
+def stats(F, n):
+    cnt = [0] * n
+    for A in F:
+        for x in range(n):
+            if A >> x & 1: cnt[x] += 1
+    return max(cnt)
+
+random.seed(int(sys.argv[2]) if len(sys.argv) > 2 else 1)
+n = int(sys.argv[1]); trials = int(sys.argv[3]) if len(sys.argv) > 3 else 200000
+eq = 0; eq_nonbool = 0; min_gap = None; min_gap_ex = None; sizes = {}
+for t in range(trials):
+    g = random.randint(2, 7)
+    gens = [random.getrandbits(n) for _ in range(g)]
+    if random.random() < 0.5: gens.append(0)
+    F = closure(gens)
+    if len(F) <= 1: continue
+    mx = stats(F, n); k = len(F)
+    gap = 2 * mx - k
+    if gap < 0:
+        print("FRANKL COUNTEREXAMPLE?", sorted(F)); sys.exit(1)
+    if gap == 0:
+        eq += 1
+        if not is_boolean(F):
+            eq_nonbool += 1
+            print("equality, non-Boolean:", k, [bin(A) for A in sorted(F)])
+    else:
+        if not is_boolean(F) and (min_gap is None or gap < min_gap):
+            min_gap = gap; min_gap_ex = sorted(F)
+        sizes[k] = sizes.get(k, 0) + 1
+print(f"n={n} trials={trials} equality cases={eq} non-Boolean equality cases={eq_nonbool}")
+print(f"min (2*maxcnt-|F|) over non-Boolean families: {min_gap}, example size {len(min_gap_ex) if min_gap_ex else None}: {[format(A, 'b').zfill(n)[::-1] for A in min_gap_ex] if min_gap_ex else None}")
+print("family sizes seen (top):", sorted(sizes.items())[:5], "...", max(sizes))

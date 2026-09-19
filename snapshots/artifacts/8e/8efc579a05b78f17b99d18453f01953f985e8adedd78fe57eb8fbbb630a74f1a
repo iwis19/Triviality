@@ -1,0 +1,45 @@
+"""Compare the idea's PP (weight 1/k) with a Granville-type correction (weight 1 per ordered pair (p,q^2))."""
+import numpy as np, math
+d = np.load("/home/ubuntu/pp_data.npz")
+Ns, R, HL, PP = d["Ns"], d["R"], d["HL"], d["PP"]
+X = int(Ns.max())
+s = np.ones(X + 1, dtype=bool); s[:2] = False
+for i in range(2, int(X**0.5) + 1):
+    if s[i]: s[i*i::i] = False
+primes = np.nonzero(s)[0]
+cnt2 = np.zeros(X + 1)   # #{q prime: q^2 < N, N - q^2 prime}
+for q in primes:
+    if q * q >= X: break
+    Nr = np.arange(q * q + 2, X + 1)
+    cnt2[Nr] += s[Nr - q * q]
+G = 2 * cnt2[Ns]         # Granville-type: ordered pairs (p,q^2),(q^2,p) with weight 1
+res0 = R - HL
+n = len(Ns)
+print("mean(R-HL)            =", res0.mean(), "±", res0.std(ddof=1) / math.sqrt(n))
+print("mean(PP) [weight 1/k] =", PP.mean(), "  ratio mean(R-HL)/mean(-PP) =", res0.mean() / -PP.mean())
+print("mean(2*cnt2) [Granville weight 1] =", G.mean(), "  ratio mean(R-HL)/mean(-2cnt2) =", res0.mean() / -G.mean())
+for name, C in (("PP", PP), ("2cnt2", G)):
+    r = res0 + C
+    print(f"  residual R-HL+{name}: mean={r.mean():+.3f} ± {r.std(ddof=1)/math.sqrt(n):.3f}; OLS slope of (R-HL) on -{name} through origin = {np.dot(res0, -C)/np.dot(C, C):.4f}")
+# Granville's asymptotic I*(2N) = I(2N)(1 - 4/sqrt(2N) prod_{l>=3}(1-(2N/l)/(l-2))) with his 2N = our N
+P = 3000
+smallp = [int(p) for p in primes[(primes >= 3) & (primes <= P)]]
+def leg(a, p):
+    a %= p
+    if a == 0: return 0
+    return 1 if pow(a, (p - 1) // 2, p) == 1 else -1
+sub = np.arange(0, n, 50)
+fac = np.array([np.prod([1 - leg(int(N), p) / (p - 2) for p in smallp]) for N in Ns[sub]])
+Istar_corr = HL[sub] * 4.0 / np.sqrt(Ns[sub]) * fac
+print("Granville I* correction I - I*: mean =", Istar_corr.mean(), " vs exact 2cnt2 mean (same subsample) =", G[sub].mean(), " vs PP mean =", PP[sub].mean())
+print("ratio mean(R-HL)/mean(-(I-I*)) on subsample =", res0[sub].mean() / -Istar_corr.mean())
+
+
+# ---- output ----
+mean(R-HL)            = -24.062605816005753 ± 0.09018364483757785
+mean(PP) [weight 1/k] = 23.440328126918033   ratio mean(R-HL)/mean(-PP) = 1.0265473113566665
+mean(2*cnt2) [Granville weight 1] = 39.91820907064651   ratio mean(R-HL)/mean(-2cnt2) = 0.6027977300639965
+  residual R-HL+PP: mean=-0.622 ± 0.085; OLS slope of (R-HL) on -PP through origin = 1.0279
+  residual R-HL+2cnt2: mean=+15.856 ± 0.089; OLS slope of (R-HL) on -2cnt2 through origin = 0.5709
+Granville I* correction I - I*: mean = 48.83725619502681  vs exact 2cnt2 mean (same subsample) = 49.63759582268637  vs PP mean = 28.715194199201527
+ratio mean(R-HL)/mean(-(I-I*)) on subsample = 0.6189054482888674

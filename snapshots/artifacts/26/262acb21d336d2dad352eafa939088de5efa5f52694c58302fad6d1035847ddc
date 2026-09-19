@@ -1,0 +1,168 @@
+=== covering.py ===
+"""Greedy Erdos-Rankin style covering for the CPAP-k search template.
+
+Goal: find a modulus M = prod of primes <= P and residue c such that in the window
+W = [0, (k-1)d] the only integers x with gcd(c+x, M) = 1 are the AP positions x = j*d.
+Equivalently: choose, for each prime p <= P, a residue class a_p (the class of -c mod p)
+that must avoid all AP positions j*d mod p, and kill every x in W with x = a_p mod p.
+
+We report r(P) = number of non-AP positions still unkilled after using all primes <= P,
+for k=10 (d=210, the Dubner et al. 1998 setting) and k=11 (d=2310, the open CPAP-11 case).
+r(P)=0 gives the 'Lemma A' pattern: k consecutive P-rough numbers in AP.
+
+Greedy rule: for each prime in increasing order pick the admissible class killing the most
+still-alive positions (ties -> smallest class).  This is a heuristic, not optimal.
+"""
+import sys
+from sympy import primerange, primorial
+
+def greedy_cover(k, d, P, verbose=False):
+    L = (k - 1) * d
+    ap = set(j * d for j in range(k))
+    alive = [x not in ap for x in range(L + 1)]
+    nalive = sum(alive)
+    hist = []
+    for p in primerange(2, P + 1):
+        forbidden = set((j * d) % p for j in range(k))
+        best, besta = -1, None
+        for a in range(p):
+            if a in forbidden:
+                continue
+            cnt = sum(1 for x in range(a, L + 1, p) if alive[x])
+            if cnt > best:
+                best, besta = cnt, a
+        if besta is None:
+            # every class mod p meets the AP: p<=k and p does not divide d -> template inadmissible
+            raise ValueError(f"no admissible class mod {p}")
+        for x in range(besta, L + 1, p):
+            alive[x] = False
+        nalive = sum(alive)
+        hist.append((p, nalive))
+        if verbose:
+            print(p, besta, nalive)
+        if nalive == 0:
+            break
+    return hist, [x for x in range(L + 1) if alive[x]]
+
+if __name__ == "__main__":
+    for k, d, P in [(3, 6, 50), (4, 6, 200), (5, 30, 400), (6, 30, 600), (10, 210, 3000), (11, 2310, 12000)]:
+        hist, left = greedy_cover(k, d, P)
+        Pfin = hist[-1][0]
+        print(f"k={k} d={d}: window length {(k-1)*d}, positions to kill {(k-1)*(d-1)}")
+        marks = [10, 50, 100, 200, 500, 1000, 2000, 3000, 5000, 8000, 12000]
+        shown = []
+        for p, n in hist:
+            if p >= (marks[0] if marks else 10**9):
+                shown.append((p, n))
+                while marks and p >= marks[0]:
+                    marks.pop(0)
+        print("   (largest prime used, positions still uncovered):", shown)
+        if not left:
+            import math
+            print(f"   fully covered with primes <= {Pfin}; log10(M) ~ {sum(math.log10(q) for q in primerange(2, Pfin+1)):.1f}")
+        else:
+            print(f"   NOT fully covered with primes <= {Pfin}; {len(left)} positions remain")
+
+=== cpap11_cost.py ===
+"""Heuristic cost model for a Dubner-Forbes-Lygeros-Mizony-Nelson-Zimmermann style CPAP-k search,
+using the greedy covering from covering.py.
+
+Model (all heuristic, Cramer/Mertens level):
+  * candidates N = M n + c with M = P#, log N ~ theta(P) = sum_{p<=P} log p  (N of the size of M);
+  * AP members sieved by primes <= S, so each is prime with prob ~ e^gamma log S / log N;
+  * each of the r(P) uncovered in-between positions is P-rough, so prime with prob
+    ~ e^gamma log P / log N; all must be composite;
+  * expected number of PRP tests  T(P) = (log N/(e^gamma log S))^k * exp(r(P) e^gamma log P / log N);
+  * one Fermat/PRP test on a D-digit number costs ~ 0.3 ms * (D/300)^2 (GMP-ish scaling).
+Outputs the P minimising CPU-time, for k=10 (calibration) and k=11.
+"""
+import math
+from sympy import primerange
+from covering import greedy_cover
+
+EG = math.exp(0.5772156649)
+
+def analyse(k, d, Pmax, S=1e10):
+    hist, _ = greedy_cover(k, d, Pmax)
+    theta = 0.0
+    rows = []
+    r_prev = (k - 1) * (d - 1)
+    hp = dict(hist)
+    for p in primerange(2, Pmax + 1):
+        theta += math.log(p)
+        r = hp.get(p, r_prev); r_prev = r
+        if theta < 5 * k:  # tiny N: model meaningless
+            continue
+        logN = theta
+        tests = (logN / (EG * math.log(S))) ** k * math.exp(r * EG * math.log(p) / logN)
+        digits = logN / math.log(10)
+        secs = tests * 3e-4 * (digits / 300) ** 2
+        rows.append((p, r, digits, tests, secs))
+    best = min(rows, key=lambda t: t[4])
+    print(f"k={k}, d={d}, sieve depth S={S:.0e}")
+    for p, r, dg, tests, secs in rows:
+        if p in (101, 211, 401, 613, 1009, 1511, 2003, 3001, 4001, 4987) or p == best[0]:
+            print(f"  P={p:5d} uncovered r={r:5d} digits~{dg:6.0f} PRP tests~{tests:9.2e} CPU-years~{secs/3.15e7:9.2e}")
+    print(f"  optimum: P={best[0]}, r={best[1]}, ~{best[2]:.0f} digits, ~{best[3]:.2e} PRP tests, ~{best[4]/3.15e7:.2e} CPU-years")
+
+if __name__ == "__main__":
+    analyse(10, 210, 700)
+    analyse(11, 2310, 5000)
+
+=== covering_localsearch.py ===
+"""Local-search improvement of the greedy CPAP template covering (see covering.py).
+
+State: one residue class a_p per prime p<=P (avoiding AP positions). Objective: minimise
+r = number of non-AP positions in [0,(k-1)d] not hit by any class.  Move: re-optimise a
+single prime's class given all others (coordinate descent), sweeping primes repeatedly.
+Reports r(P) after greedy and after local search for several P, k=10 and k=11.
+"""
+import numpy as np, math, sys
+from sympy import primerange
+
+def run(k, d, P, sweeps=40, seed=0):
+    L = (k - 1) * d
+    ap = np.zeros(L + 1, dtype=bool); ap[::d] = True
+    primes = list(primerange(2, P + 1))
+    cover = np.zeros(L + 1, dtype=np.int32)  # number of classes hitting each position
+    cls = {}
+    def forb(p): return set((j * d) % p for j in range(k))
+    # greedy init
+    for p in primes:
+        f = forb(p); best, ba = -1, None
+        for a in range(p):
+            if a in f: continue
+            cnt = int(np.count_nonzero(cover[a::p] == 0)) - int(np.count_nonzero(ap[a::p]))
+            if cnt > best: best, ba = cnt, a
+        cls[p] = ba; cover[ba::p] += 1
+    def r(): return int(np.count_nonzero((cover == 0) & ~ap))
+    r0 = r()
+    rng = np.random.default_rng(seed)
+    for s in range(sweeps):
+        improved = False
+        order = primes[:]; rng.shuffle(order)
+        for p in order:
+            a0 = cls[p]; cover[a0::p] -= 1
+            f = forb(p); best, ba = -1, None
+            for a in range(p):
+                if a in f: continue
+                cnt = int(np.count_nonzero(cover[a::p] == 0)) - int(np.count_nonzero(ap[a::p]))
+                if cnt > best or (cnt == best and a == a0): best, ba = cnt, a
+            cls[p] = ba; cover[ba::p] += 1
+            if ba != a0: improved = True
+        if not improved: break
+    return r0, r(), s + 1
+
+if __name__ == "__main__":
+    for k, d, Ps in [(10, 210, [101, 157, 211, 307, 401]), (11, 2310, [211, 401, 613, 1009, 1511, 2003])]:
+        print(f"k={k} d={d}")
+        for P in Ps:
+            r0, r1, sw = run(k, d, P)
+            avg = (k - 1) * d * math.prod(1 - 1 / p for p in primerange(2, P + 1))
+            print(f"  P={P:5d}: greedy r={r0:5d}  local-search r={r1:5d} ({sw} sweeps)   random-class expectation ~{avg:7.0f}")
+
+=== OUTPUT (cpap11_cost.py) ===
+k=10, d=210, S=1e10: P=101 r=172 digits~38 tests~1.9e10; P=157 r=133 digits~62 tests~1.1e9 (optimum, ~4.6e-4 CPU-yr); P=211 r=104 digits~84 tests~9.3e8; P=401 r=39 digits~164 tests~1.3e10; P=613 r=0 digits~253 tests~3.3e11
+k=11, d=2310, S=1e10: P=211 r=2169 tests~5e53; P=613 r=1521 tests~4.4e25; P=1009 r=1203 tests~5.8e21 (1.1e11 CPU-yr); P=1627 r=849 digits~696 tests~3.5e20 (1.8e10 CPU-yr, optimum); P=2003 r=705 tests~3.7e20; P=3001 r=379 tests~1.6e21; P=4987 r=0 digits~2126 tests~7e22
+=== OUTPUT (covering_localsearch.py) ===
+k=11: P=211 greedy 2169 -> 2168 (random-class expectation ~2389); P=1009 1203 -> 1199 (~1868); P=1511 915 -> 906 (~1764); P=2003 705 -> 704 (~1701)

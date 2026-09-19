@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+"""Experiment 1: brute-force solutions and statistics of r(n) = #{k>=1 : 2^k < n, n-2^k prime}.
+
+Outputs, per dyadic block (2^K, 2^{K+1}], the max of r(n), the argmax, and the
+number of 'near-solutions' (r(n) >= K-1, i.e. at most one failure).
+Also lists all solutions n <= LIMIT (expected: 4,7,15,21,45,75,105).
+"""
+import numpy as np, sys, math
+
+LIMIT = 1 << int(sys.argv[1]) if len(sys.argv) > 1 else 1 << 26
+
+# prime sieve
+is_prime = np.ones(LIMIT + 1, dtype=bool)
+is_prime[:2] = False
+for p in range(2, int(LIMIT ** 0.5) + 1):
+    if is_prime[p]:
+        is_prime[p * p::p] = False
+
+# r[n] = number of k>=1 with 2^k < n and n-2^k prime
+r = np.zeros(LIMIT + 1, dtype=np.uint8)
+k = 1
+while (1 << k) < LIMIT:
+    s = 1 << k
+    # n ranges over s+1 .. LIMIT ; n-2^k ranges 1 .. LIMIT-s
+    r[s + 1:] += is_prime[1:LIMIT + 1 - s]
+    k += 1
+
+# for n in (2^K, 2^{K+1}] the number of k>=1 with 2^k < n is K; solutions have r(n) == K
+sol = []
+for KK in range(1, int(math.log2(LIMIT))):
+    lo, hi = (1 << KK) + 1, min(1 << (KK + 1), LIMIT)
+    idx = np.nonzero(r[lo:hi + 1] == KK)[0]
+    sol += (lo + idx).tolist()
+print("solutions <= 2^%d:" % int(math.log2(LIMIT)), sol)
+
+print("K  maxr  argmax  maxr/K  #near(r>=K-1) #r>=K-2  #n")
+for KK in range(2, int(math.log2(LIMIT))):
+    lo, hi = (1 << KK) + 1, min(1 << (KK + 1), LIMIT)
+    blk = r[lo:hi + 1].astype(int)
+    m = blk.max(); am = lo + int(blk.argmax())
+    near = int((blk >= KK - 1).sum()); near2 = int((blk >= KK - 2).sum())
+    print(f"{KK:2d} {m:4d} {am:10d} {m/KK:6.3f} {near:8d} {near2:8d} {hi-lo+1}")

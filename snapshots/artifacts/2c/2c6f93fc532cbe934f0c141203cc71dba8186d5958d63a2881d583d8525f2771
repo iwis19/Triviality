@@ -1,0 +1,106 @@
+# |S|=1273210  sqrt|S|=1128.4  N~6.735e+17  log_7 N=21.10
+j  Q=7^j    j/log7N  max|S^(a)|/sqrt|S|  RMS_{a!=0}/sqrt|S|  cyl_count  main=(4/7)^j|S|  err/main   Linf_bound/main  L2_bound/main  abs_sum/main  argmax_a(base7)
+ 1          7   0.047         1.217         0.953     727059      727548.6    -0.0007       0.00194       0.00179       0.00156  3
+ 2         49   0.095         1.567         0.970     414869      415742.0    -0.0021       0.00933       0.00855       0.00565  44
+ 3        343   0.142         2.833         1.039     237300      237566.9    -0.0011        0.0509        0.0356        0.0186  036
+ 4       2401   0.190         3.519         1.022     135615      135752.5    -0.0010          0.18         0.128        0.0534  0161
+ 5      16807   0.237         7.331         0.996      77765       77572.9    +0.0025          1.04         0.449         0.143  00413
+ 6     117649   0.284         8.454         0.997      44809       44327.3    +0.0109          3.32           1.6         0.409  000024
+ 7     823543   0.332         8.901         0.999      25390       25329.9    +0.0024          9.65          5.64          1.13  0000225
+ 8    5764801   0.379        13.241         1.000      14620       14474.2    +0.0101          39.6          19.8          3.15  00001032
+ 9   40353607   0.427        30.312         1.000       8448        8271.0    +0.0214           250          69.6           8.7  000000004
+
+
+# source: fourier35.py
+#!/usr/bin/env python3
+"""Fourier coefficients of S = S3∩S5∩[0,N) at 7-adic frequencies a/7^j, and the
+base-7 cylinder count, for j = 1..jmax.  Compares the actual error in the cylinder
+count with the absolute-value (L^inf and L^2/Parseval) bookkeeping bounds.
+Usage: python3 fourier35.py S.bin jmax
+"""
+import sys
+import numpy as np
+
+S = np.fromfile(sys.argv[1], dtype=np.uint64)
+jmax = int(sys.argv[2])
+n = len(S)
+N = float(S.max()) + 1
+print(f"# |S|={n}  sqrt|S|={n**0.5:.1f}  N~{N:.3e}  log_7 N={np.log(N)/np.log(7):.2f}")
+print("j  Q=7^j    j/log7N  max|S^(a)|/sqrt|S|  RMS_{a!=0}/sqrt|S|  cyl_count  main=(4/7)^j|S|  err/main   Linf_bound/main  L2_bound/main  abs_sum/main  argmax_a(base7)")
+
+
+def base7(a, j):
+    s = ''
+    for _ in range(j):
+        s = str(a % 7) + s
+        a //= 7
+    return s
+
+
+for j in range(1, jmax + 1):
+    Q = 7 ** j
+    res = (S % np.uint64(Q)).astype(np.int64)
+    c = np.bincount(res, minlength=Q).astype(np.float64)
+    F = np.fft.fft(c)            # S^(a) = sum_r c_r e(-ar/Q)
+    absF = np.abs(F)
+    absF0 = absF.copy(); absF0[0] = 0
+    amax = int(np.argmax(absF0))
+    mx = absF0[amax]
+    rms = np.sqrt((absF0 ** 2).sum() / (Q - 1))
+    # cylinder indicator: all j base-7 digits <= 3
+    ok = np.ones(Q, dtype=bool)
+    r = np.arange(Q, dtype=np.int64)
+    for _ in range(j):
+        ok &= (r % 7) <= 3
+        r //= 7
+    cyl = c[ok].sum()
+    main = (4 / 7) ** j * n
+    err = cyl - main
+    Cf = np.fft.fft(ok.astype(np.float64))
+    absC = np.abs(Cf); absC[0] = 0
+    linf = mx * absC.sum() / Q
+    l2 = np.sqrt((absF0 ** 2).sum() * (absC ** 2).sum()) / Q
+    abssum = (absF0 * absC).sum() / Q
+    print(f"{j:2d} {Q:10d} {j*np.log(7)/np.log(N):7.3f}  {mx/n**0.5:12.3f}  {rms/n**0.5:12.3f}  {int(cyl):9d}  {main:12.1f}  {err/main:+9.4f}  {linf/main:12.3g}  {l2/main:12.3g}  {abssum/main:12.3g}  {base7(amax, j)}")
+    sys.stdout.flush()
+    del F, absF, absF0, Cf, absC, c, ok, r, res
+
+
+# source: isect2.c (generates S35_1e18.bin)
+// Galloping enumeration of S3 ∩ S5 ∩ [0,X) with 64-bit integers (X <= ~9e18).
+// Writes uint64 little-endian binary to argv[2].  Usage: ./isect2 X outfile
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+typedef unsigned long long u64;
+
+static u64 next_p(u64 x, u64 p, u64 maxd) {
+    for (;;) {
+        // find the most significant bad digit
+        u64 y = x, pw = 1, badpw = 0; int found = 0;
+        while (y) { u64 d = y % p; if (d > maxd) { badpw = pw; found = 1; } y /= p; if (y) pw *= p; }
+        if (!found) return x;
+        u64 pp = badpw * p;            // zero digits <= pos, add p^(pos+1)
+        x = (x / pp + 1) * pp;
+    }
+}
+
+int main(int argc, char **argv) {
+    u64 X = strtoull(argv[1], 0, 10);
+    FILE *f = fopen(argv[2], "wb");
+    u64 x = 0, cnt = 0, steps = 0;
+    while (x < X) {
+        int moved = 1;
+        while (moved) {
+            moved = 0;
+            u64 y = next_p(x, 3, 1); steps++; if (y != x) { x = y; moved = 1; }
+            y = next_p(x, 5, 2); steps++; if (y != x) { x = y; moved = 1; }
+        }
+        if (x >= X) break;
+        fwrite(&x, 8, 1, f); cnt++;
+        x++;
+    }
+    fclose(f);
+    fprintf(stderr, "count=%llu steps=%llu\n", cnt, steps);
+    return 0;
+}

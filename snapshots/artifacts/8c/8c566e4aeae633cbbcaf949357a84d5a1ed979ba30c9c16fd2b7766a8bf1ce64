@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Test the hypothesis on V(a,d) = {d, a, a+d, a+2d}:
+ (H-even) if 8 | d, a == 3 (mod 4), gcd(a,d)=1  then ML = 1/4 - 1/(2(2a+3d)) = s/(4s+2), s=(2a+3d-2)/4.
+ (H-odd)  if d == 3 (mod 4), a == -d (mod 8), gcd(a,d)=1, 3a < d  then ML = 1/4 - 1/(2(a+3d)), s=(a+3d-2)/4.
+ (H-only) these are the only members of the family with ML = s/(4s+2) (k=2).
+Sweep a<=A, d<=Dmax; report violations."""
+import math, sys
+from fractions import Fraction
+sys.path.insert(0, "/home/ubuntu/lrc")
+from lrc_enum import ml_exact
+
+A, Dmax = int(sys.argv[1]), int(sys.argv[2])
+viol = []; n_even = n_odd = n_k2 = 0; other_k = {}
+for d in range(1, Dmax + 1):
+    for a in range(1, A + 1):
+        V = sorted({d, a, a + d, a + 2 * d})
+        if len(V) != 4 or math.gcd(*V) != 1:
+            continue
+        ml, _ = ml_exact(V)
+        pred = None
+        if d % 8 == 0 and a % 4 == 3 and math.gcd(a, d) == 1:
+            pred = Fraction(1, 4) - Fraction(1, 2 * (2 * a + 3 * d)); n_even += 1
+        elif d % 4 == 3 and (a + d) % 8 == 0 and math.gcd(a, d) == 1 and 3 * a < d:
+            pred = Fraction(1, 4) - Fraction(1, 2 * (a + 3 * d)); n_odd += 1
+        k = ml.denominator - 4 * ml.numerator if ml < Fraction(1, 4) else None
+        if k == 2:
+            n_k2 += 1
+        if pred is not None and ml != pred:
+            viol.append(("formula", a, d, str(ml), str(pred)))
+        if pred is None and k == 2:
+            viol.append(("unexpected k=2", a, d, str(ml)))
+        if k is not None and k not in (1, 2):
+            other_k[(a, d)] = str(ml)
+print(f"sweep a<={A}, d<={Dmax}: predicted-even={n_even}, predicted-odd={n_odd}, observed k=2 members={n_k2}")
+print("violations:", viol)
+print("members with k not in {1,2}:", other_k)
+
+
+# ---- w_family.py ----
+import math, sys
+from fractions import Fraction
+from collections import defaultdict
+sys.path.insert(0, "/home/ubuntu/lrc")
+from lrc_enum import ml_exact
+A, Dmax = int(sys.argv[1]), int(sys.argv[2])
+hits = defaultdict(list)
+for d in range(1, Dmax + 1):
+    for a in range(1, A + 1):
+        V = sorted({d, a, a + d, a + 2 * d, a + 3 * d, 2 * a + 3 * d})
+        if len(V) != 6 or math.gcd(*V) != 1: continue
+        ml, _ = ml_exact(V)
+        if ml < Fraction(1, 6):
+            k = ml.denominator - 6 * ml.numerator
+            if k != 1: hits[(d, k)].append((a, str(ml), ml == Fraction(1,6) - Fraction(1, 2*(V[-1]+V[-2])), ml == Fraction(1,6) - Fraction(1, 2*(V[-1]+V[-3]))))
+print("family W(a,d)={d,a,a+d,a+2d,a+3d,2a+3d}, a<=%d d<=%d: near-tight members with k!=1, (d,k): a-values (ML, ML==1/6-1/(2(v5+v6)), ML==1/6-1/(2(v4+v6)))" % (A, Dmax))
+for key in sorted(hits): print(" ", key, hits[key])

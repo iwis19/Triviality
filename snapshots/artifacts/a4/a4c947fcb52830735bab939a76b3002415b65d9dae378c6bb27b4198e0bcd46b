@@ -1,0 +1,40 @@
+"""Experiment A4: scale the lattice by Q+2 instead of Q before the +-1 perturbation, so the boundary
+lattice points (coordinate exactly 1 in Lambda_1, e.g. T(e_i - e_{i+1}) = e_i - e_{i+1}/2 - e_{i+2}/2)
+stay outside (-Q,Q)^d after perturbation.  Expected ratio ~ Delta * ((Q+2)/Q)^(d-1)."""
+import random
+from fractions import Fraction as Fr
+from expA2_numpy import injective_Q, base_pair, iterate_pair, normal_vector, content, brute_dissociated
+
+def run(name, Lam, d, Q, Delta, trials, seed, margin=2):
+    rnd = random.Random(seed)
+    S = Q + margin
+    B = [[int(c*S) for c in g] for g in Lam]
+    assert all((c*S).denominator == 1 for g in Lam for c in g)
+    best = None; hits = 0
+    for t in range(trials):
+        Bp = [[x + rnd.choice([-1, 0, 0, 1]) for x in row] for row in B]
+        u = normal_vector(Bp)
+        if content(u) != 1: continue
+        if sum(u) < 0: u = [-x for x in u]
+        if any(x <= 0 for x in u): continue
+        if not injective_Q(u, Q): continue
+        hits += 1
+        ratio = max(u) / Q**(d-1)
+        if best is None or ratio < best[0]: best = (ratio, u)
+    pred = float(Delta) * (S/Q)**(d-1)
+    print(f"\n== {name}: d={d}, Q={Q}, scale {S}, Delta={float(Delta):.4f}, Delta*(S/Q)^(d-1)={pred:.4f}; trials={trials}, Q-dissociated hits={hits}")
+    if best:
+        ratio, u = best
+        l = Q.bit_length()-1; A = sorted(2**j*ui for j in range(l) for ui in u)
+        print(f"   best u={u}  max A/2^(n-1) = {ratio:.4f}  (n={len(A)})")
+        if len(A) <= 22: print("   brute-force distinct subset sums:", brute_dissociated(A))
+
+if __name__ == "__main__":
+    L3, v3 = base_pair(3); L5, v5 = base_pair(5); L7, v7 = base_pair(7)
+    D = lambda b: Fr(1+Fr(1, 2**b), Fr(3,2))
+    run("Lambda_1 b=5", L5, 5, 16, D(5), trials=40, seed=1)
+    run("Lambda_1 b=5", L5, 5, 32, D(5), trials=12, seed=2)
+    run("Lambda_1 b=7", L7, 7, 8, D(7), trials=40, seed=3)
+    L9, v9 = iterate_pair(L3, v3, 3, L3, v3, 3)
+    run("Lambda_2 b=3 s=2", L9, 9, 4, Fr(9,8)**4/Fr(9,4), trials=40, seed=4)
+    run("Lambda_1 b=7", L7, 7, 16, D(7), trials=6, seed=5)

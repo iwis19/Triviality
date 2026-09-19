@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Independent re-check of claim 259590aa (idea d93b4510) and small extensions.
+
+For each L we decide with CaDiCaL (python-sat) whether there is a *distinct*
+covering system of Z whose moduli all divide L (at most one residue class per
+modulus d | L, d > 1), under several restrictions on the set of used moduli:
+
+  none        : no restriction (is L a "covering number"?)
+  psf         : prime-step-free  -- no two used moduli have ratio exactly a prime
+  pprf        : PPR-free         -- no two used moduli have ratio a prime power p^a, a>=1
+  pow2f       : no two used moduli have ratio a power of 2      (idea d93b4510, C1)
+  omega_even  : only moduli with Omega(d) even (implies psf and pow2f? no: 4 allowed)
+  omega_odd   : only moduli with Omega(d) odd
+
+Encoding: x[d,r] (d | L, d>1, 0<=r<d) = "class r mod d is used".
+  - at most one x[d,*] per d (sequential counter)
+  - for every n in 0..L-1: OR_{d|L} x[d, n mod d]
+  - y[d] <-> OR_r x[d,r]; restriction clauses  (not y[d]) or (not y[d'])
+Symmetry breaking: none (translation symmetry only; instances are small).
+"""
+import sys, time, itertools
+from math import gcd
+from pysat.solvers import Cadical153
+from pysat.card import CardEnc, EncType
+from pysat.formula import IDPool
+
+
+def divisors(n):
+    ds = [d for d in range(1, n + 1) if n % d == 0]
+    return ds
+
+
+def factor(n):
+    f = {}
+    p = 2
+    while p * p <= n:
+        while n % p == 0:
+            f[p] = f.get(p, 0) + 1
+            n //= p
+        p += 1
+    if n > 1:
+        f[n] = f.get(n, 0) + 1
+    return f
+
+
+def is_prime(n):
+    return n > 1 and all(n % p for p in range(2, int(n ** 0.5) + 1))
+
+
+def is_prime_power(n):
+    if n < 2:
+        return False
+    f = factor(n)
+    return len(f) == 1
+
+
+def is_pow2(n):
+    return n >= 2 and (n & (n - 1)) == 0
+
+
+def Omega(n):
+    return sum(factor(n).values())
+
+
+def solve(L, mode, time_limit=None):
+    pool = IDPool()
+    mods = [d for d in divisors(L) if d > 1]
+    if mode == "omega_even":
+        mods = [d for d in mods if Omega(d) % 2 == 0]
+    if mode == "omega_odd":
+        mods = [d for d in mods if Omega(d) % 2 == 1]
+    x = {(d, r): pool.id(("x", d, r)) for d in mods for r in range(d)}
+    y = {d: pool.id(("y", d)) for d in mods}
+    s = Cadical153()
+    # at most one class per modulus, y[d] <-> OR_r x[d,r]
+    for d in mods:
+        lits = [x[d, r] for r in range(d)]
+        for cl in CardEnc.atmost(lits, bound=1, vpool=pool, encoding=EncType.seqcounter).clauses:
+            s.add_clause(cl)
+        s.add_clause([-y[d]] + lits)
+        for l in lits:
+            s.add_clause([y[d], -l])
+    # covering
+    for n in range(L):
+        s.add_clause([x[d, n % d] for d in mods])
+    # restrictions
+    forb = 0
+    for a, b in itertools.combinations(mods, 2):
+        lo, hi = min(a, b), max(a, b)
+        if hi % lo:
+            continue
+        q = hi // lo
+        bad = False
+        if mode == "psf":
+            bad = is_prime(q)
+        elif mode == "pprf":
+            bad = is_prime_power(q)
+        elif mode == "pow2f":
+            bad = is_pow2(q)
+        if bad:
+            s.add_clause([-y[a], -y[b]])
+            forb += 1
+    t0 = time.time()
+    res = s.solve()
+    dt = time.time() - t0
+    model = None
+    if res:
+        m = set(l for l in s.get_model() if l > 0)
+        model = sorted((d, r) for (d, r), v in x.items() if v in m)
+    s.delete()
+    return res, model, dt, forb
+
+
+def verify_cover(L, model):
+    cov = [False] * L
+    for d, r in model:
+        for n in range(r, L, d):
+            cov[n] = True
+    return all(cov)
+
+
+if __name__ == "__main__":
+    mode_list = sys.argv[1].split(",") if len(sys.argv) > 1 else ["none", "psf", "pprf", "pow2f"]
+    Ls = [int(a) for a in sys.argv[2:]] if len(sys.argv) > 2 else list(range(2, 631))
+    for L in Ls:
+        out = []
+        for mode in mode_list:
+            res, model, dt, forb = solve(L, mode)
+            if res:
+                assert verify_cover(L, model)
+                used = sorted(set(d for d, _ in model))
+                out.append(f"{mode}=SAT({len(used)} moduli, {dt:.1f}s) {model if len(model)<=14 else used}")
+            else:
+                out.append(f"{mode}=UNSAT({dt:.1f}s)")
+            if mode == "none" and not res:
+                break  # not a covering number, skip restricted variants
+        if len(out) > 1 or "SAT(" in out[0]:
+            print(L, factor(L), " | ".join(out), flush=True)

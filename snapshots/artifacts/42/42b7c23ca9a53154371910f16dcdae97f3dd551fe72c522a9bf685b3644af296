@@ -1,0 +1,57 @@
+"""Compare LP verdicts in search*.log with Morris (2006), Theorem 1 (proper FC(5)-families) + Poonen's
+FC(4) family {123,124,134}.  Verdict predicted by literature: G is FC iff the union-closure of G contains
+the union-closure of a permutation image of one of the generator systems below (Morris: a family
+containing an FC-family is FC; Morris Thm 1 lists all proper FC(5); 3 three-subsets of a 4-set is the only
+proper FC(4) [Poonen]; no proper FC(3); FC(1),FC(2) contain a 1- or 2-set, excluded here)."""
+import itertools, re, sys
+N = 5
+def s(*xs): return sum(1 << (x - 1) for x in xs)
+MORRIS = [
+    [s(1,2,3), s(1,2,4), s(1,3,4)],            # (a) three 3-subsets (also covers Poonen's FC(4))
+    [s(1,2,3), s(1,2,4), s(1,3,5)],
+    [s(1,2,3), s(1,2,4), s(3,4,5)],
+    [s(1,2,3), s(1,4,5), s(2,4,5)],
+    [s(1,2,3), s(1,2,4), s(1,3,4,5)],          # (b)
+    [s(1,2,3), s(1,4,5), s(2,3,4,5)],          # (c)
+    [s(1,2,3), s(1,4,5), s(1,2,3,4), s(1,2,3,5), s(1,2,4,5), s(1,3,4,5)],  # (d)
+    [s(1,2,3), s(1,2,4,5), s(1,3,4,5), s(2,3,4,5)],  # (e)
+    [s(1,2,3,4), s(1,2,3,5), s(1,2,4,5), s(1,3,4,5), s(2,3,4,5)],          # (f)
+]
+# (a) 'any three of the 3-subsets' of [5]: enumerate all triples of 3-sets up to symmetry to be safe
+threes = [x for x in range(32) if bin(x).count('1') == 3]
+for T in itertools.combinations(threes, 3):
+    MORRIS.append(list(T))
+
+def closure(G):
+    F = set(G)
+    changed = True
+    while changed:
+        changed = False
+        for a in list(F):
+            for b in list(F):
+                if a | b not in F: F.add(a | b); changed = True
+    return frozenset(F)
+
+def perm_img(G, p):
+    return [sum(1 << p[i] for i in range(N) if x >> i & 1) for x in G]
+
+MORRIS_CL = set()
+for G in MORRIS:
+    for p in itertools.permutations(range(N)):
+        MORRIS_CL.add(closure(perm_img(G, p)))
+
+def lit_fc(G):
+    C = closure(G)
+    return any(mc <= C for mc in MORRIS_CL)
+
+mismatch = 0; n = 0
+for fn in sys.argv[1:]:
+    for line in open(fn):
+        m = re.match(r'([\d,]+)\s+poonen=\s*(-?[\d.]+)', line)
+        if not m: continue
+        G = [sum(1 << (int(ch) - 1) for ch in blk) for blk in m.group(1).split(',')]
+        lp_fc = float(m.group(2)) >= -1e-6
+        n += 1
+        if lp_fc != lit_fc(G):
+            mismatch += 1; print('MISMATCH', line.strip(), 'literature says FC =', lit_fc(G))
+print('classes compared:', n, 'mismatches:', mismatch)

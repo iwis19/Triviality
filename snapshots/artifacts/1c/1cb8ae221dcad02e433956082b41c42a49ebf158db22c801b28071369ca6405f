@@ -1,0 +1,45 @@
+"""Independent Python check of a T5/T6-obstruction on [6] found by t6test.c (walk6 mode).
+Checks: union-closed; for every x there is no injection f: F_{not x} -> F_x with A ⊆ f(A) (T5), via Hall/matching;
+automorphism group (permutations of [6] preserving F) is trivial, hence T6(x) == T5(x) for every x;
+also directly checks T6 with pi = identity (the only automorphism)."""
+from itertools import permutations
+FAMILIES={6:"23 123 34 234 1234 45 345 2345 12345 126 1236 12346 156 1256 2356 12356 456 1456 12456 3456 13456 23456 123456",
+          7:"123 234 1234 345 2345 12345 2356 12356 456 3456 23456 123456 127 1237 12347 123457 1267 12367 123467 567 1567 12567 23567 123567 4567 14567 124567 34567 134567 234567 1234567"}
+import sys
+n=int(sys.argv[1]) if len(sys.argv)>1 else 7
+sets=FAMILIES[n].split()
+def m(s):
+    r=0
+    for ch in s: r|=1<<(int(ch)-1)
+    return r
+F=frozenset(m(s) for s in sets)
+assert all((a|b) in F for a in F for b in F), "not union-closed"
+def matching(Lset,Rset,adj):
+    match={}
+    def aug(u,seen):
+        for v in Rset:
+            if adj(u,v) and v not in seen:
+                seen.add(v)
+                if v not in match or aug(match[v],seen):
+                    match[v]=u; return True
+        return False
+    return all(aug(u,set()) for u in Lset)
+def T(x,pi=None):
+    L=[A for A in F if not A>>x&1]; R=[A for A in F if A>>x&1]
+    def img(A): 
+        return sum(1<<pi[i] for i in range(n) if A>>i&1) if pi else None
+    adj=lambda A,B: (A&~B)==0 or (pi is not None and img(A)==B)
+    return matching(L,R,adj)
+auts=[p for p in permutations(range(n)) if frozenset(sum(1<<p[i] for i in range(n) if A>>i&1) for A in F)==F]
+print("|F| =",len(F)," min set size =",min(bin(A).count('1') for A in F))
+print("frequencies:",[sum(1 for A in F if A>>i&1) for i in range(n)],"(|F|/2 =",len(F)/2,")")
+print("T5(x) for x=1..6:",[T(x) for x in range(n)])
+print("automorphisms:",auts)
+print("T6(x) with each automorphism:",{str(p):[T(x,p) for x in range(n)] for p in auts})
+
+# OUTPUT (python3 verify_t6_both.py 7):
+# |F| = 31  min set size = 3
+# frequencies: [19, 22, 22, 19, 22, 21, 19] (|F|/2 = 15.5 )
+# T5(x) for x=1..6: [False, False, False, False, False, False, False]
+# automorphisms: [(0, 1, 2, 3, 4, 5, 6)]
+# T6(x) with each automorphism: {'(0, 1, 2, 3, 4, 5, 6)': [False, False, False, False, False, False, False]}

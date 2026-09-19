@@ -1,0 +1,213 @@
+import Mathlib
+import MathLab.Basic
+
+/-!
+# A CRT template for consecutive primes in arithmetic progression (Erdős #141)
+
+For every `k ≥ 3` we build `M, c, d` such that the linear forms `f_j(n) = M n + c + j d`
+(`0 ≤ j < k`) are admissible and, for every `n ≥ 1`, every integer strictly between
+`f_j(n)` and `f_{j+1}(n)` is composite.
+
+Construction: `d = k!`, `W = (k-1) d`, `F = W!`, `X = {x < W : d ∤ x}`,
+`M = ∏_{x ∈ X} (x F + 1)`, `c = F^(φ(M) - 1)` (so `F c ≡ 1 [MOD M]`).
+For `x ∈ X` the factor `q_x = x F + 1` of `M` divides `c + x`, hence every non-AP position
+`M n + c + x` of the window is divisible by `q_x` and larger than it. Every prime divisor of
+`M` exceeds `W`, so it cannot divide any AP term `c + j d`.
+-/
+
+
+theorem cpap_template (k : ℕ) (hk : 3 ≤ k) : ∃ M c d : ℕ, 0 < M ∧ 0 < d ∧ (∀ p : ℕ, p.Prime → ∃ n, ∀ j < k, ¬ p ∣ M * n + c + j * d) ∧ ∀ n ≥ 1, ∀ j, j + 1 < k → ∀ y, M * n + c + j * d < y → y < M * n + c + (j + 1) * d → ¬ y.Prime := by
+  obtain ⟨d, hd_def⟩ : ∃ d, d = k.factorial := ⟨_, rfl⟩
+  have hd : 0 < d := hd_def ▸ Nat.factorial_pos k
+  obtain ⟨W, hW_def⟩ : ∃ W, W = (k - 1) * d := ⟨_, rfl⟩
+  obtain ⟨F, hF_def⟩ : ∃ F, F = W.factorial := ⟨_, rfl⟩
+  have hF : 0 < F := hF_def ▸ Nat.factorial_pos W
+  obtain ⟨X, hX_def⟩ : ∃ X : Finset ℕ, X = (Finset.range W).filter (fun x => ¬ d ∣ x) := ⟨_, rfl⟩
+  have hmemX : ∀ x, x ∈ X ↔ x < W ∧ ¬ d ∣ x := by
+    intro x
+    rw [hX_def, Finset.mem_filter, Finset.mem_range]
+  obtain ⟨M, hM_def⟩ : ∃ M, M = ∏ x ∈ X, (x * F + 1) := ⟨_, rfl⟩
+  have hM : 0 < M := hM_def ▸ Finset.prod_pos (fun x _ => Nat.succ_pos _)
+  have hFx : ∀ x : ℕ, Nat.Coprime F (x * F + 1) := fun x =>
+    (Nat.coprime_mul_right_add_right F 1 x).mpr (Nat.coprime_one_right F)
+  have hFM : Nat.Coprime F M := by
+    rw [hM_def]
+    exact Nat.Coprime.prod_right (fun x _ => hFx x)
+  obtain ⟨c, hc_def⟩ : ∃ c, c = F ^ (Nat.totient M - 1) := ⟨_, rfl⟩
+  have hFc : F * c ≡ 1 [MOD M] := by
+    have hpos : 0 < Nat.totient M := Nat.totient_pos.mpr hM
+    have : F * c = F ^ Nat.totient M := by
+      rw [hc_def, ← pow_succ']
+      congr 1
+      omega
+    rw [this]
+    exact Nat.ModEq.pow_totient hFM
+  have hqM : ∀ x ∈ X, (x * F + 1) ∣ M := by
+    intro x hx
+    rw [hM_def]
+    exact Finset.dvd_prod_of_mem _ hx
+  -- key covering property: for `x ∈ X`, `x F + 1 ∣ c + x`
+  have hcov : ∀ x ∈ X, (x * F + 1) ∣ c + x := by
+    intro x hx
+    have h1 : F * c ≡ 1 [MOD x * F + 1] := hFc.of_dvd (hqM x hx)
+    have h2 : F * (c + x) ≡ 0 [MOD x * F + 1] := by
+      have e : F * (c + x) = F * c + x * F := by ring
+      rw [e]
+      calc F * c + x * F ≡ 1 + x * F [MOD x * F + 1] := h1.add_right _
+        _ = x * F + 1 := by ring
+        _ ≡ 0 [MOD x * F + 1] := Nat.modEq_zero_iff_dvd.mpr dvd_rfl
+    have h3 : (x * F + 1) ∣ F * (c + x) := Nat.modEq_zero_iff_dvd.mp h2
+    exact (hFx x).symm.dvd_of_dvd_mul_left h3
+  -- every prime divisor of `M` divides some `c + x` (`x ∈ X`) and exceeds `W`
+  have hbig : ∀ p, p.Prime → p ∣ M → ∃ x ∈ X, p ∣ c + x ∧ W < p := by
+    intro p hp hpM
+    rw [hM_def] at hpM
+    obtain ⟨x, hx, hpx⟩ := (Nat.Prime.prime hp).dvd_finset_prod_iff _ |>.mp hpM
+    refine ⟨x, hx, dvd_trans hpx (hcov x hx), ?_⟩
+    by_contra hle
+    push_neg at hle
+    have hpF : p ∣ F := hF_def ▸ Nat.dvd_factorial hp.pos hle
+    have h1 : p ∣ x * F + 1 - x * F := Nat.dvd_sub hpx (dvd_mul_of_dvd_right hpF x)
+    rw [Nat.add_sub_cancel_left] at h1
+    have := Nat.le_of_dvd one_pos h1
+    have := hp.one_lt
+    omega
+  refine ⟨M, c, d, hM, hd, ?_, ?_⟩
+  · -- admissibility
+    intro p hp
+    by_cases hpM : p ∣ M
+    · refine ⟨0, fun j hj hdiv => ?_⟩
+      obtain ⟨x, hx, hpx, hWp⟩ := hbig p hp hpM
+      rw [hmemX] at hx
+      rw [mul_zero, zero_add] at hdiv
+      have hjd : j * d ≤ W := by
+        rw [hW_def]
+        exact Nat.mul_le_mul (by omega) le_rfl
+      rcases lt_trichotomy x (j * d) with h | h | h
+      · have h1 := Nat.dvd_sub hdiv hpx
+        rw [Nat.add_sub_add_left] at h1
+        have := Nat.le_of_dvd (by omega) h1
+        omega
+      · exact hx.2 ⟨j, by rw [h, mul_comm]⟩
+      · have h1 := Nat.dvd_sub hpx hdiv
+        rw [Nat.add_sub_add_left] at h1
+        have := Nat.le_of_dvd (by omega) h1
+        omega
+    · by_cases hpd : p ∣ d
+      · by_cases hpc : p ∣ c
+        · refine ⟨1, fun j hj hdiv => ?_⟩
+          rw [mul_one] at hdiv
+          have h1 : p ∣ M + c := (Nat.dvd_add_left (dvd_mul_of_dvd_right hpd j)).mp hdiv
+          exact hpM ((Nat.dvd_add_left hpc).mp h1)
+        · refine ⟨0, fun j hj hdiv => ?_⟩
+          rw [mul_zero, zero_add] at hdiv
+          exact hpc ((Nat.dvd_add_left (dvd_mul_of_dvd_right hpd j)).mp hdiv)
+      · have hkp : k < p := by
+          by_contra hle
+          push_neg at hle
+          exact hpd (hd_def ▸ Nat.dvd_factorial hp.pos hle)
+        haveI : Fact p.Prime := ⟨hp⟩
+        have hcop : Nat.Coprime M p := ((Nat.Prime.coprime_iff_not_dvd hp).mpr hpM).symm
+        have hMinv : (M : ZMod p) * (M : ZMod p)⁻¹ = 1 := ZMod.coe_mul_inv_eq_one M hcop
+        obtain ⟨n, hn⟩ : ∃ n : ℕ, (n : ZMod p) = -((c : ZMod p) + (k : ZMod p) * (d : ZMod p)) * (M : ZMod p)⁻¹ :=
+          ⟨_, ZMod.natCast_zmod_val _⟩
+        refine ⟨n, fun j hj hdiv => ?_⟩
+        have hz : ((M * n + c + j * d : ℕ) : ZMod p) = 0 := (ZMod.natCast_eq_zero_iff _ _).mpr hdiv
+        push_cast at hz
+        rw [hn] at hz
+        have hz' : ((j : ZMod p) - (k : ZMod p)) * (d : ZMod p) = 0 := by
+          linear_combination hz + ((c : ZMod p) + (k : ZMod p) * (d : ZMod p)) * hMinv
+        rcases mul_eq_zero.mp hz' with h | h
+        · have h' : (j : ZMod p) = (k : ZMod p) := sub_eq_zero.mp h
+          rw [ZMod.natCast_eq_natCast_iff', Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt hkp] at h'
+          omega
+        · exact hpd ((ZMod.natCast_eq_zero_iff d p).mp h)
+  · -- every integer strictly between consecutive AP terms is composite
+    intro n hn j hj y hy1 hy2 hy
+    obtain ⟨x, hx⟩ : ∃ x, y = M * n + c + x := ⟨y - (M * n + c), by omega⟩
+    have e : (j + 1) * d = j * d + d := by ring
+    have hx1 : j * d < x := by omega
+    have hx2 : x < (j + 1) * d := by omega
+    have hxW : x < W := by
+      rw [hW_def]
+      calc x < (j + 1) * d := hx2
+        _ ≤ (k - 1) * d := Nat.mul_le_mul (by omega) le_rfl
+    have hxd : ¬ d ∣ x := by
+      rintro ⟨m, hm⟩
+      have hm' : x = m * d := by rw [hm, mul_comm]
+      rw [hm'] at hx1 hx2
+      have h1 : j < m := Nat.lt_of_mul_lt_mul_right hx1
+      have h2 : m < j + 1 := Nat.lt_of_mul_lt_mul_right hx2
+      omega
+    have hxX : x ∈ X := (hmemX x).mpr ⟨hxW, hxd⟩
+    have hq : (x * F + 1) ∣ M := hqM x hxX
+    have hqy : (x * F + 1) ∣ y := by
+      rw [hx, add_assoc]
+      exact dvd_add (dvd_mul_of_dvd_left hq n) (hcov x hxX)
+    have hqleM : x * F + 1 ≤ M := Nat.le_of_dvd hM hq
+    have hMn : M ≤ M * n := Nat.le_mul_of_pos_right M hn
+    have hx0 : 0 < x := by omega
+    have hxF : 0 < x * F := Nat.mul_pos hx0 hF
+    rcases hy.eq_one_or_self_of_dvd _ hqy with h | h
+    · omega
+    · omega
+
+
+/-- Conditional reduction (claim C2): if every admissible AP-shaped family of linear forms
+`M n + c + j d` (`j < k`) takes simultaneously prime values at some `n ≥ 1`
+(Dickson's conjecture restricted to AP templates), then for every `k ≥ 3` there are
+`k` primes in arithmetic progression with no prime strictly between consecutive terms,
+i.e. `k` consecutive primes in arithmetic progression. -/
+theorem cpap_of_dickson_ap
+    (H : ∀ k M c d : ℕ, 0 < M → 0 < d →
+      (∀ p : ℕ, p.Prime → ∃ n, ∀ j < k, ¬ p ∣ M * n + c + j * d) →
+      ∃ n ≥ 1, ∀ j < k, (M * n + c + j * d).Prime) :
+    ∀ k ≥ 3, ∃ a e : ℕ, 0 < e ∧ (∀ j < k, (a + j * e).Prime) ∧
+      ∀ j, j + 1 < k → ∀ y, a + j * e < y → y < a + (j + 1) * e → ¬ y.Prime := by
+  intro k hk
+  obtain ⟨M, c, d, hM, hd, hadm, hcomp⟩ := cpap_template k hk
+  obtain ⟨n, hn, hprime⟩ := H k M c d hM hd hadm
+  exact ⟨M * n + c, d, hd, hprime, hcomp n hn⟩
+
+/-- A block of `k` primes in AP with no primes strictly between consecutive terms consists of
+`k` consecutive primes in the sense of `Nat.nth Nat.Prime`. -/
+theorem nth_prime_of_ap_block (k a e : ℕ) (he : 0 < e)
+    (hprime : ∀ j < k, (a + j * e).Prime)
+    (hgap : ∀ j, j + 1 < k → ∀ y, a + j * e < y → y < a + (j + 1) * e → ¬ y.Prime) :
+    ∃ i, ∀ j < k, Nat.nth Nat.Prime (i + j) = a + j * e := by
+  refine ⟨Nat.count Nat.Prime a, fun j hj => ?_⟩
+  suffices hcount : ∀ j < k, Nat.count Nat.Prime (a + j * e) = Nat.count Nat.Prime a + j by
+    rw [← hcount j hj]
+    exact Nat.nth_count (hprime j hj)
+  intro j
+  induction j with
+  | zero => intro _; simp
+  | succ j ih =>
+    intro hj
+    have ih' := ih (by omega)
+    have e1 : a + (j + 1) * e = (a + j * e + 1) + (e - 1) := by
+      have : (j + 1) * e = j * e + e := by ring
+      omega
+    rw [e1, Nat.count_add, Nat.count_succ, if_pos (hprime j (by omega)), ih']
+    have h0 : Nat.count (fun m => Nat.Prime (a + j * e + 1 + m)) (e - 1) = 0 := by
+      rw [Nat.count_iff_forall_not]
+      intro m hm
+      refine hgap j hj _ (by omega) ?_
+      have : (j + 1) * e = j * e + e := by ring
+      omega
+    rw [h0]
+    ring
+
+/-- Conditional reduction (claim C2) in the `Nat.nth Nat.Prime` form: if every admissible
+AP-shaped family of linear forms `M n + c + j d` (`j < k`) takes simultaneously prime values
+at some `n ≥ 1`, then for every `k ≥ 3` there is an index `i` with
+`nth Prime (i + j) = a + j e` for all `j < k`: `k` consecutive primes in AP. -/
+theorem consecutive_primes_ap_of_dickson_ap
+    (H : ∀ k M c d : ℕ, 0 < M → 0 < d →
+      (∀ p : ℕ, p.Prime → ∃ n, ∀ j < k, ¬ p ∣ M * n + c + j * d) →
+      ∃ n ≥ 1, ∀ j < k, (M * n + c + j * d).Prime) :
+    ∀ k ≥ 3, ∃ a e i : ℕ, 0 < e ∧ ∀ j < k, Nat.nth Nat.Prime (i + j) = a + j * e := by
+  intro k hk
+  obtain ⟨a, e, he, hprime, hgap⟩ := cpap_of_dickson_ap H k hk
+  obtain ⟨i, hi⟩ := nth_prime_of_ap_block k a e he hprime hgap
+  exact ⟨a, e, i, he, hi⟩

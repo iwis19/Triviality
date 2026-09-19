@@ -1,0 +1,64 @@
+"""Idea 2584d84c. (1) covering radius of the 24-cell = 45 deg (numerical + formula check).
+(2) Is claim 3ad7748e vacuous for m<=23?  Numerically minimise the covering radius of m points
+on S^3 (no min-angle constraint) with an analytic-gradient soft-min objective; report the
+largest min_p max_i <p,x_i> found. If < 1/sqrt2 for all m<=23, no equator with <=23 points has rho<=45 deg.
+"""
+import itertools, sys, numpy as np
+from scipy.optimize import minimize
+np.set_printoptions(precision=5)
+
+def cell24():
+    pts = []
+    for i, j in itertools.combinations(range(4), 2):
+        for si in (1, -1):
+            for sj in (1, -1):
+                v = np.zeros(4); v[i] = si; v[j] = sj; pts.append(v/np.sqrt(2))
+    return np.array(pts)
+
+def cover_cos(X, trials, rng):
+    f = lambda q: np.max(X @ (q/np.linalg.norm(q)))
+    best = 10
+    for _ in range(trials):
+        r = minimize(f, rng.normal(size=X.shape[1]), method="Nelder-Mead",
+                     options={"xatol":1e-10, "fatol":1e-12, "maxiter":3000})
+        best = min(best, r.fun)
+    return best
+
+rng = np.random.default_rng(1)
+C = cell24()
+c = cover_cos(C, 500, rng)
+print("24-cell: min_p max_v <p,v> =", c, "(1/sqrt2 =", 1/np.sqrt(2), ") covering radius deg:", np.degrees(np.arccos(c)), flush=True)
+u = rng.normal(size=(200000, 4)); u /= np.linalg.norm(u, axis=1)[:, None]
+lhs = np.max(u @ C.T, axis=1); s = -np.sort(-np.abs(u), axis=1)
+print("formula (|u|_(1)+|u|_(2))/sqrt2: max abs err", np.max(np.abs(lhs-(s[:,0]+s[:,1])/np.sqrt(2))), "sample min", lhs.min(), flush=True)
+
+P = rng.normal(size=(6000, 4)); P /= np.linalg.norm(P, axis=1)[:, None]
+def make_obj(m, t=60.0):
+    def obj(x):
+        Y = x.reshape(m, 4); nrm = np.linalg.norm(Y, axis=1)[:, None]; Yn = Y/nrm
+        S = P @ Yn.T                              # (samples, m)
+        # smooth max over code points for each sample
+        a = S.max(axis=1, keepdims=True); w = np.exp(t*(S-a)); Z = w.sum(axis=1, keepdims=True)
+        cov = (a + np.log(Z)/t).ravel()            # soft covering cos per sample
+        # smooth min over samples (to be maximised) -> minimise negative
+        b = cov.min(); v = np.exp(-t*(cov-b)); W = v.sum()
+        val = b - np.log(W)/t
+        # gradient
+        dcov = (v/W)                               # d val / d cov_s
+        dS = (w/Z) * dcov[:, None]                 # d val / d S
+        dYn = dS.T @ P                             # (m,4)
+        # chain through normalisation
+        dY = (dYn - (np.sum(dYn*Yn, axis=1, keepdims=True))*Yn)/nrm
+        return -val, -dY.ravel()
+    return obj
+
+for m in [int(a) for a in sys.argv[1:]] or [16, 20, 22, 23, 24]:
+    best = -1
+    for rs in range(8):
+        X = rng.normal(size=(m, 4)); X /= np.linalg.norm(X, axis=1)[:, None]
+        for t in (30.0, 100.0, 300.0):
+            r = minimize(make_obj(m, t), X.ravel(), jac=True, method="L-BFGS-B", options={"maxiter": 2000})
+            X = r.x.reshape(m, 4); X /= np.linalg.norm(X, axis=1)[:, None]
+        cc = cover_cos(X, 300, rng)
+        best = max(best, cc)
+    print("m=%d: best min_p max_i <p,x_i> = %.5f  -> covering radius %.3f deg  (45 deg needs >= 0.70711)" % (m, best, np.degrees(np.arccos(best))), flush=True)

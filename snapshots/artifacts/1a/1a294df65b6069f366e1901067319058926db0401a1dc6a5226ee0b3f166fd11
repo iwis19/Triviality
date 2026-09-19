@@ -1,0 +1,41 @@
+/-!
+Strengthened finite core of the D5 lower bound kappa(5) >= 40 (critic's version).
+The lab's existing target `d5Vecs.Pairwise (fun u v => dot u v ≤ 1)` is true for
+any list of vectors with small entries (e.g. the zero vector repeated), so on its
+own it does not encode a 40-point kissing configuration. The statement below adds
+the missing ingredients: 40 distinct integer vectors, each of squared norm 2,
+pairwise dot ≤ 1. After scaling by 1/sqrt 2 these are unit vectors with pairwise
+inner products ≤ 1/2, i.e. a 40-point kissing configuration in R^5.
+Only core Lean 4 is used (no Mathlib).
+-/
+
+def dot (u v : List Int) : Int := (List.zipWith (· * ·) u v).foldl (· + ·) 0
+
+def d5Vecs : List (List Int) :=
+  [[ 1, 1, 0, 0, 0], [ 1,-1, 0, 0, 0], [-1, 1, 0, 0, 0], [-1,-1, 0, 0, 0],
+   [ 1, 0, 1, 0, 0], [ 1, 0,-1, 0, 0], [-1, 0, 1, 0, 0], [-1, 0,-1, 0, 0],
+   [ 1, 0, 0, 1, 0], [ 1, 0, 0,-1, 0], [-1, 0, 0, 1, 0], [-1, 0, 0,-1, 0],
+   [ 1, 0, 0, 0, 1], [ 1, 0, 0, 0,-1], [-1, 0, 0, 0, 1], [-1, 0, 0, 0,-1],
+   [ 0, 1, 1, 0, 0], [ 0, 1,-1, 0, 0], [ 0,-1, 1, 0, 0], [ 0,-1,-1, 0, 0],
+   [ 0, 1, 0, 1, 0], [ 0, 1, 0,-1, 0], [ 0,-1, 0, 1, 0], [ 0,-1, 0,-1, 0],
+   [ 0, 1, 0, 0, 1], [ 0, 1, 0, 0,-1], [ 0,-1, 0, 0, 1], [ 0,-1, 0, 0,-1],
+   [ 0, 0, 1, 1, 0], [ 0, 0, 1,-1, 0], [ 0, 0,-1, 1, 0], [ 0, 0,-1,-1, 0],
+   [ 0, 0, 1, 0, 1], [ 0, 0, 1, 0,-1], [ 0, 0,-1, 0, 1], [ 0, 0,-1, 0,-1],
+   [ 0, 0, 0, 1, 1], [ 0, 0, 0, 1,-1], [ 0, 0, 0,-1, 1], [ 0, 0, 0,-1,-1]]
+
+theorem d5Vecs_length : d5Vecs.length = 40 := by decide
+
+theorem d5Vecs_dim : d5Vecs.all (fun v => v.length == 5) = true := by decide
+
+theorem d5Vecs_norm : d5Vecs.all (fun v => dot v v == 2) = true := by decide
+
+theorem d5Vecs_nodup : d5Vecs.Nodup := by decide
+
+theorem d5Vecs_kissing : d5Vecs.Pairwise (fun u v => dot u v ≤ 1) := by decide
+
+/-- The combined statement: 40 distinct integer vectors in Z^5 of squared norm 2 with pairwise dot ≤ 1. -/
+theorem d5Vecs_kissing_config :
+    d5Vecs.length = 40 ∧ d5Vecs.all (fun v => v.length == 5) = true ∧
+    d5Vecs.all (fun v => dot v v == 2) = true ∧ d5Vecs.Nodup ∧
+    d5Vecs.Pairwise (fun u v => dot u v ≤ 1) :=
+  ⟨d5Vecs_length, d5Vecs_dim, d5Vecs_norm, d5Vecs_nodup, d5Vecs_kissing⟩

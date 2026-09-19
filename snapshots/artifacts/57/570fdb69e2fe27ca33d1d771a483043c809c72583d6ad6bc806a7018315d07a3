@@ -1,0 +1,34 @@
+import Mathlib
+import MathLab.Basic
+
+/-!
+Single-interval Hall obstruction to inclusion-respecting injections.
+
+Let `F` be a finite family of subsets of `Fin n`, `x` an element and `e ⊆ Fin n` with
+`x ∉ e`.  If the sets of `F` containing `e` but not `x` outnumber the sets of `F`
+containing `e` and `x`, then there is no injection `f` from `{A ∈ F : x ∉ A}` to
+`{B ∈ F : x ∈ B}` with `A ⊆ f A`: such an `f` would map the first group injectively
+into the second (because `e ⊆ A ⊆ f A`).  Union-closedness of `F` is not needed.
+-/
+
+theorem no_superset_injection_of_interval {n : ℕ} (F : Finset (Finset (Fin n))) (x : Fin n)
+    (e : Finset (Fin n))
+    (h : (F.filter (fun A => e ⊆ A ∧ x ∈ A)).card < (F.filter (fun A => e ⊆ A ∧ x ∉ A)).card) :
+    ¬ ∃ f : Finset (Fin n) → Finset (Fin n),
+      (∀ A ∈ F, x ∉ A → f A ∈ F ∧ x ∈ f A ∧ A ⊆ f A) ∧
+      Set.InjOn f (↑(F.filter (fun A => x ∉ A)) : Set (Finset (Fin n))) := by
+  rintro ⟨f, hf, hinj⟩
+  have hle : (F.filter (fun A => e ⊆ A ∧ x ∉ A)).card ≤
+      (F.filter (fun A => e ⊆ A ∧ x ∈ A)).card := by
+    apply Finset.card_le_card_of_injOn f
+    · intro A hA
+      simp only [Finset.coe_filter, Set.mem_setOf_eq] at hA
+      obtain ⟨hAF, heA, hxA⟩ := hA
+      obtain ⟨hfF, hxf, hsub⟩ := hf A hAF hxA
+      simp only [Finset.coe_filter, Set.mem_setOf_eq]
+      exact ⟨hfF, heA.trans hsub, hxf⟩
+    · intro A hA B hB hAB
+      simp only [Finset.coe_filter, Set.mem_setOf_eq] at hA hB
+      exact hinj (by simp only [Finset.coe_filter, Set.mem_setOf_eq]; exact ⟨hA.1, hA.2.2⟩)
+        (by simp only [Finset.coe_filter, Set.mem_setOf_eq]; exact ⟨hB.1, hB.2.2⟩) hAB
+  omega

@@ -1,0 +1,6 @@
+k=3 speeds<=30 gcd=1: 0 counterexamples; tight: [(1,2)]; min ML above 1/k: (1,4) -> 2/5
+k=4 speeds<=30: 0 counterexamples; tight: [(1,2,3)]; min ML above 1/k: (1,2,6) -> 2/7
+k=5 speeds<=24: 0 counterexamples; tight: [(1,2,3,4),(1,3,4,7)]; min ML above 1/k: (1,2,3,8) -> 2/9
+k=6 speeds<=18: 0 counterexamples; tight: [(1,2,3,4,5),(1,3,4,5,9)]; min ML above 1/k: (1,2,3,4,10) -> 2/11
+k=7 speeds<=14: 0 counterexamples; tight: [(1,2,3,4,5,6)]; min ML above 1/k: (1,2,3,4,5,12) -> 2/13
+(runtime 87s, python3, Fractions; exact)

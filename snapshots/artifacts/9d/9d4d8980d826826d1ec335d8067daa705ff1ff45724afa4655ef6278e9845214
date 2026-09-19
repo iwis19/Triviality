@@ -1,0 +1,119 @@
+"""Heuristic (optimistic) estimate of what Musin's extended Delsarte method can give in dimension n.
+
+Musin (Annals 2008, Thm 2): for f = 1 + sum c_k G_k, c_k >= 0, and any spherical 1/2-code X,
+   |X| <= h_max := max_m h_m,   h_m = f(1) + max_{Y} sum_i f(y0 . y_i),
+where Y = {y_1..y_m} is a 1/2-code (pairwise angle >= 60 deg) lying in the cap {y : y . (-y0) >= t0}
+(only there can f be positive, since f <= 0 on [-t0, 1/2]).
+
+We solve  min_c h_max  by a cutting-plane loop:
+  master LP: min t  s.t.  t >= f(1) + sum_i f(y0 . y_i)  for all stored Y;  f <= 0 on [-t0, 1/2];  c >= 0
+  oracle:    for m = 1..mu, multi-start SLSQP maximisation of sum_i f(-cos phi_i) over cap configurations.
+The oracle is a nonconvex local search, so the reported h_max is a LOWER estimate of the true h_max(f):
+the resulting bound is OPTIMISTIC (a true rigorous bound is >= what is printed).
+Also allows optional positivity of f on [1/2 - eps, 1/2] with near-contact count <= K (idea (a)).
+"""
+import sys
+import numpy as np
+from scipy.optimize import linprog, minimize
+from scipy.special import eval_jacobi
+
+rng = np.random.default_rng(0)
+
+def gegen_mat(n, deg, ts):
+    a = (n - 3) / 2.0
+    ts = np.atleast_1d(ts)
+    return np.array([[eval_jacobi(k, a, a, t) / eval_jacobi(k, a, a, 1.0) for k in range(1, deg + 1)] for t in ts])
+
+def f_eval(n, deg, c, ts):
+    return 1 + gegen_mat(n, deg, ts) @ c
+
+def oracle(n, deg, c, t0, m, restarts=12):
+    """max sum_i f(-cos phi_i) with e0 = first basis vector, y_i . e0 >= t0, y_i . y_j <= 1/2."""
+    if m == 0:
+        return 0.0, None
+    best, bestY = -np.inf, None
+    def unpack(v):
+        Y = v.reshape(m, n)
+        return Y / np.linalg.norm(Y, axis=1, keepdims=True)
+    def obj(v):
+        Y = unpack(v)
+        return -np.sum(f_eval(n, deg, c, -Y[:, 0]))
+    cons = []
+    cons.append({"type": "ineq", "fun": lambda v: unpack(v)[:, 0] - t0})
+    if m > 1:
+        iu = np.triu_indices(m, 1)
+        cons.append({"type": "ineq", "fun": lambda v: 0.5 - (unpack(v) @ unpack(v).T)[iu]})
+    for r in range(restarts):
+        Y0 = rng.normal(size=(m, n))
+        Y0[:, 0] = np.abs(Y0[:, 0]) + 1.0  # start roughly inside the cap
+        Y0 /= np.linalg.norm(Y0, axis=1, keepdims=True)
+        try:
+            res = minimize(obj, Y0.ravel(), constraints=cons, method="SLSQP", options={"maxiter": 300, "ftol": 1e-10})
+        except Exception:
+            continue
+        Y = unpack(res.x)
+        # feasibility check
+        if np.min(Y[:, 0]) < t0 - 1e-7:
+            continue
+        if m > 1 and np.max((Y @ Y.T)[np.triu_indices(m, 1)]) > 0.5 + 1e-7:
+            continue
+        val = -obj(res.x)
+        if val > best:
+            best, bestY = val, Y
+    return best, bestY
+
+def run(n, t0, deg=11, mu=6, iters=25, eps=0.0, K=0, npts=1500, verbose=True):
+    ts_neg = np.linspace(-t0, 0.5 - eps, npts)
+    Gneg = gegen_mat(n, deg, ts_neg)
+    G1 = gegen_mat(n, deg, [1.0])[0]
+    cuts = []  # list of arrays of inner products y0.y_i (= -y_i[:,0])
+    hist = []
+    for it in range(iters):
+        # master LP: vars c (deg), t, u ; min t
+        nv = deg + 2
+        A, b = [], []
+        # f <= 0 on [-t0, 1/2-eps]
+        A.append(np.hstack([Gneg, np.zeros((len(ts_neg), 2))])); b.append(-np.ones(len(ts_neg)))
+        if eps > 0:
+            ts_c = np.linspace(0.5 - eps, 0.5, 50)
+            Gc = gegen_mat(n, deg, ts_c)
+            A.append(np.hstack([Gc, np.zeros((len(ts_c), 1)), -np.ones((len(ts_c), 1))])); b.append(-np.ones(len(ts_c)))
+        # t >= f(1) + sum f(y0.y_i) + K u   for each cut  (f(1) = 1 + G1.c)
+        rows = [np.concatenate([G1, [-1.0, K]])]
+        ms = [0]
+        for ip in cuts:
+            Gy = gegen_mat(n, deg, ip)
+            rows.append(np.concatenate([G1 + Gy.sum(axis=0), [-1.0, K]]))
+            ms.append(len(ip))
+        rows = np.array(rows)
+        A.append(rows); b.append(-(1.0 + np.array(ms, dtype=float)))
+        cost = np.zeros(nv); cost[deg] = 1.0
+        res = linprog(cost, A_ub=np.vstack(A), b_ub=np.concatenate(b), bounds=[(0, None)] * nv, method="highs")
+        assert res.status == 0, res.message
+        c, t, u = res.x[:deg], res.x[deg], res.x[deg + 1]
+        f1 = 1 + G1 @ c
+        # oracle
+        worst, worstY, worstm = 0.0, None, 0
+        for m in range(1, mu + 1):
+            val, Y = oracle(n, deg, c, t0, m)
+            if Y is not None and val > worst:
+                worst, worstY, worstm = val, Y, m
+        hmax_est = f1 + worst + K * u
+        hist.append((t, hmax_est))
+        if verbose:
+            print(f"  it {it:2d}: master t={t:.4f}  f(1)={f1:.4f}  oracle max={worst:.4f} (m={worstm})  u={u:.4f}  -> h_max est {hmax_est:.4f}", flush=True)
+        if worstY is None or worst <= 1e-9:
+            break
+        cuts.append(-worstY[:, 0])
+        if abs(hmax_est - t) < 2e-3:
+            break
+    return c, hist
+
+if __name__ == "__main__":
+    n = int(sys.argv[1]); t0 = float(sys.argv[2]); deg = int(sys.argv[3]); mu = int(sys.argv[4])
+    eps = float(sys.argv[5]) if len(sys.argv) > 5 else 0.0
+    K = int(sys.argv[6]) if len(sys.argv) > 6 else 0
+    print(f"n={n} t0={t0} deg={deg} mu={mu} eps={eps} K={K}")
+    c, hist = run(n, t0, deg, mu, eps=eps, K=K)
+    print("final (master t, h_max estimate):", hist[-1])
+    print("coeffs c_1..:", np.round(c, 4))

@@ -1,0 +1,150 @@
+"""Numerical search for N-point spherical codes on S^4 with min angle 60 degrees
+(i.e. kissing configurations in R^5), plus a saturation check of the D5 configuration.
+
+Method: maximise the minimum pairwise angle via a soft-max surrogate
+    E_k(X) = (1/k) log sum_{i<j} exp(k <x_i/|x_i|, x_j/|x_j|>),
+minimised with L-BFGS for an increasing schedule of k (20, 60, 200, 600, 2000, 8000), random restarts.
+Reports the best achieved minimum angle for N = 40 and N = 41.
+A run reaching 60.000 deg for N=41 would be a new kissing configuration; the code is a
+heuristic and cannot prove non-existence.
+"""
+import itertools
+import sys
+import numpy as np
+from scipy.optimize import minimize
+
+rng = np.random.default_rng(int(sys.argv[1]) if len(sys.argv) > 1 else 0)
+DIM = 5
+
+
+def normalize(X):
+    return X / np.linalg.norm(X, axis=1, keepdims=True)
+
+
+def min_angle_deg(X):
+    G = X @ X.T
+    np.fill_diagonal(G, -1.0)
+    return np.degrees(np.arccos(np.clip(G.max(), -1, 1)))
+
+
+def energy_and_grad(x, N, k):
+    X = x.reshape(N, DIM)
+    nrm = np.linalg.norm(X, axis=1, keepdims=True)
+    U = X / nrm
+    G = U @ U.T
+    iu = np.triu_indices(N, 1)
+    g = G[iu]
+    m = g.max()
+    w = np.exp(k * (g - m))
+    S = w.sum()
+    E = m + np.log(S) / k
+    # dE/dG_ij = w_ij / S  for i<j
+    W = np.zeros((N, N))
+    W[iu] = w / S
+    W = W + W.T
+    dU = W @ U  # gradient wrt U
+    # chain through normalisation: dX = (I - u u^T) dU / |x|
+    dX = (dU - np.sum(dU * U, axis=1, keepdims=True) * U) / nrm
+    return E, dX.ravel()
+
+
+def optimize(X):
+    x = X.ravel().copy()
+    N = X.shape[0]
+    for k in [20.0, 60.0, 200.0, 600.0, 2000.0, 8000.0]:
+        res = minimize(energy_and_grad, x, args=(N, k), jac=True, method="L-BFGS-B",
+                       options={"maxiter": 3000, "gtol": 1e-10})
+        x = res.x
+    return normalize(x.reshape(N, DIM))
+
+
+def search(N, restarts):
+    best = -1.0
+    hist = []
+    for r in range(restarts):
+        X = normalize(rng.standard_normal((N, DIM)))
+        X = optimize(X)
+        a = min_angle_deg(X)
+        hist.append(a)
+        best = max(best, a)
+    return best, hist
+
+
+def d5_config():
+    V = []
+    for i, j in itertools.combinations(range(5), 2):
+        for si, sj in itertools.product([1, -1], repeat=2):
+            v = np.zeros(5)
+            v[i], v[j] = si, sj
+            V.append(v / np.sqrt(2))
+    return np.array(V)
+
+
+def deepest_hole_angle(X, trials=20000, iters=300):
+    """Approximate max over y in S^4 of min_i angle(y, x_i) (covering radius of X)."""
+    Y = normalize(rng.standard_normal((trials, DIM)))
+    for _ in range(iters):
+        G = Y @ X.T
+        nearest = X[G.argmax(axis=1)]
+        Y = normalize(Y - 0.02 * nearest)
+    G = Y @ X.T
+    ang = np.degrees(np.arccos(np.clip(G.max(axis=1), -1, 1)))
+    return ang.max()
+
+
+if __name__ == "__main__":
+    restarts = int(sys.argv[2]) if len(sys.argv) > 2 else 30
+    D5 = d5_config()
+    print(f"D5 config: {len(D5)} points, min angle = {min_angle_deg(D5):.6f} deg")
+    print(f"D5 deepest hole (approx covering radius) = {deepest_hole_angle(D5):.4f} deg "
+          f"(< 60 => no 41st sphere fits into the D5 arrangement)")
+    for N in [40, 41]:
+        b, hist = search(N, restarts)
+        hist = np.round(sorted(hist, reverse=True), 3)
+        print(f"N={N}: best min angle over {restarts} restarts = {b:.4f} deg; top-5 = {hist[:5]}")
+
+
+def polish(X, iters=200):
+    """Exact max-min polishing: SLSQP on  max t  s.t. <x_i,x_j> <= -t (i<j), |x_i|=1."""
+    N = X.shape[0]
+    iu = np.triu_indices(N, 1)
+
+    def obj(z):
+        return -z[-1]
+
+    def obj_grad(z):
+        g = np.zeros_like(z); g[-1] = -1.0; return g
+
+    def ineq(z):  # -t - <x_i,x_j> >= 0
+        Xz = z[:-1].reshape(N, DIM)
+        return -z[-1] - (Xz @ Xz.T)[iu]
+
+    def eq(z):
+        Xz = z[:-1].reshape(N, DIM)
+        return np.sum(Xz * Xz, axis=1) - 1.0
+
+    G = X @ X.T
+    np.fill_diagonal(G, -1)
+    z0 = np.concatenate([X.ravel(), [-G.max()]])
+    res = minimize(obj, z0, jac=obj_grad, method="SLSQP",
+                   constraints=[{"type": "ineq", "fun": ineq}, {"type": "eq", "fun": eq}],
+                   options={"maxiter": iters, "ftol": 1e-14})
+    return normalize(res.x[:-1].reshape(N, DIM))
+
+
+if __name__ == "__main__" and len(sys.argv) > 3 and sys.argv[3] == "polish":
+    # sanity: perturbed D5 should polish back to 60 deg
+    Xp = normalize(D5 + 0.05 * rng.standard_normal(D5.shape))
+    print(f"perturbed D5: {min_angle_deg(Xp):.4f} -> polished {min_angle_deg(polish(Xp)):.4f} deg")
+    for N in [40, 41]:
+        bestX, besta = None, -1
+        for r in range(restarts):
+            X = optimize(normalize(rng.standard_normal((N, DIM))))
+            a = min_angle_deg(X)
+            if a > besta:
+                besta, bestX = a, X
+        Xq = polish(bestX)
+        G = Xq @ Xq.T; np.fill_diagonal(G, -1)
+        print(f"N={N}: softmax best {besta:.4f} -> SLSQP polished {min_angle_deg(Xq):.4f} deg; "
+              f"#pairs within 1e-4 of max inner product: {(G > G.max()-1e-4).sum()//2}")
+        np.save(f"best_{N}.npy", Xq)

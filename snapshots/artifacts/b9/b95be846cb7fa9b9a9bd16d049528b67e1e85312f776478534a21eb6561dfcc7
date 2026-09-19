@@ -1,0 +1,12 @@
+# python3 c540b.py ; extra_checks.py
+D5     N=40 max ip=0.5 spectrum {-1:20, -1/2:240, 0:280, 1/2:240}; deepest hole cos=0.632456=2/sqrt10 (50.7685 deg), dir (-1,-1,1,1,-1)/sqrt5
+C5-40b N=40 max ip=0.5 spectrum {-1:12, -3/4:32, -1/2:192, -1/4:32, 0:272, 1/2:240}; inner products NOT inside {-1,-1/2,0,1/2};
+       deepest hole cos=0.632456=2/sqrt10 (50.7685 deg), dir (0,0,0,2,-1)/sqrt5
+24-cell covering radius: max cos = 0.707107 = 1/sqrt2 (45.0000 deg)
+D5     symmetry group order (elements of O(5) permuting the set, found by Gram-matrix backtracking): 3840
+C5-40b symmetry group order: 384
+# records.py (public data)
+Cohn spherical-codes.org (5,41): max cos=0.514705973641, min angle=59.0222 deg, #pairs at max=183, antipodal pairs=0
+Sloane pack.5.41: max cos=0.514994652697, min angle=59.0029 deg, #pairs at max=153, antipodal pairs=0
+Sloane pack.5.40: max cos=0.5, spectrum {-1:20,-1/2:240,0:280,1/2:240} (= D5 spectrum), antipodal pairs=20
+spherical-codes.org (4,14): max cos=0.319519 (71.3662 deg); (4,15): max cos=0.350992 (69.4520 deg)

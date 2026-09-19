@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+"""Exact enumeration of the gap of loneliness ML(v) = max_t min_i ||v_i t||
+for all n-subsets of {1..B} with gcd 1 (n moving runners + 1 stationary, k=n+1).
+
+Exactness: f(t)=min_i ||v_i t|| is piecewise linear with slopes +-v_i, so its max is
+attained at a breakpoint a/(2 v_i) or a crossing a/(v_i+v_j), a/(v_i-v_j).
+We evaluate f exactly (integer arithmetic) at all such rationals in (0,1).
+
+Also computes for each set:
+  * lonely times at level ML (candidate points where f = ML)
+  * minimal modulus m*(v): smallest m such that some a in Z_m has
+    v_i a mod m in [m/(n+1), m - m/(n+1)] for all i (i.e. t=a/m certifies 1/(n+1)).
+Usage: python3 lrc_enum.py n B outfile.json
+"""
+import sys, json, itertools, math
+from fractions import Fraction
+import numpy as np
+
+def ml_exact(v):
+    """Return (ML as Fraction, list of lonely times (Fraction) attaining ML)."""
+    v = np.array(v, dtype=np.int64)
+    n = len(v)
+    dens = set()
+    for x in v:
+        dens.add(int(2 * x))
+    for i in range(n):
+        for j in range(i + 1, n):
+            dens.add(int(v[i] + v[j]))
+            dens.add(int(v[j] - v[i]))
+    best = Fraction(0)
+    best_times = []
+    for d in dens:
+        if d <= 1:
+            continue
+        a = np.arange(1, d, dtype=np.int64)
+        r = (v[:, None] * a[None, :]) % d
+        dist = np.minimum(r, d - r).min(axis=0)  # numerators over d
+        mx = int(dist.max())
+        val = Fraction(mx, d)
+        if val > best:
+            best = val
+            best_times = [Fraction(int(x), d) for x in a[dist == mx]]
+        elif val == best:
+            best_times += [Fraction(int(x), d) for x in a[dist == mx]]
+    return best, sorted(set(best_times))
+
+def min_modulus(v, n, mmax):
+    """Smallest m<=mmax s.t. exists a: all v_i a mod m in [ceil(m/(n+1)), m-ceil(m/(n+1))]."""
+    v = np.array(v, dtype=np.int64)
+    for m in range(2, mmax + 1):
+        lo = -(-m // (n + 1))  # ceil(m/(n+1))
+        hi = m - lo
+        if lo > hi:
+            continue
+        a = np.arange(1, m, dtype=np.int64)
+        r = (v[:, None] * a[None, :]) % m
+        ok = ((r >= lo) & (r <= hi)).all(axis=0)
+        if ok.any():
+            return m
+    return None
+
+def main():
+    n, B = int(sys.argv[1]), int(sys.argv[2])
+    out = sys.argv[3]
+    first = set(int(x) for x in sys.argv[4].split(',')) if len(sys.argv) > 4 else None
+    res = []
+    target = Fraction(1, n + 1)
+    for v in itertools.combinations(range(1, B + 1), n):
+        if math.gcd(*v) != 1:
+            continue
+        if first is not None and v[0] not in first:
+            continue
+        ml, times = ml_exact(v)
+        mstar = min_modulus(v, n, 4 * B + 4)
+        res.append({
+            "v": list(v), "ml": [ml.numerator, ml.denominator],
+            "tight": ml == target,
+            "below_target": ml < target,
+            "times": [[t.numerator, t.denominator] for t in times] if ml <= Fraction(1, n) else None,
+            "mstar": mstar,
+        })
+    with open(out, "w") as f:
+        json.dump({"n": n, "B": B, "sets": res}, f)
+    mls = sorted(set(Fraction(*r["ml"]) for r in res))
+    print(f"n={n} B={B} sets={len(res)} minML={mls[0]} (target {target}) "
+          f"#below_target={sum(r['below_target'] for r in res)} #tight={sum(r['tight'] for r in res)}")
+
+if __name__ == "__main__":
+    main()
+
+
+# ---- analyze.py ----
+#!/usr/bin/env python3
+"""Analyze enumeration outputs: tight instances, lonely-time denominators,
+spectrum below 1/n (Kravitz / Fan-Sun form s/(ns+k)), minimal modulus m*."""
+import json, glob, math
+from fractions import Fraction
+from collections import Counter, defaultdict
+
+for fn in sorted([f for f in glob.glob("/home/ubuntu/lrc/enum_n*_B*.json") if "sos" not in f], key=lambda s: int(s.split("_n")[1].split("_")[0])):
+    d = json.load(open(fn)); n, B, S = d["n"], d["B"], d["sets"]
+    print(f"\n=== n={n} (k={n+1}) speeds<=B={B}, {len(S)} gcd-1 sets ===")
+    tight = [r for r in S if r["tight"]]
+    print("tight instances:", [r["v"] for r in tight])
+    for r in tight:
+        ts = [Fraction(*t) for t in r["times"]]
+        dens = sorted(set(t.denominator for t in ts))
+        res = [[x % (n + 1) for x in r["v"]]]
+        print(f"  v={r['v']} lonely times={[str(t) for t in ts]} denominators={dens} residues mod {n+1}={res[0]}")
+    # spectrum below 1/n
+    below = defaultdict(list)
+    for r in S:
+        ml = Fraction(*r["ml"])
+        if ml < Fraction(1, n):
+            below[ml].append(r["v"])
+    print(f"distinct ML values < 1/n: {len(below)}")
+    kc = Counter()
+    for ml in sorted(below):
+        p, q = ml.numerator, ml.denominator
+        k = q - n * p  # ml = p/(np+k)
+        kc[k] += 1
+        ex = below[ml][:3]
+        print(f"  ML={ml} = s/(ns+k) with s={p},k={k}; #sets={len(below[ml])} e.g. {ex}")
+    print("  k-distribution (k=1 is Kravitz discrete part):", dict(kc))
+    # minimal modulus statistics
+    ratios = [(r["mstar"], max(r["v"]), r["v"]) for r in S if r["mstar"] is not None]
+    none = sum(1 for r in S if r["mstar"] is None)
+    mx = max(ratios, key=lambda x: x[0] / x[1])
+    print(f"m* (min modulus of a time a/m certifying 1/(n+1)): none-found={none}, max m*={max(x[0] for x in ratios)}, "
+          f"max m*/maxspeed={mx[0]}/{mx[1]} at v={mx[2]}")
+    cnt = Counter(r["mstar"] for r in S)
+    small = sum(c for m, c in cnt.items() if m is not None and m <= n + 1)
+    print(f"  fraction with m* <= n+1: {small/len(S):.4f}; with m* <= 2(n+1): {sum(c for m,c in cnt.items() if m is not None and m <= 2*(n+1))/len(S):.4f}")
+    # ML distribution summary
+    mlc = Counter(Fraction(*r["ml"]) for r in S)
+    print(f"  ML=1/2 fraction: {mlc[Fraction(1,2)]/len(S):.4f}; #distinct ML values: {len(mlc)}")

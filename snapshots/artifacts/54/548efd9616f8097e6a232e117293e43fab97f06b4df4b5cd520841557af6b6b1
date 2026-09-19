@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""Independent check of claim 95b804ef (idea d93b4510).
+
+For m | n, m < n, we compute the set  D(m,n) = { d mod m : x^d - 1 in (Phi_m, Phi_n) Z[x] }.
+Since x is a unit modulo (Phi_m, Phi_n) (Phi_k(0) = +-1), the congruences
+    f = -x^a (mod Phi_m),  f = -x^b (mod Phi_n)
+are simultaneously solvable in Z[x] iff  b - a  mod m  lies in D(m,n)  (a, b taken with b >= a,
+otherwise swap the roles using the unit x).
+
+Method (exact integer linear algebra, no Groebner bases):
+  Z[x]/(Phi_m) = Z[zeta_m] is free over Z with basis 1, x, ..., x^{phi(m)-1}.
+  The ideal (Phi_n) in Z[zeta_m] is the Z-span of  x^i * (Phi_n mod Phi_m),  0 <= i < phi(m).
+  If Res(Phi_m, Phi_n) = +-1 the ideal is the whole ring (all d allowed).
+  Otherwise the generator matrix G is square nonsingular and  v in ideal  iff  G^{-1} v is integral.
+"""
+import sys
+from sympy import cyclotomic_poly, Poly, symbols, Matrix, Rational, totient, factorint, resultant
+x = symbols('x')
+
+
+def prime_power_ratio(q):
+    f = factorint(q)
+    return len(f) == 1
+
+
+def allowed_differences(m, n):
+    Pm = Poly(cyclotomic_poly(m, x), x)
+    Pn = Poly(cyclotomic_poly(n, x), x)
+    phi = int(totient(m))
+    g = Pn.rem(Pm)
+    cols = []
+    for i in range(phi):
+        gi = (g * Poly(x ** i, x)).rem(Pm)
+        c = [0] * phi
+        for (e,), coeff in gi.terms():
+            c[e] = int(coeff)
+        cols.append(c)
+    G = Matrix(cols).T  # phi x phi, columns = generators
+    if G.det() == 0:
+        raise RuntimeError("degenerate")
+    Ginv = G.inv()
+    res = []
+    for d in range(m):
+        v = (Poly(x ** d, x) - Poly(1, x)).rem(Pm)
+        c = [0] * phi
+        for (e,), coeff in v.terms():
+            c[e] = int(coeff)
+        sol = Ginv * Matrix(c)
+        if all(s.q == 1 for s in sol):
+            res.append(d)
+    return res, abs(int(G.det()))
+
+
+if __name__ == "__main__":
+    N = int(sys.argv[1]) if len(sys.argv) > 1 else 60
+    bad = []
+    for n in range(2, N + 1):
+        for m in range(2, n):
+            if n % m:
+                continue
+            q = n // m
+            D, idx = allowed_differences(m, n)
+            if not prime_power_ratio(q):
+                pred = list(range(m))
+                tag = "non-pp ratio: all"
+            else:
+                p = list(factorint(q))[0]
+                if p == 2 and m % 2 == 0:
+                    pred = [d for d in range(m) if d % (m // 2) == 0]
+                    tag = "m even, ratio 2^t: d = 0 mod m/2"
+                else:
+                    pred = [0]
+                    tag = "d = 0 mod m"
+            ok = (D == pred)
+            if not ok:
+                bad.append((m, n, D, pred))
+            print(f"m={m:3d} n={n:3d} q={q:3d} |Z[x]/(Phi_m,Phi_n)|={idx:6d}  D={D}  [{tag}] {'OK' if ok else 'MISMATCH'}")
+    print("mismatches:", bad)

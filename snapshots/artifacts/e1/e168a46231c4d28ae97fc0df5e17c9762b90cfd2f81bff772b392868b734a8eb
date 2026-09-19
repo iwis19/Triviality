@@ -1,0 +1,116 @@
+"""Second known 40-point kissing configuration in R^5 (Leech 1967; Cohn-Jiao-Kumar-Torquato 2011, Sect. 4.2, 'C5-40b'):
+24-cell equator (D4 roots) + top cap = coset b (±e_i, +1) + bottom cap = coset c ((±1/2)^4 even signs, -1), all scaled by 1/sqrt2.
+Checks: it is a kissing configuration (min angle 60), it is not isometric to D5 (not antipodal), its deepest hole,
+and 'augment then relax' (idea seed (iii)) from both 40-point configurations.
+Also: is Sloane's pack.5.40 antipodal (D5) or not (C5-40b)?
+"""
+import itertools
+import numpy as np
+from scipy.optimize import minimize
+
+rng = np.random.default_rng(1)
+
+
+def d4_roots():
+    R = []
+    for i, j in itertools.combinations(range(4), 2):
+        for si in (1, -1):
+            for sj in (1, -1):
+                v = np.zeros(4); v[i] = si; v[j] = sj; R.append(v)
+    return np.array(R)
+
+
+def coset_b():
+    return np.array([s * np.eye(4)[i] for i in range(4) for s in (1, -1)])
+
+
+def coset_c():
+    return np.array([np.array(s) / 2 for s in itertools.product((1, -1), repeat=4) if np.prod(s) == 1])
+
+
+def layered(top, bottom):
+    eq = np.hstack([d4_roots(), np.zeros((24, 1))])
+    tp = np.hstack([top, np.ones((8, 1))])
+    bt = np.hstack([bottom, -np.ones((8, 1))])
+    X = np.vstack([eq, tp, bt]) / np.sqrt(2)
+    return X
+
+
+def gram_stats(X):
+    G = X @ X.T
+    np.fill_diagonal(G, -1)
+    return G.max(), np.degrees(np.arccos(np.clip(G.max(), -1, 1)))
+
+
+def is_antipodal(X, tol=1e-6):
+    return all(np.min(np.linalg.norm(X + x, axis=1)) < tol for x in X)
+
+
+def deepest_hole(X, starts=3000):
+    best, bp = -1, None
+    for _ in range(starts):
+        p0 = rng.normal(size=X.shape[1])
+        f = lambda p: (X @ (p / np.linalg.norm(p))).max()
+        r = minimize(f, p0, method="Nelder-Mead", options={"xatol": 1e-10, "fatol": 1e-12, "maxiter": 4000})
+        a = np.degrees(np.arccos(np.clip(r.fun, -1, 1)))
+        if a > best:
+            best, bp = a, r.x / np.linalg.norm(r.x)
+    return best, bp
+
+
+D5 = layered(coset_b(), coset_b())
+C40b = layered(coset_b(), coset_c())
+for name, X in (("C5-40a (D5)", D5), ("C5-40b", C40b)):
+    m, ang = gram_stats(X)
+    print(f"{name}: N={len(X)}, max inner product {m:.6f}, min angle {ang:.4f}, antipodal={is_antipodal(X)}")
+    h, p = deepest_hole(X)
+    print(f"   deepest hole {h:.4f} deg at {np.round(p, 4)}")
+
+S40 = np.loadtxt("/home/ubuntu/sloane_5_40.txt").reshape(-1, 5)
+S40 /= np.linalg.norm(S40, axis=1, keepdims=True)
+print("Sloane pack.5.40 antipodal:", is_antipodal(S40, tol=1e-4))
+# distance distribution as isometry invariant
+def inner_product_histogram(X):
+    G = np.round(X @ X.T, 3)
+    vals, cnt = np.unique(G[np.triu_indices(len(X), 1)], return_counts=True)
+    return dict(zip(vals, cnt))
+print("D5 ip histogram   :", inner_product_histogram(D5))
+print("C5-40b ip histogram:", inner_product_histogram(C40b))
+print("Sloane40 ip histogram:", inner_product_histogram(S40))
+
+
+# augment-then-relax: maximise t s.t. <x_i,x_j> <= cos(t) via SLSQP on 41 points (smooth reformulation with slack s = max ip)
+def relax(X0, iters=3000):
+    N, n = X0.shape
+    iu = np.triu_indices(N, 1)
+
+    def unpack(z):
+        X = z[:-1].reshape(N, n)
+        return X, z[-1]
+
+    def obj(z):
+        return z[-1]  # minimise max inner product s
+
+    def cons_ip(z):
+        X, s = unpack(z)
+        G = X @ X.T
+        return s - G[iu]  # >= 0
+
+    def cons_norm(z):
+        X, s = unpack(z)
+        return np.sum(X * X, axis=1) - 1  # == 0
+
+    z0 = np.concatenate([X0.ravel(), [((X0 @ X0.T) - 2 * np.eye(N)).max()]])
+    r = minimize(obj, z0, method="SLSQP",
+                 constraints=[{"type": "ineq", "fun": cons_ip}, {"type": "eq", "fun": cons_norm}],
+                 options={"maxiter": iters, "ftol": 1e-12})
+    X, s = unpack(r.x)
+    X /= np.linalg.norm(X, axis=1, keepdims=True)
+    return gram_stats(X)[1], X
+
+
+for name, X in (("D5", D5), ("C5-40b", C40b)):
+    h, p = deepest_hole(X, starts=500)
+    X41 = np.vstack([X, p])
+    ang, _ = relax(X41)
+    print(f"augment-then-relax from {name}+hole: 41-point min angle {ang:.4f} deg")

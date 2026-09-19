@@ -1,0 +1,25 @@
+-- Core Lean 4 (no Mathlib). Integer core of the second 40-point kissing configuration
+-- C5-40b (Leech; Cohn-Jiao-Kumar-Torquato 2011, Sect. 4.2), scaled by 2*sqrt2:
+-- 24-cell equator (±2,±2,0,0,0), top cap (±2 e_i, 2), bottom cap ((±1)^4 even, -2).
+-- Squared norm 8; kissing condition <u,v> <= 1/2 becomes dot u v <= 4.
+def dot (u v : List Int) : Int := (List.zipWith (· * ·) u v).foldl (· + ·) 0
+
+def c540bVecs : List (List Int) :=
+  [[2,2,0,0,0],[2,-2,0,0,0],[-2,2,0,0,0],[-2,-2,0,0,0],
+   [2,0,2,0,0],[2,0,-2,0,0],[-2,0,2,0,0],[-2,0,-2,0,0],
+   [2,0,0,2,0],[2,0,0,-2,0],[-2,0,0,2,0],[-2,0,0,-2,0],
+   [0,2,2,0,0],[0,2,-2,0,0],[0,-2,2,0,0],[0,-2,-2,0,0],
+   [0,2,0,2,0],[0,2,0,-2,0],[0,-2,0,2,0],[0,-2,0,-2,0],
+   [0,0,2,2,0],[0,0,2,-2,0],[0,0,-2,2,0],[0,0,-2,-2,0],
+   [2,0,0,0,2],[-2,0,0,0,2],[0,2,0,0,2],[0,-2,0,0,2],
+   [0,0,2,0,2],[0,0,-2,0,2],[0,0,0,2,2],[0,0,0,-2,2],
+   [1,1,1,1,-2],[1,1,-1,-1,-2],[1,-1,1,-1,-2],[1,-1,-1,1,-2],
+   [-1,1,1,-1,-2],[-1,1,-1,1,-2],[-1,-1,1,1,-2],[-1,-1,-1,-1,-2]]
+
+theorem c540bVecs_kissing_config :
+    c540bVecs.length = 40 ∧
+    c540bVecs.all (fun v => v.length == 5) = true ∧
+    c540bVecs.all (fun v => dot v v == 8) = true ∧
+    c540bVecs.Nodup ∧
+    c540bVecs.Pairwise (fun u v => dot u v ≤ 4) := by
+  decide

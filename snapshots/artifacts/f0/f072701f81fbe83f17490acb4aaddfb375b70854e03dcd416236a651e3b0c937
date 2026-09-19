@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+"""Circle-method numerology for S3 ∩ S5 ∩ S7 over Z/QZ, Q = 7^k.
+A3 = {n<3^L: base-3 digits in {0,1}}, A5 = {n<5^m: digits<=2}, A7 = {n<7^k: digits<=3},
+with 3^L, 5^m <= 7^k = Q.  Exact identity:
+   |A3 ∩ A5 ∩ A7| = Q^{-2} sum_{a,b} Â3(a) Â5(b) conj(Â7(a+b)).
+Main term M = |A3||A5||A7|/Q^2;  trivial error bound
+   E = Q^{-2} sum_{(a,b)≠0} |Â3(a)||Â5(b)||Â7(a+b)|  (computed via FFT convolution of |Â3|,|Â5|).
+Also the two-set analogues and L^q norms of the normalized Riesz products.
+"""
+import numpy as np, math, sys, time
+
+def digit_set(base, dmax, ndig):
+    """indicator array (length base**ndig) of numbers with all base-`base` digits <= dmax"""
+    arr = np.array([1.0])
+    for _ in range(ndig):
+        new = np.zeros(len(arr) * base)
+        for d in range(dmax + 1):
+            new[d * len(arr):(d + 1) * len(arr)] = arr
+        arr = new
+    return arr
+
+def run(k):
+    Q = 7 ** k
+    L = int(math.floor(k * math.log(7) / math.log(3)))
+    m = int(math.floor(k * math.log(7) / math.log(5)))
+    ind3 = np.zeros(Q); ind3[:3 ** L] = digit_set(3, 1, L)
+    ind5 = np.zeros(Q); ind5[:5 ** m] = digit_set(5, 2, m)
+    ind7 = digit_set(7, 3, k)
+    exact3 = int((ind3 * ind5 * ind7).sum())
+    F3, F5, F7 = (np.abs(np.fft.fft(x)) for x in (ind3, ind5, ind7))
+    n3, n5, n7 = ind3.sum(), ind5.sum(), ind7.sum()
+    # convolution of |F3| and |F5| over Z/Q via FFT (all nonnegative)
+    conv = np.real(np.fft.ifft(np.fft.fft(F3) * np.fft.fft(F5)))
+    total = float((F7 * conv).sum()) / Q ** 2
+    main = n3 * n5 * n7 / Q ** 2
+    E3 = total - main
+    # two-set analogues (over Z/Q): |A_i ∩ A_j| = Q^{-1} sum_a Â_i(a) conj Â_j(a)
+    def two(Fi, Fj, ni, nj, indi, indj):
+        exact = int((indi * indj).sum())
+        mainv = ni * nj / Q
+        err = float((Fi * Fj).sum()) / Q - mainv
+        return exact, mainv, err
+    t37 = two(F3, F7, n3, n7, ind3, ind7)
+    t57 = two(F5, F7, n5, n7, ind5, ind7)
+    t35 = two(F3, F5, n3, n5, ind3, ind5)
+    # L^q exponents of normalized Riesz products at this scale: log_Q( sum_a (|Â(a)|/|A|)^q )
+    def lq(F, n, q):
+        return math.log((F / n) ** q .sum()) / math.log(Q) if False else math.log(((F / n) ** q).sum()) / math.log(Q)
+    out = dict(k=k, Q=Q, L=L, m=m, n3=int(n3), n5=int(n5), n7=int(n7),
+               exact3=exact3, main3=main, trivial_err3=E3,
+               t37=t37, t57=t57, t35=t35,
+               l1=[lq(F3, n3, 1), lq(F5, n5, 1), lq(F7, n7, 1)],
+               l2=[lq(F3, n3, 2), lq(F5, n5, 2), lq(F7, n7, 2)])
+    return out
+
+if __name__ == "__main__":
+    kmax = int(sys.argv[1]) if len(sys.argv) > 1 else 8
+    for k in range(3, kmax + 1):
+        t0 = time.time(); o = run(k)
+        print(f"k={o['k']} Q=7^{k}={o['Q']} L={o['L']} m={o['m']}  |A3|={o['n3']} |A5|={o['n5']} |A7|={o['n7']}")
+        print(f"   triple: exact={o['exact3']}  main={o['main3']:.4f}  trivial_err_bound={o['trivial_err3']:.4g}  "
+              f"log_Q(err/main)={math.log(o['trivial_err3']/o['main3'])/math.log(o['Q']):.4f}")
+        for name, t in (("3,7", o['t37']), ("5,7", o['t57']), ("3,5", o['t35'])):
+            ex, mv, er = t
+            print(f"   pair {name}: exact={ex} main={mv:.3f} trivial_err={er:.4g} log_Q(err/main)={math.log(er/mv)/math.log(o['Q']):.4f}")
+        print(f"   L1 exponents (log_Q sum|F|/|A|): {['%.4f'%v for v in o['l1']]}   L2: {['%.4f'%v for v in o['l2']]}   ({time.time()-t0:.1f}s)")
+        sys.stdout.flush()

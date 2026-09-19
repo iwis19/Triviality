@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Galloping intersection of digit-restricted sets with arbitrary precision.
+Enumerates n < N with base-b digits <= d for each (b,d) in bases, optionally shifted:
+condition is (n - t) in S_{b,d}.  Usage: isect.py N [--bases 3:1:0,5:2:0,7:3:0] [--count-only]
+"""
+import sys, time
+
+def nextd(x, b, d):
+    """smallest y >= x all of whose base-b digits are <= d"""
+    if x <= 0:
+        return 0
+    dig = []
+    v = x
+    while v:
+        dig.append(v % b); v //= b
+    L = len(dig)
+    bad = -1
+    for i in range(L - 1, -1, -1):
+        if dig[i] > d:
+            bad = i; break
+    if bad < 0:
+        return x
+    j = bad + 1
+    while j < L and dig[j] >= d:
+        j += 1
+    if j >= L:
+        return b ** L
+    dig[j] += 1
+    for i in range(j):
+        dig[i] = 0
+    r = 0
+    for i in range(L - 1, -1, -1):
+        r = r * b + dig[i]
+    return r
+
+def enumerate_isect(N, bases, start=0):
+    """bases: list of (b, d, t). yields n in [start, N) with n - t in S_{b,d} for all."""
+    x = start
+    steps = 0
+    while x < N:
+        changed = True
+        while changed:
+            changed = False
+            for (b, d, t) in bases:
+                y = nextd(x - t, b, d) + t
+                steps += 1
+                if y != x:
+                    x = y; changed = True; break
+        if x >= N:
+            break
+        yield x, steps
+        x += 1
+
+if __name__ == "__main__":
+    N = int(sys.argv[1]) if len(sys.argv) > 1 else 10**70
+    bases = [(3, 1, 0), (5, 2, 0), (7, 3, 0)]
+    countonly = False
+    args = sys.argv[2:]
+    i = 0
+    while i < len(args):
+        if args[i] == "--bases":
+            bases = [tuple(int(z) for z in s.split(":")) for s in args[i + 1].split(",")]; i += 2
+        elif args[i] == "--count-only":
+            countonly = True; i += 1
+        else:
+            i += 1
+    t0 = time.time(); cnt = 0; steps = 0
+    for n, steps in enumerate_isect(N, bases):
+        cnt += 1
+        if not countonly:
+            print(n)
+    print(f"# count={cnt} steps={steps} time={time.time()-t0:.2f}s", file=sys.stderr)

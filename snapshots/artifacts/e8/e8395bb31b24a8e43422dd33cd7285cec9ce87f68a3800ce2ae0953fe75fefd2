@@ -1,0 +1,92 @@
+"""Test the strong form of claim 8fb1100d: 'every distinct covering contains moduli m and pm (p prime)'.
+
+For each L we ask a SAT solver whether there is a covering of Z/L by classes with distinct moduli d | L, d > 1,
+at most one class per modulus, such that NO two used moduli have ratio exactly a prime ('prime-step-free').
+Variables x[d,r] = class r mod d is used.  Constraints:
+  - coverage: for each residue j mod L, OR_{d|L,d>1} x[d, j mod d]
+  - distinctness: at most one r for each d
+  - prime-step-free: for d | L, p prime, pd | L: not(used[d] and used[pd])
+Also reports, for comparison, plain covering (no restriction) and the PPR-free variant of ppr_free.py.
+Requires python-sat (pip install python-sat).
+"""
+import sys
+from itertools import combinations
+from sympy import divisors, primefactors, isprime
+from pysat.solvers import Cadical153
+from pysat.card import CardEnc
+
+def solve(L, restriction):
+    ds = [d for d in divisors(L) if d > 1]
+    var = {}
+    nv = 0
+    for d in ds:
+        for r in range(d):
+            nv += 1; var[(d, r)] = nv
+    used = {}
+    for d in ds:
+        nv += 1; used[d] = nv
+    cls = []
+    for j in range(L):
+        cls.append([var[(d, j % d)] for d in ds])
+    for d in ds:
+        lits = [var[(d, r)] for r in range(d)]
+        cls += CardEnc.atmost(lits, 1, top_id=nv).clauses
+        nv = max(nv, max(abs(l) for c in cls for l in c))
+        for r in range(d):
+            cls.append([-var[(d, r)], used[d]])            # x[d,r] -> used[d]
+    for a, b in combinations(ds, 2):
+        if b % a == 0:
+            q = b // a
+            if restriction == 'prime_step' and isprime(q):
+                cls.append([-used[a], -used[b]])
+            if restriction == 'ppr' and len(primefactors(q)) == 1:
+                cls.append([-used[a], -used[b]])
+    with Cadical153(bootstrap_with=cls) as s:
+        ok = s.solve()
+        if not ok:
+            return None
+        model = set(l for l in s.get_model() if l > 0)
+        return sorted((d, r) for (d, r), v in var.items() if v in model)
+
+if __name__ == '__main__':
+    Ls = [int(a) for a in sys.argv[1:]] or [12, 24, 36, 48, 60, 72, 80, 90, 96, 108, 120, 144, 168, 180, 210, 240, 252, 280, 288, 300, 336, 360, 378, 420, 432, 480, 504, 540, 560, 600, 630, 720, 840, 900, 1080, 1260, 1440, 1680, 2520]
+    for L in Ls:
+        plain = solve(L, None)
+        ps = solve(L, 'prime_step')
+        ppr = solve(L, 'ppr')
+        print(f"L={L}: covering {'SAT' if plain else 'UNSAT'}; prime-step-free {'SAT' if ps else 'UNSAT'}; PPR-free {'SAT' if ppr else 'UNSAT'}", flush=True)
+        if ps:
+            print("   prime-step-free covering:", ps, flush=True)
+
+# ---- output (default L list; killed by 1200 s timeout while working on L=720) ----
+# L=12: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=24: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=36: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=48: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=60: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=72: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=80: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=90: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=96: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=108: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=120: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=144: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=168: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=180: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=210: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=240: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=252: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=280: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=288: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=300: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=336: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=360: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=378: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=420: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=432: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=480: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=504: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=540: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=560: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=600: covering SAT; prime-step-free UNSAT; PPR-free UNSAT
+# L=630: covering SAT; prime-step-free UNSAT; PPR-free UNSAT

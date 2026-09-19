@@ -1,0 +1,350 @@
+import Mathlib
+import MathLab.Basic
+
+/-!
+# Sum-denominator lemma for the lonely runner problem
+
+For positive integer speeds `v : Fin n → ℕ` let
+
+* `nd x = |x - round x|` be the distance from `x` to the nearest integer, and
+* `gap v t = ⨅ i, nd (v i * t)` the distance (on the unit circle) from the stationary
+  runner to the nearest moving runner at time `t`.
+
+`gap_max_at_crossing` shows that the loneliness maximum `sup_t gap v t` is attained, and
+that a maximiser `t` either has `gap v t = 1/2` or is a "crossing time"
+`t = a / (v i + v j)` with `i ≠ j`, `a : ℤ`.
+-/
+
+open Filter Topology
+
+/-- Distance from `x` to the nearest integer. -/
+noncomputable def nd (x : ℝ) : ℝ := |x - round x|
+
+/-- Distance from the stationary runner to the nearest of the runners with speeds `v i`
+at time `t`. -/
+noncomputable def gap {n : ℕ} (v : Fin n → ℕ) (t : ℝ) : ℝ := ⨅ i, nd (v i * t)
+
+lemma nd_nonneg (x : ℝ) : 0 ≤ nd x := abs_nonneg _
+
+lemma nd_le_half (x : ℝ) : nd x ≤ 1 / 2 := abs_sub_round x
+
+lemma nd_eq_min (x : ℝ) : nd x = min (Int.fract x) (1 - Int.fract x) := abs_sub_round_eq_min x
+
+lemma nd_le_add (x y : ℝ) : nd x ≤ nd y + |x - y| := by
+  unfold nd
+  calc |x - round x| ≤ |x - round y| := round_le x (round y)
+    _ = |(x - y) + (y - round y)| := by ring_nf
+    _ ≤ |x - y| + |y - round y| := abs_add_le _ _
+    _ = |y - round y| + |x - y| := add_comm _ _
+
+lemma lipschitz_nd : LipschitzWith 1 nd :=
+  LipschitzWith.of_le_add fun x y => by rw [Real.dist_eq]; exact nd_le_add x y
+
+lemma continuous_nd : Continuous nd := lipschitz_nd.continuous
+
+lemma nd_add_int (x : ℝ) (k : ℤ) : nd (x + k) = nd x := by
+  unfold nd
+  rw [round_add_intCast]
+  push_cast
+  ring_nf
+
+lemma nd_neg_le (x : ℝ) : nd (-x) ≤ nd x := by
+  unfold nd
+  calc |-x - round (-x)| ≤ |-x - ((-round x : ℤ) : ℝ)| := round_le _ _
+    _ = |x - round x| := by
+      push_cast
+      rw [← abs_neg]
+      ring_nf
+
+lemma nd_neg (x : ℝ) : nd (-x) = nd x :=
+  le_antisymm (nd_neg_le x) (by simpa using nd_neg_le (-x))
+
+/-- Local slope `+1` of `nd` to the right of a point in the "increasing" half. -/
+lemma nd_add_of_fract_lt_half {x h : ℝ} (hx : Int.fract x < 1 / 2) (h0 : 0 ≤ h)
+    (hh : Int.fract x + h ≤ 1 / 2) : nd (x + h) = nd x + h := by
+  have hf : Int.fract (x + h) = Int.fract x + h := by
+    rw [Int.fract_eq_iff]
+    refine ⟨by linarith [Int.fract_nonneg x], by linarith, ⟨⌊x⌋, ?_⟩⟩
+    unfold Int.fract
+    ring
+  rw [nd_eq_min, nd_eq_min, hf, min_eq_left (by linarith), min_eq_left (by linarith)]
+
+lemma gap_le {n : ℕ} (v : Fin n → ℕ) (t : ℝ) (i : Fin n) : gap v t ≤ nd (v i * t) :=
+  ciInf_le ⟨0, by rintro _ ⟨j, rfl⟩; exact nd_nonneg _⟩ i
+
+lemma gap_exists_eq {n : ℕ} [NeZero n] (v : Fin n → ℕ) (t : ℝ) :
+    ∃ i, nd (v i * t) = gap v t :=
+  exists_eq_ciInf_of_finite
+
+lemma gap_add_int {n : ℕ} (v : Fin n → ℕ) (t : ℝ) (k : ℤ) : gap v (t + k) = gap v t := by
+  unfold gap
+  have : ∀ i : Fin n, nd (v i * (t + k)) = nd (v i * t) := by
+    intro i
+    rw [mul_add, ← nd_add_int ((v i : ℝ) * t) ((v i : ℤ) * k)]
+    push_cast
+    ring_nf
+  simp only [this]
+
+lemma gap_neg {n : ℕ} (v : Fin n → ℕ) (t : ℝ) : gap v (-t) = gap v t := by
+  unfold gap
+  simp only [mul_neg, nd_neg]
+
+lemma gap_continuous {n : ℕ} [NeZero n] (v : Fin n → ℕ) : Continuous (gap v) := by
+  have : gap v = fun t => Finset.univ.inf' Finset.univ_nonempty (fun i => nd (v i * t)) := by
+    ext t
+    unfold gap
+    rw [Finset.inf'_univ_eq_ciInf]
+  rw [this]
+  exact Continuous.finset_inf'_apply _ fun i _ =>
+    continuous_nd.comp (continuous_const.mul continuous_id)
+
+/-- The loneliness maximum is attained (compactness of `[0,1]` plus periodicity). -/
+lemma gap_exists_max {n : ℕ} [NeZero n] (v : Fin n → ℕ) : ∃ t : ℝ, ∀ s, gap v s ≤ gap v t := by
+  obtain ⟨t, -, ht⟩ := (isCompact_Icc (a := (0 : ℝ)) (b := 1)).exists_isMaxOn
+    (Set.nonempty_Icc.mpr zero_le_one) (gap_continuous v).continuousOn
+  refine ⟨t, fun s => ?_⟩
+  have hs : Int.fract s ∈ Set.Icc (0 : ℝ) 1 := ⟨Int.fract_nonneg s, (Int.fract_lt_one s).le⟩
+  calc gap v s = gap v (Int.fract s + ⌊s⌋) := by rw [Int.fract_add_floor]
+    _ = gap v (Int.fract s) := gap_add_int _ _ _
+    _ ≤ gap v t := ht hs
+
+/-- If every runner attaining the minimum at time `t` is in its increasing phase, then
+`gap` can be increased by moving slightly to the right. -/
+lemma gap_exists_gt_of_all_plus {n : ℕ} [NeZero n] (v : Fin n → ℕ) (hv : ∀ i, 0 < v i) (t : ℝ)
+    (h : ∀ i, nd (v i * t) = gap v t → Int.fract (v i * t) < 1 / 2) :
+    ∃ ε > 0, gap v t < gap v (t + ε) := by
+  have key : ∀ i, ∀ᶠ ε in 𝓝[>] (0 : ℝ), gap v t < nd (v i * (t + ε)) := by
+    intro i
+    rcases (gap_le v t i).lt_or_eq with hlt | heq
+    · have hc : ContinuousAt (fun ε : ℝ => nd (v i * (t + ε))) 0 :=
+        (continuous_nd.comp (continuous_const.mul (continuous_const.add continuous_id))).continuousAt
+      have hlt' : gap v t < (fun ε : ℝ => nd (v i * (t + ε))) 0 := by simpa using hlt
+      exact (hc.eventually_const_lt hlt').filter_mono nhdsWithin_le_nhds
+    · have hf := h i heq.symm
+      have hvi : (0 : ℝ) < v i := by exact_mod_cast hv i
+      set δ : ℝ := (1 / 2 - Int.fract ((v i : ℝ) * t)) / v i with hδ_def
+      have hδ : 0 < δ := div_pos (by linarith) hvi
+      filter_upwards [Ioo_mem_nhdsGT hδ] with ε hε
+      have hε' : (v i : ℝ) * ε < 1 / 2 - Int.fract ((v i : ℝ) * t) := by
+        have := hε.2
+        rw [hδ_def, lt_div_iff₀ hvi] at this
+        linarith
+      have : 0 < (v i : ℝ) * ε := mul_pos hvi hε.1
+      rw [mul_add, nd_add_of_fract_lt_half hf this.le (by linarith), ← heq]
+      linarith
+  obtain ⟨ε, hall, hε⟩ := ((eventually_all.mpr key).and self_mem_nhdsWithin).exists
+  obtain ⟨j, hj⟩ := gap_exists_eq v (t + ε)
+  refine ⟨ε, hε, ?_⟩
+  rw [← hj]
+  exact hall j
+
+/-- **Sum-denominator lemma.** For positive integer speeds the loneliness maximum
+`sup_t gap v t` is attained at some time `t`, and either `gap v t = 1/2` or `t` is a crossing
+time `a / (v i + v j)` of two distinct runners (`a : ℤ`). -/
+theorem gap_max_at_crossing {n : ℕ} [NeZero n] (v : Fin n → ℕ) (hv : ∀ i, 0 < v i) :
+    ∃ t : ℝ, (∀ s : ℝ, gap v s ≤ gap v t) ∧
+      (gap v t = 1 / 2 ∨ ∃ i j : Fin n, i ≠ j ∧ ∃ a : ℤ, t = a / ((v i : ℝ) + v j)) := by
+  obtain ⟨t, ht⟩ := gap_exists_max v
+  refine ⟨t, ht, ?_⟩
+  by_cases hhalf : gap v t = 1 / 2
+  · exact Or.inl hhalf
+  right
+  have hm_lt : gap v t < 1 / 2 :=
+    lt_of_le_of_ne ((gap_le v t (Classical.arbitrary _)).trans (nd_le_half _)) hhalf
+  by_cases hP : ∃ i, nd (v i * t) = gap v t ∧ Int.fract ((v i : ℝ) * t) < 1 / 2
+  · by_cases hQ : ∃ j, nd (v j * t) = gap v t ∧ 1 / 2 ≤ Int.fract ((v j : ℝ) * t)
+    · obtain ⟨i, hi, hfi⟩ := hP
+      obtain ⟨j, hj, hfj⟩ := hQ
+      refine ⟨i, j, ?_, ⌊(v i : ℝ) * t⌋ + ⌊(v j : ℝ) * t⌋ + 1, ?_⟩
+      · rintro rfl
+        linarith
+      · have e1 : gap v t = v i * t - ⌊(v i : ℝ) * t⌋ := by
+          rw [← hi, nd_eq_min, min_eq_left (by linarith)]
+          unfold Int.fract
+          ring
+        have e2 : gap v t = ⌊(v j : ℝ) * t⌋ + 1 - v j * t := by
+          rw [← hj, nd_eq_min, min_eq_right (by linarith)]
+          unfold Int.fract
+          ring
+        have hpos : (0 : ℝ) < v i + v j := by
+          have := hv i
+          have := hv j
+          positivity
+        rw [eq_div_iff hpos.ne']
+        push_cast
+        linarith
+    · push_neg at hQ
+      obtain ⟨ε, hε, hlt⟩ := gap_exists_gt_of_all_plus v hv t hQ
+      exact absurd (ht (t + ε)) (not_le.mpr hlt)
+  · push_neg at hP
+    have hneg : gap v (-t) = gap v t := gap_neg v t
+    have hall : ∀ i, nd (v i * -t) = gap v (-t) → Int.fract ((v i : ℝ) * -t) < 1 / 2 := by
+      intro i hi
+      rw [hneg, mul_neg, nd_neg] at hi
+      rw [mul_neg]
+      have h1 := hP i hi
+      have h2 : Int.fract ((v i : ℝ) * t) ≠ 0 := by
+        intro h0
+        rw [h0] at h1
+        norm_num at h1
+      rw [Int.fract_neg h2]
+      have h3 : nd (v i * t) = 1 - Int.fract ((v i : ℝ) * t) := by
+        rw [nd_eq_min, min_eq_right (by linarith)]
+      linarith
+    obtain ⟨ε, hε, hlt⟩ := gap_exists_gt_of_all_plus v hv (-t) hall
+    rw [hneg] at hlt
+    exact absurd (ht (-t + ε)) (not_le.mpr hlt)
+
+/-- Consequence: if some time achieves loneliness level `c`, then so does a time which is
+either at level exactly `1/2` or a crossing time `a / (v i + v j)`, `i ≠ j`. -/
+theorem exists_lonely_crossing_time {n : ℕ} [NeZero n] (v : Fin n → ℕ) (hv : ∀ i, 0 < v i)
+    (c : ℝ) (hc : ∃ s : ℝ, c ≤ gap v s) :
+    ∃ t : ℝ, c ≤ gap v t ∧
+      (gap v t = 1 / 2 ∨ ∃ i j : Fin n, i ≠ j ∧ ∃ a : ℤ, t = a / ((v i : ℝ) + v j)) := by
+  obtain ⟨t, ht, hcross⟩ := gap_max_at_crossing v hv
+  obtain ⟨s, hs⟩ := hc
+  exact ⟨t, hs.trans (ht s), hcross⟩
+
+/-! ### The level-`1/2` case: with coprime speeds the time `t = 1/2` works -/
+
+lemma nd_eq_half_iff (x : ℝ) : nd x = 1 / 2 ↔ Int.fract x = 1 / 2 := by
+  rw [nd_eq_min]
+  constructor
+  · intro h
+    have h1 := h ▸ min_le_left (Int.fract x) (1 - Int.fract x)
+    have h2 := h ▸ min_le_right (Int.fract x) (1 - Int.fract x)
+    linarith
+  · intro h
+    rw [h]
+    norm_num
+
+lemma nd_half : nd (1 / 2) = 1 / 2 := by
+  unfold nd
+  rw [one_div, round_two_inv]
+  norm_num
+
+/-- `t = 1/2` achieves the (absolute) maximal loneliness `1/2` iff all speeds are odd. -/
+theorem gap_half_eq_half_iff {n : ℕ} [NeZero n] (v : Fin n → ℕ) :
+    gap v (1 / 2) = 1 / 2 ↔ ∀ i, Odd (v i) := by
+  constructor
+  · intro h i
+    have h1 : nd (v i * (1 / 2)) = 1 / 2 := by
+      have := gap_le v (1 / 2) i
+      rw [h] at this
+      exact le_antisymm (nd_le_half _) this
+    rw [nd_eq_half_iff] at h1
+    unfold Int.fract at h1
+    have h2 : ((v i : ℤ) : ℝ) = 2 * ⌊(v i : ℝ) * (1 / 2)⌋ + 1 := by push_cast; linarith
+    have h3 : (v i : ℤ) = 2 * ⌊(v i : ℝ) * (1 / 2)⌋ + 1 := by exact_mod_cast h2
+    exact (Int.odd_coe_nat _).mp ⟨_, h3⟩
+  · intro h
+    have : ∀ i, nd (v i * (1 / 2)) = 1 / 2 := by
+      intro i
+      obtain ⟨k, hk⟩ := h i
+      have : (v i : ℝ) * (1 / 2) = 1 / 2 + ((k : ℤ) : ℝ) := by
+        rw [hk]; push_cast; ring
+      rw [this, nd_add_int, nd_half]
+    unfold gap
+    simp only [this]
+    exact ciInf_const
+
+/-- If the speeds are coprime (as a set) and some time has loneliness `1/2`, then all speeds
+are odd (and hence, by `gap_half_eq_half_iff`, `t = 1/2` also has loneliness `1/2`). -/
+theorem odd_of_gap_eq_half {n : ℕ} [NeZero n] (v : Fin n → ℕ) (hv : ∀ i, 0 < v i)
+    (hg : Finset.univ.gcd v = 1) {t : ℝ} (ht : gap v t = 1 / 2) : ∀ i, Odd (v i) := by
+  -- each `2 v i t` is an odd integer `o i`
+  obtain ⟨o, hodd, ho⟩ : ∃ o : Fin n → ℤ, (∀ i, Odd (o i)) ∧ ∀ i, (o i : ℝ) = 2 * v i * t := by
+    refine ⟨fun i => 2 * ⌊(v i : ℝ) * t⌋ + 1, fun i => ⟨⌊(v i : ℝ) * t⌋, rfl⟩, fun i => ?_⟩
+    have h1 : nd (v i * t) = 1 / 2 := by
+      have := gap_le v t i
+      rw [ht] at this
+      exact le_antisymm (nd_le_half _) this
+    rw [nd_eq_half_iff] at h1
+    unfold Int.fract at h1
+    push_cast
+    linarith
+  obtain ⟨i₀⟩ : Nonempty (Fin n) := inferInstance
+  -- cross relation `v i * o i₀ = v i₀ * o i`
+  have hcross : ∀ i, (v i : ℤ) * o i₀ = (v i₀ : ℤ) * o i := by
+    intro i
+    have : ((v i : ℤ) * o i₀ : ℝ) = ((v i₀ : ℤ) * o i : ℝ) := by
+      push_cast
+      rw [ho i, ho i₀]
+      ring
+    exact_mod_cast this
+  have hv₀ : ((v i₀ : ℕ) : ℤ) ≠ 0 := by exact_mod_cast (hv i₀).ne'
+  have hgpos : 0 < Int.gcd (v i₀ : ℤ) (o i₀) := Int.gcd_pos_of_ne_zero_left _ hv₀
+  obtain ⟨m', n', hmn, hm, hn⟩ := Int.exists_gcd_one hgpos
+  set g : ℤ := (Int.gcd (v i₀ : ℤ) (o i₀) : ℤ) with hg_def
+  have hg0 : g ≠ 0 := by
+    rw [hg_def]
+    exact_mod_cast hgpos.ne'
+  -- `m'` divides every speed, hence divides their gcd `1`
+  have hm'dvd : ∀ i, m' ∣ (v i : ℤ) := by
+    intro i
+    have h1 : (v i : ℤ) * n' * g = m' * o i * g := by
+      have := hcross i
+      rw [hn, hm] at this
+      linear_combination this
+    have h2 : (v i : ℤ) * n' = m' * o i := mul_right_cancel₀ hg0 h1
+    exact Int.dvd_of_dvd_mul_left_of_gcd_one (Dvd.intro _ h2.symm) hmn
+  have hunit : IsUnit m' := by
+    rw [Int.isUnit_iff_natAbs_eq]
+    have : m'.natAbs ∣ Finset.univ.gcd v := by
+      apply Finset.dvd_gcd
+      intro i _
+      have := Int.natAbs_dvd_natAbs.mpr (hm'dvd i)
+      simpa using this
+    rw [hg] at this
+    exact Nat.eq_one_of_dvd_one this
+  -- hence `v i₀ ∣ o i₀`, so `2 t = o i₀ / v i₀` is an integer `p`
+  have hdvd : (v i₀ : ℤ) ∣ o i₀ := by
+    rw [hm, hn]
+    exact (hunit.mul_left_dvd).mpr (dvd_mul_left g n')
+  set p : ℤ := o i₀ / (v i₀ : ℤ) with hp_def
+  have hp : (v i₀ : ℤ) * p = o i₀ := Int.mul_ediv_cancel' hdvd
+  have h2t : 2 * t = p := by
+    have e2 : ((o i₀ : ℤ) : ℝ) = (v i₀ : ℝ) * p := by
+      rw [← hp]
+      push_cast
+      ring
+    have h1 : (v i₀ : ℝ) * (2 * t) = (v i₀ : ℝ) * p := by
+      rw [← e2, ho i₀]
+      ring
+    have hv₀' : (v i₀ : ℝ) ≠ 0 := by exact_mod_cast (hv i₀).ne'
+    exact mul_left_cancel₀ hv₀' h1
+  intro i
+  have h1 : (v i : ℤ) * p = o i := by
+    have : (((v i : ℤ) * p : ℤ) : ℝ) = (o i : ℝ) := by
+      rw [ho i]
+      push_cast
+      rw [← h2t]
+      ring
+    exact_mod_cast this
+  have h2 : Odd ((v i : ℤ) * p) := h1 ▸ hodd i
+  exact (Int.odd_coe_nat _).mp (Int.odd_mul.mp h2).1
+
+/-- **Sum-denominator lemma, coprime form.** For positive integer speeds with `gcd = 1`
+the loneliness maximum is attained either at `t = 1/2` or at a crossing time
+`a / (v i + v j)`, `i ≠ j`, `a : ℤ`. -/
+theorem gap_max_at_half_or_crossing {n : ℕ} [NeZero n] (v : Fin n → ℕ) (hv : ∀ i, 0 < v i)
+    (hg : Finset.univ.gcd v = 1) :
+    ∃ t : ℝ, (∀ s : ℝ, gap v s ≤ gap v t) ∧
+      (t = 1 / 2 ∨ ∃ i j : Fin n, i ≠ j ∧ ∃ a : ℤ, t = a / ((v i : ℝ) + v j)) := by
+  obtain ⟨t, ht, hcross⟩ := gap_max_at_crossing v hv
+  rcases hcross with hhalf | hcross
+  · refine ⟨1 / 2, fun s => ?_, Or.inl rfl⟩
+    rw [(gap_half_eq_half_iff v).mpr (odd_of_gap_eq_half v hv hg hhalf), ← hhalf]
+    exact ht s
+  · exact ⟨t, ht, Or.inr hcross⟩
+
+/-- Consequence (coprime form): if some time achieves loneliness level `c`, then so does
+`t = 1/2` or a crossing time `a / (v i + v j)`, `i ≠ j`. -/
+theorem exists_lonely_half_or_crossing_time {n : ℕ} [NeZero n] (v : Fin n → ℕ)
+    (hv : ∀ i, 0 < v i) (hg : Finset.univ.gcd v = 1) (c : ℝ) (hc : ∃ s : ℝ, c ≤ gap v s) :
+    ∃ t : ℝ, c ≤ gap v t ∧
+      (t = 1 / 2 ∨ ∃ i j : Fin n, i ≠ j ∧ ∃ a : ℤ, t = a / ((v i : ℝ) + v j)) := by
+  obtain ⟨t, ht, hcross⟩ := gap_max_at_half_or_crossing v hv hg
+  obtain ⟨s, hs⟩ := hc
+  exact ⟨t, hs.trans (ht s), hcross⟩
+

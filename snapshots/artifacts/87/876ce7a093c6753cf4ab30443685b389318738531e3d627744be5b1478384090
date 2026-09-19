@@ -1,0 +1,314 @@
+#!/usr/bin/env python3
+"""
+Experiment for idea 47ea3c1b (two-distance-avoiding colour classes).
+
+Ring: Rbar_3 = Z[w1, w3, w4, conjugates] where
+  w1 = (1 + i sqrt3)/2,  w3 = (5 + i sqrt11)/6,  w4 = (7 + i sqrt15)/8
+(all of modulus 1).  Elements are represented EXACTLY as vectors of 8 Fractions
+over the monomial basis a^e1 b^e2 c^e3 (e in {0,1}) of Q(a,b,c),
+a = i sqrt3, b = i sqrt11, c = i sqrt15  (a^2=-3, b^2=-11, c^2=-15).
+Complex conjugation = (a,b,c) -> (-a,-b,-c).  |z|^2 = z * conj(z) lies in the
+real subfield Q(sqrt5, sqrt33) (even-degree monomials 1, ab, ac, bc).
+
+Vertex set V = S + S + S (3-fold Minkowski sum) where S = {w1^p w3^q w4^r :
+0<=p<6, (q,r) in {(0,0),(1,0),(-1,0),(0,1),(0,-1)}}  (30 unit vectors).
+All edges are found by float screening followed by EXACT verification of the
+squared distance, so E_1 (unit edges) and E_d are complete on V.
+"""
+from fractions import Fraction as F
+from itertools import product
+import math, sys, time, json
+import numpy as np
+from multiprocessing import Pool
+from pysat.solvers import Cadical153
+from pysat.card import CardEnc, EncType
+
+# ---------- exact arithmetic in Q(i sqrt3, i sqrt11, i sqrt15) ----------
+SQ = {0: -3, 1: -11, 2: -15}            # a^2, b^2, c^2
+MONOS = list(product((0, 1), repeat=3))  # index -> exponent triple
+IDX = {m: i for i, m in enumerate(MONOS)}
+
+def mul(x, y):
+    z = [F(0)] * 8
+    for i, xi in enumerate(x):
+        if xi == 0: continue
+        ei = MONOS[i]
+        for j, yj in enumerate(y):
+            if yj == 0: continue
+            ej = MONOS[j]
+            coef = xi * yj
+            e = []
+            for k in range(3):
+                s = ei[k] + ej[k]
+                if s == 2: coef *= SQ[k]; s = 0
+                e.append(s)
+            z[IDX[tuple(e)]] += coef
+    return tuple(z)
+
+def add(x, y): return tuple(a + b for a, b in zip(x, y))
+def sub(x, y): return tuple(a - b for a, b in zip(x, y))
+def conj(x):
+    return tuple(v if sum(MONOS[i]) % 2 == 0 else -v for i, v in enumerate(x))
+def norm2(x): return mul(x, conj(x))   # exact |x|^2 (real subfield)
+
+def elem(**kw):
+    z = [F(0)] * 8
+    for k, v in kw.items():
+        z[IDX[tuple(int(ch) for ch in k[1:])]] = F(v)
+    return tuple(z)
+
+ONE = elem(m000=1)
+w1 = elem(m000=F(1, 2), m100=F(1, 2))
+w3 = elem(m000=F(5, 6), m010=F(1, 6))
+w4 = elem(m000=F(7, 8), m001=F(1, 8))
+for w in (w1, w3, w4):
+    assert norm2(w) == ONE, "generator not unit modulus"
+
+def power(x, n):
+    r = ONE
+    base = x if n >= 0 else conj(x)  # conj = inverse for unit modulus
+    for _ in range(abs(n)): r = mul(r, base)
+    return r
+
+SQRT = {(0,0,0): 1.0, (1,0,0): math.sqrt(3), (0,1,0): math.sqrt(11),
+        (0,0,1): math.sqrt(15), (1,1,0): -math.sqrt(33), (1,0,1): -math.sqrt(45),
+        (0,1,1): -math.sqrt(165), (1,1,1): math.sqrt(495)}
+def to_complex(x):
+    re = im = 0.0
+    for i, v in enumerate(x):
+        if v == 0: continue
+        m = MONOS[i]; deg = sum(m)
+        val = float(v) * SQRT[m]   # sign already accounts for i^2 in even products
+        if deg % 2 == 0: re += val
+        else:
+            # odd degree: i^deg * sqrt(prod); i^1 = i, i^3 = -i
+            im += val if deg == 1 else -val
+    return complex(re, im)
+
+def real_value(x):  # for elements of the real subfield
+    c = to_complex(x); assert abs(c.imag) < 1e-9; return c.real
+
+# ---------- build vertex set ----------
+def build_S():
+    S = []
+    for p in range(6):
+        for (q, r) in [(0,0),(1,0),(-1,0),(0,1),(0,-1)]:
+            S.append(mul(power(w1, p), mul(power(w3, q), power(w4, r))))
+    return S
+
+def minkowski(S, k):
+    cur = {tuple([F(0)]*8)}
+    for _ in range(k):
+        cur = {add(x, s) for x in cur for s in S}
+    return sorted(cur, key=lambda z: (to_complex(z).real, to_complex(z).imag))
+
+def exact_pairs(V, target_sq, pts):
+    """All unordered pairs {i,j} with |V_i - V_j|^2 == target_sq EXACTLY."""
+    t = real_value(target_sq)
+    n = len(V); out = []
+    d2 = np.abs(pts[:, None] - pts[None, :]) ** 2
+    cand = np.argwhere(np.abs(d2 - t) < 1e-7)
+    for i, j in cand:
+        if i < j and norm2(sub(V[i], V[j])) == target_sq:
+            out.append((int(i), int(j)))
+    return out
+
+def distance_spectrum(V, pts, top):
+    """Squared distances (exact) occurring in V with multiplicities (float-binned, then exact)."""
+    n = len(V)
+    d2 = np.abs(pts[:, None] - pts[None, :]) ** 2
+    iu = np.triu_indices(n, 1)
+    vals = np.round(d2[iu], 6)
+    uniq, counts = np.unique(vals, return_counts=True)
+    order = np.argsort(-counts)
+    spec = []
+    for o in order[:top]:
+        # recover an exact representative
+        idx = np.argwhere(np.abs(d2 - uniq[o]) < 1e-5)
+        i, j = idx[0]
+        spec.append((norm2(sub(V[i], V[j])), int(counts[o])))
+    return spec
+
+# ---------- SAT helpers ----------
+def var(v, c, k): return v * k + c + 1
+
+def colouring_clauses(n, edges, k, avoid_by_colour=None):
+    """Proper k-colouring on `edges`; avoid_by_colour: dict colour -> extra edge list that
+    that colour must not be monochromatic on."""
+    cl = []
+    for v in range(n):
+        cl.append([var(v, c, k) for c in range(k)])
+    for (i, j) in edges:
+        for c in range(k):
+            cl.append([-var(i, c, k), -var(j, c, k)])
+    if avoid_by_colour:
+        for c, E in avoid_by_colour.items():
+            for (i, j) in E:
+                cl.append([-var(i, c, k), -var(j, c, k)])
+    return cl
+
+def solve(clauses, assumptions=(), timeout=None):
+    with Cadical153(bootstrap_with=clauses) as s:
+        ok = s.solve(assumptions=list(assumptions))
+        return ok, (s.get_model() if ok else None)
+
+def max_independent_rc2(n, edges, timeout_s=240):
+    """Maximum independent set via RC2 MaxSAT (hard: edge clauses, soft: x_i).
+    Returns (size, exact_flag); if RC2 does not finish within the time limit the
+    greedy lower bound is returned with exact_flag=False."""
+    from pysat.formula import WCNF
+    from pysat.examples.rc2 import RC2
+    import signal
+    wcnf = WCNF()
+    for (i, j) in edges: wcnf.append([-(i+1), -(j+1)])
+    for v in range(n): wcnf.append([v+1], weight=1)
+    class TO(Exception): pass
+    def h(sig, frm): raise TO()
+    signal.signal(signal.SIGALRM, h); signal.alarm(timeout_s)
+    try:
+        with RC2(wcnf, solver='cd15') as rc2:
+            m = rc2.compute()
+        signal.alarm(0)
+        return sum(1 for l in m[:n] if l > 0), True
+    except TO:
+        # greedy fallback
+        adj = [set() for _ in range(n)]
+        for (i, j) in edges: adj[i].add(j); adj[j].add(i)
+        alive = set(range(n)); size = 0
+        while alive:
+            v = min(alive, key=lambda u: len(adj[u] & alive))
+            size += 1; alive -= adj[v] | {v}
+        return size, False
+
+def max_independent(n, edges, lo, hi, conf_budget=200000):
+    """Independent set bounds in (n, edges) by binary search with a cardinality encoding.
+    Returns (best_found, upper_bound, exact_flag).  Each SAT call has a conflict budget;
+    an undecided call ends the search with exact_flag=False."""
+    base = [[-(i+1), -(j+1)] for (i, j) in edges]
+    best = lo
+    lits = list(range(1, n+1))
+    exact = True
+    while lo < hi:
+        mid = (lo + hi + 1) // 2
+        card = CardEnc.atleast(lits=lits, bound=mid, top_id=n, encoding=EncType.seqcounter)
+        with Cadical153(bootstrap_with=base + card.clauses) as s:
+            s.conf_budget(conf_budget)
+            r = s.solve_limited()
+            if r is True:
+                lo = mid; best = mid
+            elif r is False:
+                hi = mid - 1
+            else:
+                exact = False; break
+    return best, hi, exact
+
+NTOP = 16
+
+def test1_job(args):
+    d, V3, pts3, E1_3, V2, pts2, E1_2, origin = args
+    n3, n2 = len(V3), len(V2)
+    Ed3 = exact_pairs(V3, d, pts3)
+    clauses = colouring_clauses(n3, E1_3, 6, avoid_by_colour={5: Ed3})
+    ok_lit, _ = solve(clauses)
+    ok_org, _ = solve(clauses, assumptions=[var(origin, 5, 6)])
+    Ed2 = exact_pairs(V2, d, pts2)
+    alpha, ex = max_independent_rc2(n2, E1_2 + Ed2)
+    return {"d_float": real_value(d), "d_exact": [str(x) for x in d], "Ed_V3": len(Ed3),
+            "sat_colour6_avoids_1_and_d": ok_lit, "sat_with_origin_colour6": ok_org,
+            "Ed_V2": len(Ed2), "alpha_E1uEd_V2": alpha,
+            "alpha_exact": ex, "alpha_ratio": alpha / n2}
+
+# ---------- main ----------
+def main():
+    t0 = time.time()
+    results = {}
+    S = build_S()
+    assert all(norm2(s) == ONE for s in S)
+    V3 = minkowski(S, 3)
+    V2 = minkowski(S, 2)
+    pts3 = np.array([to_complex(z) for z in V3])
+    pts2 = np.array([to_complex(z) for z in V2])
+    print(f"|S|={len(S)} |V2|={len(V2)} |V3|={len(V3)}  ({time.time()-t0:.1f}s)")
+    results["S_size"] = len(S); results["V2_size"] = len(V2); results["V3_size"] = len(V3)
+
+    E1_3 = exact_pairs(V3, ONE, pts3)
+    E1_2 = exact_pairs(V2, ONE, pts2)
+    print(f"|E1(V3)|={len(E1_3)} |E1(V2)|={len(E1_2)}  ({time.time()-t0:.1f}s)")
+    results["E1_V3"] = len(E1_3); results["E1_V2"] = len(E1_2)
+
+    # 4- and 5-colourability of V3 (context: if V3 is 5-colourable, the literal
+    # test 'colour 6 avoids 1 and d' is trivially satisfiable with colour 6 empty)
+    n3 = len(V3)
+    for k in (4, 5):
+        ok, _ = solve(colouring_clauses(n3, E1_3, k))
+        print(f"V3 {k}-colourable: {ok}  ({time.time()-t0:.1f}s)")
+        results[f"V3_{k}col"] = ok
+
+    spec = distance_spectrum(V3, pts3, top=40)
+    spec = [(d, c) for (d, c) in spec if d != ONE and c > 0 and real_value(d) > 1e-9]
+    print("top squared distances in V3 (exact vector, float, #pairs):")
+    results["spectrum"] = []
+    for d, c in spec:
+        print("  ", [str(x) for x in d], round(real_value(d), 6), c)
+        results["spectrum"].append({"exact": [str(x) for x in d], "float": real_value(d), "pairs": c})
+
+    # ---- Test 1 (literal): 6-colouring, colour 6 (index 5) avoids both 1 and d ----
+    # ---- Test 1' (non-trivial): additionally colour 6 is used at the origin and
+    #      the 5 other colours are NOT allowed on the origin's E1-neighbours' ... no:
+    #      we instead compute the max size of colour class 6 = max independent set of
+    #      E1 u E_d on V2 (two-distance independence number), which is the
+    #      finite analogue of the density of a class avoiding two distances.
+    origin = [i for i, z in enumerate(V3) if all(x == 0 for x in z)][0]
+    n2 = len(V2)
+    a1, a1ex = max_independent_rc2(n2, E1_2)
+    results["alpha1_V2"] = {"size": a1, "exact": a1ex}
+    print(f"alpha(E1,V2) = {a1} exact={a1ex}  ({time.time()-t0:.1f}s)")
+    spec = spec[:NTOP]
+    jobs = [(d, V3, pts3, E1_3, V2, pts2, E1_2, origin) for d, c in spec]
+    with Pool(min(8, len(jobs))) as pool:
+        results["test1"] = pool.map(test1_job, jobs)
+    for rec in results["test1"]:
+        print(f"d={rec['d_float']:.6f} |Ed3|={rec['Ed_V3']} lit={rec['sat_colour6_avoids_1_and_d']} "
+              f"origin6={rec['sat_with_origin_colour6']} |Ed2|={rec['Ed_V2']} "
+              f"alpha(E1uEd,V2)={rec['alpha_E1uEd_V2']} exact={rec['alpha_exact']} ratio={rec['alpha_ratio']:.4f}")
+    print(f"test1 done ({time.time()-t0:.1f}s)")
+
+    # ---- Test 2 (literal): is there a 6-colouring of V3 in which EVERY colour class
+    #      realises EVERY d in D (on at least one pair)?  SAT => the structural lemma
+    #      'some class avoids some d in D' fails for this finite V3.
+    D = [d for d, c in spec[:12]]
+    clauses = colouring_clauses(n3, E1_3, 6)
+    top = n3 * 6
+    for d in D:
+        Ed3 = exact_pairs(V3, d, pts3)
+        for col in range(6):
+            aux = []
+            for (i, j) in Ed3:
+                top += 1; aux.append(top)
+                clauses.append([-top, var(i, col, 6)]); clauses.append([-top, var(j, col, 6)])
+            clauses.append(aux)  # at least one monochromatic d-pair in colour col
+    ok2, _ = solve(clauses)
+    print(f"Test 2: 6-colouring of V3 with all 6 classes realising all {len(D)} distances: {ok2}  ({time.time()-t0:.1f}s)")
+    results["test2_all_classes_realise_all_D"] = ok2
+    results["test2_D"] = [real_value(d) for d in D]
+
+    # Test 2 with 5 colours as well (V3 is 5-colourable if reported so above)
+    if results.get("V3_5col"):
+        clauses = colouring_clauses(n3, E1_3, 5); top = n3 * 5
+        for d in D:
+            Ed3 = exact_pairs(V3, d, pts3)
+            for col in range(5):
+                aux = []
+                for (i, j) in Ed3:
+                    top += 1; aux.append(top)
+                    clauses.append([-top, var(i, col, 5)]); clauses.append([-top, var(j, col, 5)])
+                clauses.append(aux)
+        ok2b, _ = solve(clauses)
+        print(f"Test 2 (5 colours): {ok2b}  ({time.time()-t0:.1f}s)")
+        results["test2_5colours"] = ok2b
+
+    results["elapsed_s"] = time.time() - t0
+    json.dump(results, open("/home/ubuntu/hn_twodist_results.json", "w"), indent=1, default=str)
+
+if __name__ == "__main__":
+    main()

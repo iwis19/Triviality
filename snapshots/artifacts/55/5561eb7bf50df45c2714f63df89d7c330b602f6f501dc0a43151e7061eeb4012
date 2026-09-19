@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""Independent re-implementation of the wheel search for Erdos #1142 (critic check of claim C10).
+
+For each dyadic block K (2^K < n <= 2^{K+1}) the candidates are
+  (a) every n in (2^K, 2^K + K + 1]  (covers the exceptions n = 2^K + p, p <= K+1), and
+  (b) every multiple of M_S(K) = prod{p <= K+1 : 2 is a primitive root mod p} in (2^K + K + 1, 2^{K+1}].
+For each candidate, test n - 2^k for k = 1..K with gmpy2.is_prime (BPSW/Miller-Rabin; never declares a
+prime composite), exiting at the first composite.  A candidate surviving all K tests is printed as a
+"survivor" and then re-checked with sympy.isprime.
+Usage: python3 wheel_search.py KMIN KMAX
+"""
+import sys, time
+import gmpy2
+from gmpy2 import mpz
+
+def primes_upto(N):
+    s = bytearray([1]) * (N + 1)
+    s[0:2] = b"\x00\x00"
+    for i in range(2, int(N ** 0.5) + 1):
+        if s[i]:
+            s[i*i::i] = bytearray(len(s[i*i::i]))
+    return [i for i in range(N + 1) if s[i]]
+
+def order2(p):
+    # multiplicative order of 2 mod p (p odd prime), by factoring p-1
+    n = p - 1
+    fac = []
+    m = n
+    d = 2
+    while d * d <= m:
+        if m % d == 0:
+            fac.append(d)
+            while m % d == 0:
+                m //= d
+        d += 1
+    if m > 1:
+        fac.append(m)
+    o = n
+    for q in fac:
+        while o % q == 0 and pow(2, o // q, p) == 1:
+            o //= q
+    return o
+
+def S(K):
+    return [p for p in primes_upto(K + 1) if p > 2 and order2(p) == p - 1]
+
+def survives(n, K):
+    for k in range(1, K + 1):
+        if not gmpy2.is_prime(n - (mpz(1) << k), 25):
+            return k
+    return 0
+
+def main(kmin, kmax):
+    total = 0
+    t0 = time.time()
+    for K in range(kmin, kmax + 1):
+        SK = S(K)
+        M = 1
+        for p in SK:
+            M *= p
+        lo = (mpz(1) << K)
+        hi = (mpz(1) << (K + 1))
+        cnt = 0
+        surv = []
+        killed_at = {}
+        # (a) exceptions region
+        for n in range(int(lo) + 1, int(lo) + K + 2):
+            cnt += 1
+            k = survives(mpz(n), K)
+            if k == 0:
+                surv.append(n)
+            killed_at[k] = killed_at.get(k, 0) + 1
+        # (b) multiples of M above 2^K + K + 1
+        start = ((lo + K + 1) // M + 1) * M
+        n = start
+        while n <= hi:
+            cnt += 1
+            k = survives(n, K)
+            if k == 0:
+                surv.append(int(n))
+            killed_at[k] = killed_at.get(k, 0) + 1
+            n += M
+        total += cnt
+        top = sorted(killed_at.items())[:6]
+        print(f"K={K} |S|={len(SK)} log2M={float(gmpy2.log2(M)):.2f} cands={cnt} survivors={surv} killed_at(first6)={top} t={time.time()-t0:.1f}s", flush=True)
+        if surv:
+            import sympy
+            for n in surv:
+                ok = all(sympy.isprime(n - 2**k) for k in range(1, K + 1))
+                print(f"   recheck n={n}: all n-2^k prime (sympy) = {ok}", flush=True)
+    print(f"TOTAL candidates={total} time={time.time()-t0:.1f}s", flush=True)
+
+if __name__ == "__main__":
+    main(int(sys.argv[1]), int(sys.argv[2]))

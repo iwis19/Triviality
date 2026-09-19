@@ -1,0 +1,34 @@
+# Verify the pulled-back 5-colouring z -> f(z mod 5), f=(1,0,1,2), on explicit unit-distance graphs
+# in Z[1/6][s3,s11] (Moser field localized at 6), including negative powers of w3 and accidental edges.
+from fractions import Fraction as Fr
+from hn_pilot import mul, add, neg, conj, norm2, power, w1, w3, ONE, ZERO, k_colourable
+import itertools, time
+f = (1,0,1,2); m = 5
+def red(x):  # reduce a 4-tuple of Fractions with denominators coprime to 5 modulo 5
+    out = []
+    for q in x:
+        assert q.denominator % 5 != 0
+        out.append((q.numerator * pow(q.denominator, -1, m)) % m)
+    return tuple(out)
+def colour(z): return sum(a*b for a,b in zip(f, red(z))) % m
+for L, brange in ((2, range(-2,3)), (3, range(-1,2))):
+    units = list({mul(power(w1,a), power(w3,b)) for a in range(6) for b in brange})
+    pts = {ZERO}
+    layer = {ZERO}
+    for _ in range(L):
+        layer = {add(p,u) for p in layer for u in units}
+        pts |= layer
+    pts = sorted(pts); n = len(pts)
+    t0=time.time()
+    edges = [(i,j) for i in range(n) for j in range(i+1,n) if norm2(add(pts[i],neg(pts[j])))==ONE]
+    bad = [(i,j) for i,j in edges if colour(pts[i])==colour(pts[j])]
+    ugen = set(units)|{neg(u) for u in units}
+    acc = sum(1 for i,j in edges if add(pts[i],neg(pts[j])) not in ugen)
+    print(f"L={L} b in {list(brange)}: n={n} edges={len(edges)} accidental_edges={acc} monochromatic_edges_under_f={len(bad)}  ({time.time()-t0:.1f}s)")
+    if n < 1000:
+        ok4,_ = k_colourable(n, edges, 4, fix=[(0,0)])
+        print(f"   4-colourable by SAT: {ok4}")
+# Moser spindle check: vertices 0, w1^a, w3-rotated copy
+sp = [ZERO, ONE, w1, add(ONE,w1), w3, mul(w3,w1), mul(w3,add(ONE,w1))]
+e = [(i,j) for i in range(7) for j in range(i+1,7) if norm2(add(sp[i],neg(sp[j])))==ONE]
+print("Moser spindle edges:", len(e), "3-colourable:", k_colourable(7,e,3)[0], "colours:", [colour(p) for p in sp])

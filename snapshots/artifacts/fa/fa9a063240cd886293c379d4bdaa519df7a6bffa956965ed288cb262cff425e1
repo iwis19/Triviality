@@ -1,0 +1,118 @@
+"""Critic check for idea bb58a820 (residue-class component of delta(N)) and for the
+Granville secondary-term remark in idea bd7e0bf8.
+
+R(N)      = #{(p,q) ordered : p+q=N, p,q odd primes}           (FFT of prime indicator)
+HL_int(N) = S(N) * sum_{3<=t<=N-3} 1/(log t log(N-t)),  S(N)=2*C2*prod_{p|N,p>2}(p-1)/(p-2)
+delta(N)  = R/HL_int - 1
+PP(N)     = 2 * sum_{k>=2} (1/k) #{q prime : q^k<N, N-q^k prime}   (prime-power correction,
+            own derivation of the count-version of Granville's I* secondary term)
+"""
+import numpy as np, math, sys
+
+X = int(sys.argv[1]) if len(sys.argv) > 1 else 10**6
+NMIN = X // 10
+
+# ---- primes
+is_p = np.ones(X + 1, dtype=bool); is_p[:2] = False
+for i in range(2, int(X**0.5) + 1):
+    if is_p[i]: is_p[i*i::i] = False
+primes = np.nonzero(is_p)[0]
+
+# ---- R(N) via FFT of odd-prime indicator
+ind = is_p.astype(np.float64); ind[2] = 0.0
+L = 1 << int(math.ceil(math.log2(2 * X + 2)))
+R = np.fft.irfft(np.fft.rfft(ind, L) ** 2, L)[:X + 1]
+R = np.rint(R).astype(np.int64)
+
+# ---- singular series
+C2 = 0.6601618158468695739278121100145557784326233602847334133194484233354056423
+S = np.full(X + 1, 2 * C2)
+for p in primes[1:]:
+    S[p::p] *= (p - 1) / (p - 2)
+
+# ---- HL_int via FFT of 1/log t
+u = np.zeros(X + 1); t = np.arange(3, X + 1); u[3:] = 1.0 / np.log(t)
+conv = np.fft.irfft(np.fft.rfft(u, L) ** 2, L)[:X + 1]
+HL = S * conv
+
+N = np.arange(NMIN, X + 1, 2)
+N = N[N % 2 == 0]
+delta = R[N] / HL[N] - 1.0
+z = (R[N] - HL[N]) / np.sqrt(HL[N])
+print(f"X={X}  even N in [{NMIN},{X}]: n={len(N)}")
+print(f"mean delta={delta.mean():.5f} sd delta={delta.std():.5f}   mean z={z.mean():.4f} sd z={z.std():.4f}")
+print(f"max |R-HL|/sqrt(N) = {np.max(np.abs(R[N]-HL[N])/np.sqrt(N)):.3f}, min (R-HL)/sqrt(N)={np.min((R[N]-HL[N])/np.sqrt(N)):.3f}")
+
+# ---- prime-power correction PP(N)
+PP = np.zeros(X + 1)
+for q in primes:
+    if q * q >= X: break
+    k = 2; s = q * q
+    while s < X:
+        idx = np.arange(s + 1, X + 1)
+        hit = is_p[idx - s]
+        PP[idx[hit]] += 2.0 / k
+        k += 1; s *= q
+pp = PP[N]
+print(f"mean PP={pp.mean():.3f}; mean (R-HL)={np.mean(R[N]-HL[N]):.3f}; ratio mean(R-HL)/(-mean PP)={np.mean(R[N]-HL[N])/(-pp.mean()):.3f}")
+print(f"corr(R-HL, -PP)={np.corrcoef(R[N]-HL[N], -pp)[0,1]:.3f}; after subtracting PP: mean z'={np.mean((R[N]-HL[N]+pp)/np.sqrt(HL[N])):.4f}")
+
+# ---- autocorrelation of delta at lags 2k, split by 3|k
+def acf(x, kmax=500):
+    x = x - x.mean(); v = (x * x).mean()
+    return np.array([np.mean(x[:-k] * x[k:]) / v for k in range(1, kmax + 1)])
+a = acf(delta)
+ks = np.arange(1, 501)
+print(f"delta acf: mean over 3|k = {a[ks%3==0].mean():.4f}, 3∤k = {a[ks%3!=0].mean():.4f}; lag1..6: {np.round(a[:6],4)}")
+
+# ---- residue-class model with q in {3,5,7,11,13}
+def class_model(N, qs):
+    tot = np.zeros(len(N))
+    for q in qs:
+        cnt = np.zeros((q, X + 1))
+        for a in range(1, q):
+            c = np.zeros(X + 1); c[primes[primes % q == a]] = 1; cnt[a] = np.cumsum(c)
+        pi_prime = cnt[1:].sum(axis=0)  # primes <= x coprime to q
+        eps = (q - 1) * cnt / np.maximum(pi_prime, 1) - 1.0   # eps[a, x]
+        dq = np.zeros(len(N))
+        for i, n in enumerate(N):
+            r = n % q; acc = 0.0; m = 0
+            for a in range(1, q):
+                b = (r - a) % q
+                if b == 0: continue
+                acc += eps[a, n] + eps[b, n]; m += 1
+            dq[i] = acc / m
+        tot += dq
+    return tot
+dq = class_model(N, [3, 5, 7, 11, 13])
+slope = np.polyfit(dq, delta, 1)
+res = delta - slope[0] * dq
+ar = acf(res)
+print(f"regression delta ~ sum delta_q: slope={slope[0]:.3f} intercept={slope[1]:.5f}; corr={np.corrcoef(dq,delta)[0,1]:.3f}")
+print(f"residual acf: mean over 3|k = {ar[ks%3==0].mean():.4f}, 3∤k = {ar[ks%3!=0].mean():.4f}; SE~1/sqrt(n)={1/np.sqrt(len(N)):.4f}")
+# Chebyshev-bias check: pi(N;3,2)-pi(N;3,1) at N=X, and mean delta by N mod 3
+c1 = np.sum(primes % 3 == 1); c2 = np.sum(primes % 3 == 2)
+print(f"pi(X;3,2)-pi(X;3,1) = {c2-c1}, relative {(c2-c1)/(c1+c2):.5f}")
+for r in range(3):
+    print(f"  mean delta for N≡{r} (mod 3): {delta[N%3==r].mean():+.5f}   mean z: {z[N%3==r].mean():+.4f}")
+# after also removing PP: detrended residual
+res2 = (R[N] - HL[N] + pp) / HL[N]
+for r in range(3):
+    print(f"  mean (R-HL+PP)/HL for N≡{r} (mod 3): {res2[N%3==r].mean():+.5f}")
+
+print("---- extra diagnostics")
+for r in range(3):
+    print(f"  mean class-model residual for N≡{r} (mod 3): {res[N%3==r].mean():+.5f};  mean dq: {dq[N%3==r].mean():+.5f}; mean PP/HL: {(pp/HL[N])[N%3==r].mean():+.5f}")
+print(f"corr(dq, -PP/HL) = {np.corrcoef(dq, -pp/HL[N])[0,1]:.3f}")
+res_pp = (R[N] - HL[N] + pp) / HL[N]
+apc = acf(res_pp)
+print(f"acf after subtracting PP only: 3|k {apc[ks%3==0].mean():.4f}, 3∤k {apc[ks%3!=0].mean():.4f}")
+# remove smooth trend in N (moving mean over 2001 points) then acf
+def detrend(x, w=2001):
+    ker = np.ones(w)/w; tr = np.convolve(x, ker, mode='same'); return x - tr
+adt = acf(detrend(res_pp)); adt2 = acf(detrend(delta)); adt3 = acf(detrend(res))
+print(f"acf detrended delta: 3|k {adt2[ks%3==0].mean():.4f}, 3∤k {adt2[ks%3!=0].mean():.4f}")
+print(f"acf detrended class-residual: 3|k {adt3[ks%3==0].mean():.4f}, 3∤k {adt3[ks%3!=0].mean():.4f}")
+print(f"acf detrended (delta+PP/HL): 3|k {adt[ks%3==0].mean():.4f}, 3∤k {adt[ks%3!=0].mean():.4f}; max|acf| {np.abs(adt).max():.4f}")
+# per-q contributions: class model with only q=3
+d3 = class_model(N, [3]); print(f"sd delta_3 = {d3.std():.5f}, sd sum_q delta_q = {dq.std():.5f}, sd delta={delta.std():.5f}")

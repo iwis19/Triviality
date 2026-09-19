@@ -1,0 +1,61 @@
+"""Delsarte LP checks for the critic pass on idea fb3e317e (Musin-style cap method, n=5).
+
+LP(n, T, deg): min f(1) s.t. f = sum_{k<=deg} c_k G_k^{(n)}, c_0 = 1, c_k >= 0, f(t) <= 0 for t in T (grid).
+Gegenbauer polynomials normalised G_k(1)=1 for S^{n-1} (alpha = (n-3)/2 in the Jacobi/Gegenbauer convention).
+Also: Musin-type crude LP  min f(1) + M*u  with f<=0 on [-t0,1/2], f<=u on [-1,-t0].
+"""
+import numpy as np
+from scipy.optimize import linprog
+from scipy.special import eval_gegenbauer, eval_jacobi
+
+def gegen(n, k, t):
+    # normalised Gegenbauer for S^{n-1}: P_k^{((n-3)/2,(n-3)/2)}(t)/P_k(1)
+    a = (n - 3) / 2.0
+    return eval_jacobi(k, a, a, t) / eval_jacobi(k, a, a, 1.0)
+
+def lp(n, intervals, deg=30, npts=4001, extra=None):
+    """intervals: list of (lo,hi) where f<=0. Returns (value, coeffs)."""
+    ts = np.concatenate([np.linspace(lo, hi, max(3, int(npts * (hi - lo) / 1.5))) for lo, hi in intervals])
+    G = np.array([[gegen(n, k, t) for k in range(1, deg + 1)] for t in ts])  # f(t) = 1 + G c
+    # variables c_1..c_deg >= 0 ; minimise f(1) = 1 + sum c_k ; constraints 1 + G c <= 0
+    A = G
+    b = -np.ones(len(ts))
+    res = linprog(np.ones(deg), A_ub=A, b_ub=b, bounds=[(0, None)] * deg, method="highs")
+    assert res.status == 0, res.message
+    return 1 + res.fun, res.x
+
+def musin_crude(n, t0, M, deg=30, npts=4001):
+    """min f(1) + M*u : f = 1 + sum c_k G_k, c>=0, f<=0 on [-t0,1/2], f<=u on [-1,-t0], u>=0.
+    Valid bound on N if every 60-degree code inside the cap {<x,y> <= -t0} has <= M points."""
+    ts1 = np.linspace(-t0, 0.5, npts)
+    ts2 = np.linspace(-1, -t0, max(3, int(npts * (1 - t0) / 1.5)))
+    G1 = np.array([[gegen(n, k, t) for k in range(1, deg + 1)] for t in ts1])
+    G2 = np.array([[gegen(n, k, t) for k in range(1, deg + 1)] for t in ts2])
+    # vars: c_1..c_deg, u
+    A1 = np.hstack([G1, np.zeros((len(ts1), 1))]); b1 = -np.ones(len(ts1))
+    A2 = np.hstack([G2, -np.ones((len(ts2), 1))]); b2 = -np.ones(len(ts2))
+    cost = np.concatenate([np.ones(deg), [M]])
+    res = linprog(cost, A_ub=np.vstack([A1, A2]), b_ub=np.concatenate([b1, b2]),
+                  bounds=[(0, None)] * (deg + 1), method="highs")
+    assert res.status == 0, res.message
+    c, u = res.x[:deg], res.x[deg]
+    return 1 + c.sum() + M * u, 1 + c.sum(), u, c
+
+if __name__ == "__main__":
+    print("Sanity: n=5 kissing LP [-1,1/2]:", round(lp(5, [(-1, 0.5)])[0], 4), "(Odlyzko-Sloane 46.34)")
+    print("Sanity: n=4 kissing LP [-1,1/2]:", round(lp(4, [(-1, 0.5)])[0], 4), "(25.56)")
+    print("Claim 170c: n=4, inner products <= 1/3:", round(lp(4, [(-1, 1 / 3)])[0], 4))
+    print("Claim 48b2: n=5, T=[-1,-0.95]u[-0.55,0.5]:", round(lp(5, [(-1, -0.95), (-0.55, 0.5)])[0], 4))
+    print("Same with wider gap [-1,-0.95]u[-0.5,0.5]:", round(lp(5, [(-1, -0.95), (-0.5, 0.5)])[0], 4))
+    print("n=5, avoid (-0.95,-0.6):", round(lp(5, [(-1, -0.95), (-0.6, 0.5)])[0], 4))
+    print("n=5, avoid (-0.9,-0.55):", round(lp(5, [(-1, -0.9), (-0.55, 0.5)])[0], 4))
+    print("n=5, no pair below -0.55 (T=[-0.55,0.5]):", round(lp(5, [(-0.55, 0.5)])[0], 4))
+    print()
+    print("Crude Musin LP, n=4 (Musin used t0~0.6058 with m<=6):")
+    for t0, M in [(0.6058, 6)]:
+        print("  t0=%.4f M=%d -> bound %.4f (f(1)=%.4f, u=%.4f)" % ((t0, M) + musin_crude(4, t0, M)[:3]))
+    print("Crude Musin LP, n=5, for various t0 and assumed cap capacities M:")
+    for t0 in [0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9]:
+        for M in [1, 2, 4, 6, 8, 10, 12]:
+            v, f1, u, _ = musin_crude(5, t0, M)
+            print("  t0=%.2f M=%2d -> bound %.4f (f(1)=%.4f, u=%.4f)" % (t0, M, v, f1, u))

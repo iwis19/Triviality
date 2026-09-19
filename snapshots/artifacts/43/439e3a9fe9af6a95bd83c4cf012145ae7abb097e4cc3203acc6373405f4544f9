@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Experiment 2: Hardy-Littlewood / Bateman-Horn style expected number of solutions
+E_K = sum_{2^K < n <= 2^{K+1}} P(n-2^k prime for all 1<=k<=K),
+with the tuple-specific singular series
+  S_K = prod_p (1 - nu_p/p) / (1 - 1/p)^K,   nu_p = #{2^k mod p : 1<=k<=K} = min(K, ord_p(2)) (p odd), nu_2 = 1,
+and the size factor  prod_k 1/log(n - 2^k)  integrated numerically over the block.
+
+This is heuristic only (Cramer/Hardy-Littlewood model).  Output: E_K for small K
+(compare with true counts 1,1,1,1,2,0,0,... for K=2..), and tail sums.
+"""
+import math, sys
+from sympy import primerange, n_order
+
+PMAX = int(sys.argv[1]) if len(sys.argv) > 1 else 200000
+KMAX = int(sys.argv[2]) if len(sys.argv) > 2 else 400
+
+primes = list(primerange(3, PMAX))
+orders = {p: n_order(2, p) for p in primes}
+
+def log_S(K):
+    # log of singular series, with tail correction for p > PMAX
+    s = (K - 1) * math.log(2)  # p = 2 factor
+    for p in primes:
+        nu = min(K, orders[p])
+        s += math.log(1 - nu / p) - K * math.log(1 - 1 / p)
+    # tail p > PMAX : log((1-K/p)(1-1/p)^{-K}) ~ -K(K-1)/(2p^2); sum_{p>P} 1/p^2 ~ 1/(P log P)
+    s += -K * (K - 1) / 2 / (PMAX * math.log(PMAX))
+    return s
+
+def log_size(K, samples=2000):
+    # average over n in (2^K, 2^{K+1}] of prod_k 1/log(n-2^k)   (log of the average)
+    vs = []
+    for i in range(samples):
+        n = 2 ** K + (i + 0.5) / samples * 2 ** K
+        v = 0.0
+        for k in range(1, K + 1):
+            v -= math.log(math.log(n - 2 ** k)) if n - 2 ** k > 1.5 else math.log(math.log(1.5))
+        vs.append(v)
+    m = max(vs)
+    return m + math.log(sum(math.exp(v - m) for v in vs) / samples)
+
+true_counts = {1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 2}  # n=4 (K=1), 7, 15, 21, 45, {75,105}
+print(" K   log10 E_K      E_K        true")
+tail = 0.0
+rows = []
+for K in range(2, KMAX + 1):
+    lE = K * math.log(2) + log_S(K) + log_size(K, samples=400 if K > 40 else 2000)
+    E = math.exp(lE) if lE > -700 else 0.0
+    rows.append((K, lE / math.log(10), E))
+    if K <= 12 or K % 20 == 0:
+        print(f"{K:3d} {lE/math.log(10):12.3f} {E:12.4e}   {true_counts.get(K,0)}")
+
+def tail_sum(K0):
+    return sum(E for (K, _, E) in rows if K >= K0)
+print("sum_{K>=7}   E_K  = %.4e" % tail_sum(7))
+print("sum_{K>=44}  E_K  = %.4e   (Mientka-Weitzenkamp bound 2^44)" % tail_sum(44))
+print("sum_{K>=120} E_K  = %.4e   (Alekseyev/OEIS bound 2^120)" % tail_sum(120))
+print("sum_{K>=128} E_K  = %.4e   (forum claim 2^128)" % tail_sum(128))
+# log10 E_K at 120 and 128 explicitly
+for K, l10, E in rows:
+    if K in (44, 120, 128, 200, 400):
+        print(f"log10 E_{K} = {l10:.2f}")
+
+
+# ===== OUTPUT =====
+#  K   log10 E_K      E_K        true
+#   2        0.879   7.5667e+00   1
+#   3        0.833   6.8076e+00   1
+#   4        0.536   3.4331e+00   1
+#   5        0.389   2.4517e+00   1
+#   6        0.145   1.3951e+00   2
+#   7       -0.201   6.2912e-01   0
+#   8       -0.647   2.2564e-01   0
+#   9       -1.167   6.8056e-02   0
+#  10       -1.883   1.3090e-02   0
+#  11       -2.397   4.0112e-03   0
+#  12       -3.041   9.0978e-04   0
+#  20       -7.305   4.9509e-08   0
+#  40      -22.055   8.8164e-23   0
+#  60      -41.862   1.3752e-42   0
+#  80      -61.928   1.1792e-62   0
+# 100      -84.398   4.0021e-85   0
+# 120     -107.471  3.3792e-108   0
+# 140     -133.315  4.8425e-134   0
+# 160     -159.699  1.9990e-160   0
+# 180     -188.759  1.7417e-189   0
+# 200     -215.843  1.4358e-216   0
+# 220     -243.561  2.7477e-244   0
+# 240     -271.450  3.5492e-272   0
+# 260     -299.569  2.6953e-300   0
+# 280     -329.143   0.0000e+00   0
+# 300     -359.432   0.0000e+00   0
+# 320     -390.366   0.0000e+00   0
+# 340     -421.506   0.0000e+00   0
+# 360     -454.420   0.0000e+00   0
+# 380     -488.165   0.0000e+00   0
+# 400     -520.802   0.0000e+00   0
+# sum_{K>=7}   E_K  = 9.4139e-01
+# sum_{K>=44}  E_K  = 5.8527e-26   (Mientka-Weitzenkamp bound 2^44)
+# sum_{K>=120} E_K  = 3.6133e-108   (Alekseyev/OEIS bound 2^120)
+# sum_{K>=128} E_K  = 4.1327e-118   (forum claim 2^128)
+# log10 E_44 = -25.30
+# log10 E_120 = -107.47
+# log10 E_128 = -117.40
+# log10 E_200 = -215.84
+# log10 E_400 = -520.80

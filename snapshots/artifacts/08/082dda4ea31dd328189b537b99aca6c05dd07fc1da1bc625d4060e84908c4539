@@ -1,0 +1,32 @@
+import Mathlib
+
+/-!
+Concrete instances of Erdős #141 for k = 3 and k = 4.
+`IsCPAP a d k` says that `a, a+d, …, a+(k-1)d` are prime and are *consecutive* primes
+(every prime strictly between `a` and `a+(k-1)d` is one of them).
+-/
+
+def IsCPAP (a d k : ℕ) : Prop :=
+  0 < d ∧ (∀ j < k, Nat.Prime (a + j * d)) ∧
+    ∀ n, a < n → n < a + (k - 1) * d → Nat.Prime n → ∃ j < k, n = a + j * d
+
+theorem cpap3_3 : IsCPAP 3 2 3 := by
+  refine ⟨by norm_num, ?_, ?_⟩
+  · intro j hj
+    interval_cases j <;> norm_num
+  · intro n h1 h2 hp
+    interval_cases n
+    all_goals first
+      | decide
+      | (exfalso; revert hp; norm_num)
+
+theorem cpap4_251 : IsCPAP 251 6 4 := by
+  refine ⟨by norm_num, ?_, ?_⟩
+  · intro j hj
+    interval_cases j <;> norm_num
+  · intro n h1 h2 hp
+    interval_cases n
+    all_goals first
+      | decide
+      | (exfalso; revert hp; norm_num)
+

@@ -1,0 +1,9 @@
+L=15 {3: 1, 5: 1} sigma/L=1.600  u(L)=7 (density 0.467)  | top p=5 M=3 u(M)=2  bound (p-1)u(M)-(sigma(M)-M)=7  OK
+L=21 {3: 1, 7: 1} sigma/L=1.524  u(L)=11 (density 0.524)  | top p=7 M=3 u(M)=2  bound (p-1)u(M)-(sigma(M)-M)=11  OK
+L=45 {3: 2, 5: 1} sigma/L=1.733  u(L)=16 (density 0.356)  | top p=5 M=9 u(M)=5  bound (p-1)u(M)-(sigma(M)-M)=16  OK
+L=63 {3: 2, 7: 1} sigma/L=1.651  u(L)=26 (density 0.413)  | top p=7 M=9 u(M)=5  bound (p-1)u(M)-(sigma(M)-M)=26  OK
+L=105 {3: 1, 5: 1, 7: 1} sigma/L=1.829  u(L)=35 (density 0.333)  | top p=7 M=15 u(M)=7  bound (p-1)u(M)-(sigma(M)-M)=33  OK
+L=135 {3: 3, 5: 1} sigma/L=1.778  u(L)=43 (density 0.319)  | top p=5 M=27 u(M)=14  bound (p-1)u(M)-(sigma(M)-M)=43  OK
+L=165 {3: 1, 5: 1, 11: 1} sigma/L=1.745  u(L)=63 (density 0.382)  | top p=11 M=15 u(M)=7  bound (p-1)u(M)-(sigma(M)-M)=61  OK
+L=189 {3: 3, 7: 1} sigma/L=1.693  u(L)=71 (density 0.376)  | top p=7 M=27 u(M)=14  bound (p-1)u(M)-(sigma(M)-M)=71  OK
+L=195 {3: 1, 5: 1, 13: 1} sigma/L=1.723  u(L)=77 (density 0.395)  | top p=13 M=15 u(M)=7  bound (p-1)u(M)-(sigma(M)-M)=75  OK

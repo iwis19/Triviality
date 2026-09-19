@@ -1,0 +1,414 @@
+=== isect2.c (galloping enumeration of S3∩S5∩[0,N)) ===
+// Enumerate S3 ∩ S5 ∩ [0, N) by galloping intersection.
+// S_p = { n : all base-p digits <= (p-1)/2 }.
+// Usage: ./isect2 N > out.txt   (N as decimal, < 2^63)
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+typedef unsigned long long u64;
+
+// smallest y >= x with all base-p digits <= d
+static u64 next_p(u64 x, u64 p, u64 d) {
+    u64 dig[64]; int len = 0; u64 t = x;
+    while (t) { dig[len++] = t % p; t /= p; }
+    int bad = -1;
+    for (int i = len - 1; i >= 0; i--) if (dig[i] > d) { bad = i; break; }
+    if (bad < 0) return x;
+    // find lowest position k > bad with dig[k] < d
+    int k = bad + 1;
+    while (k < len && dig[k] >= d) k++;
+    if (k == len) { dig[len++] = 1; for (int i = 0; i < len - 1; i++) dig[i] = 0; }
+    else { dig[k] += 1; for (int i = 0; i < k; i++) dig[i] = 0; }
+    u64 y = 0;
+    for (int i = len - 1; i >= 0; i--) y = y * p + dig[i];
+    return y;
+}
+
+int main(int argc, char **argv) {
+    u64 N = strtoull(argv[1], 0, 10);
+    u64 x = 0; u64 cnt = 0, steps = 0;
+    while (x < N) {
+        u64 y = next_p(x, 3, 1); steps++;
+        if (y != x) { x = y; continue; }
+        y = next_p(x, 5, 2); steps++;
+        if (y != x) { x = y; continue; }
+        printf("%llu\n", x); cnt++;
+        x++;
+    }
+    fprintf(stderr, "count=%llu steps=%llu\n", cnt, steps);
+    return 0;
+}
+
+=== fourier7.py (reproduction of b62bf60a/a9cacde1 + large-spectrum falsifier + anchor sums) ===
+#!/usr/bin/env python3
+"""Reproduce claims b62bf60a / a9cacde1 for S = S3 ∩ S5 ∩ [0,10^18) and run the
+large-spectrum falsifier of idea f2e6accd.
+
+For Q = 7^j:  Shat(a) = sum_{n in S} e(a n / Q),  Chat(a) = sum_{r in C_j} e(a r/Q),
+C_j = residues mod 7^j all of whose j base-7 digits are <= 3.
+count(S in C_j) = (1/Q) sum_a Shat(a) conj(Chat(a))  (exact).
+"""
+import sys, numpy as np
+
+S = np.loadtxt(sys.argv[1], dtype=np.uint64)
+n_elems = len(S)
+print("|S| =", n_elems)
+
+# consecutive-gap statistics (claim: 61% of gaps < 7)
+gaps = np.diff(S.astype(np.int64))
+print("fraction of consecutive gaps <7: %.4f" % np.mean(gaps < 7))
+for m in (3, 5, 9):
+    runs = 1 + np.sum(gaps >= 7 ** m)
+    print("runs at gap scale 7^%d: %d, mean size %.1f" % (m, runs, n_elems / runs))
+
+def base7(a, j):
+    s = ""
+    for _ in range(j):
+        s = str(a % 7) + s; a //= 7
+    return s
+
+def cyl_indicator(j):
+    Q = 7 ** j
+    ind = np.ones(1, dtype=np.float64)
+    for _ in range(j):
+        # digits <= 3 at the new (top) position
+        blk = np.zeros(7 * len(ind))
+        for d in range(4):
+            blk[d * len(ind):(d + 1) * len(ind)] = ind
+        ind = blk
+    assert len(ind) == Q
+    return ind
+
+jmax = int(sys.argv[2]) if len(sys.argv) > 2 else 9
+mlist = [3, 5]
+jmin = int(sys.argv[3]) if len(sys.argv) > 3 else 1
+for j in range(jmin, jmax + 1):
+    Q = 7 ** j
+    res = (S % np.uint64(Q)).astype(np.int64)
+    h = np.bincount(res, minlength=Q).astype(np.float64)
+    Shat = np.fft.fft(h)            # Shat(a) = sum_r h_r e(-a r/Q)
+    ind = cyl_indicator(j)
+    Chat = np.fft.fft(ind)
+    Csize = 4 ** j
+    absS = np.abs(Shat); absC = np.abs(Chat)
+    absS[0] = 0; absC0 = absC.copy(); absC0[0] = 0
+    rms = np.sqrt(np.mean(absS[1:] ** 2)) / np.sqrt(n_elems)
+    amax = int(np.argmax(absS))
+    mx = absS[amax] / np.sqrt(n_elems)
+    true_count = float(np.sum(h * ind))
+    main = (4 / 7) ** j * n_elems
+    err = true_count - main
+    # error via Fourier (check identity)
+    err_f = (np.sum(Shat[1:] * np.conj(Chat[1:])) / Q).real
+    Linf = absS.max() * absC0.sum() / Q
+    L2 = np.sqrt(np.sum(absS ** 2)) * np.sqrt(np.sum(absC0 ** 2)) / Q
+    Labs = np.sum(absS * absC0) / Q
+    L1C = np.log(absC.sum() / Csize) / np.log(Q)
+    print("\nj=%d Q=%d theta=j/log_7(1e18)=%.3f" % (j, Q, j / (18 * np.log(10) / np.log(7))))
+    print(" RMS|Shat|/sqrt|S| = %.3f   max|Shat|/sqrt|S| = %.2f at a=%d (base7 %s)" % (rms, mx, amax, base7(amax, j)))
+    print(" count in C_j = %d, main = %.1f, rel err = %.2f%%  (Fourier err %.1f)" % (true_count, main, 100 * err / main, err_f))
+    print(" bounds/main: Linf %.3g  L2 %.3g  abs-sum %.3g ; log_Q(||Chat||_1/|C|) = %.4f" % (Linf / main, L2 / main, Labs / main, L1C))
+
+    # ---- falsifier: restrict the Fourier error to the large spectrum of Chat ----
+    order = np.argsort(-absC0)  # a=0 excluded via absC0[0]=0 (it is last)
+    terms = (Shat * np.conj(Chat) / Q).real
+    cum = np.cumsum(terms[order])
+    print(" large-spectrum-restricted error (eta = |Chat(a)|/|C| threshold):")
+    for eta in (0.5, 0.3, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001):
+        k = int(np.sum(absC0 >= eta * Csize))
+        if k == 0:
+            continue
+        restricted = cum[k - 1]
+        # absolute-value bound on the complementary (small-spectrum) part
+        tail_abs = np.sum(absS[order[k:]] * absC0[order[k:]]) / Q
+        print("   eta=%.3f |Spec|=%d (Q^%.3f) restricted err=%.1f true=%.1f ratio=%.2f ; abs tail bound/main=%.2f"
+              % (eta, k, np.log(k) / np.log(Q), restricted, err, restricted / err if err != 0 else float('nan'), tail_abs / main))
+    # how far into the sorted spectrum does the partial sum stay within factor 2 of the truth?
+    # ---- anchors: cluster decomposition at gap scale 7^m ----
+    for m in mlist:
+        if m >= j:
+            continue
+        starts = np.concatenate(([0], np.nonzero(gaps >= 7 ** m)[0] + 1))
+        anchors = S[starts]
+        nc = len(anchors)
+        ha = np.bincount((anchors % np.uint64(Q)).astype(np.int64), minlength=Q).astype(np.float64)
+        Ahat = np.abs(np.fft.fft(ha)); Ahat[0] = 0
+        for eta in (0.1, 0.01):
+            spec = absC0 >= eta * Csize
+            print("   m=%d #clusters=%d mean size %.1f : max|Ahat|/sqrt(#c) over all a=%.2f, over Spec_%.2f=%.2f, RMS over Spec=%.2f ; naive bound Q^0.5208/sqrt(#c)=%.2f"
+                  % (m, nc, n_elems / nc, Ahat.max() / np.sqrt(nc), eta, Ahat[spec].max() / np.sqrt(nc),
+                     np.sqrt(np.mean(Ahat[spec] ** 2)) / np.sqrt(nc), Q ** 0.5208 / np.sqrt(nc)))
+    sys.stdout.flush()
+
+=== extra9.py (j=9 anchor scales m=3..9, spectrum digit structure) ===
+#!/usr/bin/env python3
+"""Extra checks at j=9 (Q=7^9): anchor sums at gap scales m=3..9, digit structure of the
+large spectrum of the cylinder, err/sqrt(main), and whether size-weighted anchors reproduce Shat(4)."""
+import sys, numpy as np
+S = np.loadtxt(sys.argv[1], dtype=np.uint64); n = len(S)
+gaps = np.diff(S.astype(np.int64))
+j = 9; Q = 7 ** j
+def base7(a):
+    s = ""
+    for _ in range(j): s = str(a % 7) + s; a //= 7
+    return s
+def signed_digits(a):
+    ds = []
+    for _ in range(j):
+        d = a % 7; a //= 7
+        ds.append(d if d <= 3 else d - 7)
+    return ds
+ind = np.ones(1)
+for _ in range(j):
+    blk = np.zeros(7 * len(ind))
+    for d in range(4): blk[d * len(ind):(d + 1) * len(ind)] = ind
+    ind = blk
+Chat = np.fft.fft(ind); absC = np.abs(Chat); absC[0] = 0; Csize = 4 ** j
+h = np.bincount((S % np.uint64(Q)).astype(np.int64), minlength=Q).astype(float)
+Shat = np.fft.fft(h)
+main = (4 / 7) ** j * n; err = np.sum(h * ind) - main
+print("j=9: err=%.1f main=%.1f sqrt(main)=%.1f err/sqrt(main)=%.2f" % (err, main, main ** .5, err / main ** .5))
+# digit structure of the large spectrum
+for eta in (0.5, 0.1, 0.01):
+    spec = np.nonzero(absC >= eta * Csize)[0]
+    mx = [max(abs(x) for x in signed_digits(int(a))) for a in spec]
+    hist = np.bincount(mx, minlength=4)
+    print("Spec_%.2f: size %d; max |signed base-7 digit| histogram (0,1,2,3): %s; examples: %s"
+          % (eta, len(spec), hist.tolist(), [base7(int(a)) for a in spec[:6]]))
+# anchors at gap scale 7^m, m=3..9, with and without size weights
+for m in range(3, 10):
+    starts = np.concatenate(([0], np.nonzero(gaps >= 7 ** m)[0] + 1))
+    anchors = S[starts]; nc = len(anchors)
+    sizes = np.diff(np.concatenate((starts, [n]))).astype(float)
+    r = (anchors % np.uint64(Q)).astype(np.int64)
+    ha = np.bincount(r, minlength=Q).astype(float); hw = np.bincount(r, weights=sizes, minlength=Q)
+    Ahat = np.fft.fft(ha); Ahat[0] = 0; Wq = np.fft.fft(hw); Wq[0] = 0
+    spec = absC >= 0.1 * Csize
+    aA = np.abs(Ahat)
+    am = int(np.argmax(aA))
+    print("m=%d #c=%d mean size %.1f: max|Ahat|/sqrt(#c)=%.2f at a=%s; over Spec_0.1: %.2f; |Shat(4)|=%.0f, size-weighted anchor sum at a=4: %.0f, |Ahat(4)|*mean=%.0f"
+          % (m, nc, n / nc, aA[am] / nc ** .5, base7(am), aA[spec].max() / nc ** .5, abs(Shat[4]), abs(Wq[4]), aA[4] * n / nc))
+
+=== OUTPUT fourier7.py (j=1..9) ===
+|S| = 1273210
+fraction of consecutive gaps <7: 0.6113
+runs at gap scale 7^3: 158015, mean size 8.1
+runs at gap scale 7^5: 44031, mean size 28.9
+runs at gap scale 7^9: 4005, mean size 317.9
+
+j=1 Q=7 theta=j/log_7(1e18)=0.047
+ RMS|Shat|/sqrt|S| = 0.953   max|Shat|/sqrt|S| = 1.22 at a=3 (base7 3)
+ count in C_j = 727059, main = 727548.6, rel err = -0.07%  (Fourier err -489.6)
+ bounds/main: Linf 0.00194  L2 0.00179  abs-sum 0.00156 ; log_Q(||Chat||_1/|C|) = 0.5295
+ large-spectrum-restricted error (eta = |Chat(a)|/|C| threshold):
+   eta=0.500 |Spec|=2 (Q^0.356) restricted err=-649.8 true=-489.6 ratio=1.33 ; abs tail bound/main=0.00
+   eta=0.300 |Spec|=2 (Q^0.356) restricted err=-649.8 true=-489.6 ratio=1.33 ; abs tail bound/main=0.00
+   eta=0.200 |Spec|=4 (Q^0.712) restricted err=-475.5 true=-489.6 ratio=0.97 ; abs tail bound/main=0.00
+   eta=0.100 |Spec|=6 (Q^0.921) restricted err=-489.6 true=-489.6 ratio=1.00 ; abs tail bound/main=0.00
+   eta=0.050 |Spec|=6 (Q^0.921) restricted err=-489.6 true=-489.6 ratio=1.00 ; abs tail bound/main=0.00
+   eta=0.020 |Spec|=6 (Q^0.921) restricted err=-489.6 true=-489.6 ratio=1.00 ; abs tail bound/main=0.00
+   eta=0.010 |Spec|=6 (Q^0.921) restricted err=-489.6 true=-489.6 ratio=1.00 ; abs tail bound/main=0.00
+   eta=0.005 |Spec|=6 (Q^0.921) restricted err=-489.6 true=-489.6 ratio=1.00 ; abs tail bound/main=0.00
+   eta=0.002 |Spec|=6 (Q^0.921) restricted err=-489.6 true=-489.6 ratio=1.00 ; abs tail bound/main=0.00
+   eta=0.001 |Spec|=6 (Q^0.921) restricted err=-489.6 true=-489.6 ratio=1.00 ; abs tail bound/main=0.00
+
+j=2 Q=49 theta=j/log_7(1e18)=0.094
+ RMS|Shat|/sqrt|S| = 0.970   max|Shat|/sqrt|S| = 1.57 at a=32 (base7 44)
+ count in C_j = 414869, main = 415742.0, rel err = -0.21%  (Fourier err -873.0)
+ bounds/main: Linf 0.00933  L2 0.00855  abs-sum 0.00565 ; log_Q(||Chat||_1/|C|) = 0.5250
+ large-spectrum-restricted error (eta = |Chat(a)|/|C| threshold):
+   eta=0.500 |Spec|=4 (Q^0.356) restricted err=-867.4 true=-873.0 ratio=0.99 ; abs tail bound/main=0.00
+   eta=0.300 |Spec|=6 (Q^0.460) restricted err=-904.2 true=-873.0 ratio=1.04 ; abs tail bound/main=0.00
+   eta=0.200 |Spec|=10 (Q^0.592) restricted err=-557.3 true=-873.0 ratio=0.64 ; abs tail bound/main=0.00
+   eta=0.100 |Spec|=24 (Q^0.817) restricted err=-768.2 true=-873.0 ratio=0.88 ; abs tail bound/main=0.00
+   eta=0.050 |Spec|=30 (Q^0.874) restricted err=-837.0 true=-873.0 ratio=0.96 ; abs tail bound/main=0.00
+   eta=0.020 |Spec|=42 (Q^0.960) restricted err=-876.2 true=-873.0 ratio=1.00 ; abs tail bound/main=0.00
+   eta=0.010 |Spec|=44 (Q^0.972) restricted err=-869.3 true=-873.0 ratio=1.00 ; abs tail bound/main=0.00
+   eta=0.005 |Spec|=46 (Q^0.984) restricted err=-873.6 true=-873.0 ratio=1.00 ; abs tail bound/main=0.00
+   eta=0.002 |Spec|=48 (Q^0.995) restricted err=-873.0 true=-873.0 ratio=1.00 ; abs tail bound/main=0.00
+   eta=0.001 |Spec|=48 (Q^0.995) restricted err=-873.0 true=-873.0 ratio=1.00 ; abs tail bound/main=0.00
+
+j=3 Q=343 theta=j/log_7(1e18)=0.141
+ RMS|Shat|/sqrt|S| = 1.039   max|Shat|/sqrt|S| = 2.83 at a=27 (base7 036)
+ count in C_j = 237300, main = 237566.9, rel err = -0.11%  (Fourier err -266.9)
+ bounds/main: Linf 0.0509  L2 0.0356  abs-sum 0.0186 ; log_Q(||Chat||_1/|C|) = 0.5236
+ large-spectrum-restricted error (eta = |Chat(a)|/|C| threshold):
+   eta=0.500 |Spec|=6 (Q^0.307) restricted err=-145.9 true=-266.9 ratio=0.55 ; abs tail bound/main=0.01
+   eta=0.300 |Spec|=14 (Q^0.452) restricted err=-377.3 true=-266.9 ratio=1.41 ; abs tail bound/main=0.01
+   eta=0.200 |Spec|=22 (Q^0.529) restricted err=-240.1 true=-266.9 ratio=0.90 ; abs tail bound/main=0.01
+   eta=0.100 |Spec|=64 (Q^0.712) restricted err=-32.0 true=-266.9 ratio=0.12 ; abs tail bound/main=0.01
+   eta=0.050 |Spec|=104 (Q^0.796) restricted err=-166.4 true=-266.9 ratio=0.62 ; abs tail bound/main=0.00
+   eta=0.020 |Spec|=184 (Q^0.893) restricted err=-258.0 true=-266.9 ratio=0.97 ; abs tail bound/main=0.00
+   eta=0.010 |Spec|=234 (Q^0.934) restricted err=-260.7 true=-266.9 ratio=0.98 ; abs tail bound/main=0.00
+   eta=0.005 |Spec|=274 (Q^0.962) restricted err=-271.6 true=-266.9 ratio=1.02 ; abs tail bound/main=0.00
+   eta=0.002 |Spec|=304 (Q^0.979) restricted err=-267.9 true=-266.9 ratio=1.00 ; abs tail bound/main=0.00
+   eta=0.001 |Spec|=326 (Q^0.991) restricted err=-267.6 true=-266.9 ratio=1.00 ; abs tail bound/main=0.00
+
+j=4 Q=2401 theta=j/log_7(1e18)=0.188
+ RMS|Shat|/sqrt|S| = 1.022   max|Shat|/sqrt|S| = 3.52 at a=92 (base7 0161)
+ count in C_j = 135615, main = 135752.5, rel err = -0.10%  (Fourier err -137.5)
+ bounds/main: Linf 0.18  L2 0.128  abs-sum 0.0534 ; log_Q(||Chat||_1/|C|) = 0.5229
+ large-spectrum-restricted error (eta = |Chat(a)|/|C| threshold):
+   eta=0.500 |Spec|=8 (Q^0.267) restricted err=150.5 true=-137.5 ratio=-1.09 ; abs tail bound/main=0.05
+   eta=0.300 |Spec|=26 (Q^0.419) restricted err=120.0 true=-137.5 ratio=-0.87 ; abs tail bound/main=0.04
+   eta=0.200 |Spec|=46 (Q^0.492) restricted err=-40.3 true=-137.5 ratio=0.29 ; abs tail bound/main=0.04
+   eta=0.100 |Spec|=138 (Q^0.633) restricted err=-32.5 true=-137.5 ratio=0.24 ; abs tail bound/main=0.02
+   eta=0.050 |Spec|=294 (Q^0.730) restricted err=-73.7 true=-137.5 ratio=0.54 ; abs tail bound/main=0.02
+   eta=0.020 |Spec|=650 (Q^0.832) restricted err=-84.6 true=-137.5 ratio=0.62 ; abs tail bound/main=0.01
+   eta=0.010 |Spec|=948 (Q^0.881) restricted err=-150.7 true=-137.5 ratio=1.10 ; abs tail bound/main=0.00
+   eta=0.005 |Spec|=1320 (Q^0.923) restricted err=-133.4 true=-137.5 ratio=0.97 ; abs tail bound/main=0.00
+   eta=0.002 |Spec|=1698 (Q^0.955) restricted err=-133.7 true=-137.5 ratio=0.97 ; abs tail bound/main=0.00
+   eta=0.001 |Spec|=1900 (Q^0.970) restricted err=-136.9 true=-137.5 ratio=1.00 ; abs tail bound/main=0.00
+   m=3 #clusters=158015 mean size 8.1 : max|Ahat|/sqrt(#c) over all a=3.05, over Spec_0.10=2.08, RMS over Spec=1.05 ; naive bound Q^0.5208/sqrt(#c)=0.14
+   m=3 #clusters=158015 mean size 8.1 : max|Ahat|/sqrt(#c) over all a=3.05, over Spec_0.01=2.28, RMS over Spec=0.97 ; naive bound Q^0.5208/sqrt(#c)=0.14
+
+j=5 Q=16807 theta=j/log_7(1e18)=0.235
+ RMS|Shat|/sqrt|S| = 0.996   max|Shat|/sqrt|S| = 7.33 at a=206 (base7 00413)
+ count in C_j = 77765, main = 77572.9, rel err = 0.25%  (Fourier err 192.1)
+ bounds/main: Linf 1.04  L2 0.449  abs-sum 0.143 ; log_Q(||Chat||_1/|C|) = 0.5225
+ large-spectrum-restricted error (eta = |Chat(a)|/|C| threshold):
+   eta=0.500 |Spec|=10 (Q^0.237) restricted err=265.9 true=192.1 ratio=1.38 ; abs tail bound/main=0.13
+   eta=0.300 |Spec|=42 (Q^0.384) restricted err=153.2 true=192.1 ratio=0.80 ; abs tail bound/main=0.12
+   eta=0.200 |Spec|=82 (Q^0.453) restricted err=135.2 true=192.1 ratio=0.70 ; abs tail bound/main=0.11
+   eta=0.100 |Spec|=262 (Q^0.572) restricted err=12.5 true=192.1 ratio=0.07 ; abs tail bound/main=0.09
+   eta=0.050 |Spec|=690 (Q^0.672) restricted err=63.4 true=192.1 ratio=0.33 ; abs tail bound/main=0.07
+   eta=0.020 |Spec|=1842 (Q^0.773) restricted err=213.6 true=192.1 ratio=1.11 ; abs tail bound/main=0.04
+   eta=0.010 |Spec|=3230 (Q^0.830) restricted err=157.2 true=192.1 ratio=0.82 ; abs tail bound/main=0.02
+   eta=0.005 |Spec|=5118 (Q^0.878) restricted err=191.9 true=192.1 ratio=1.00 ; abs tail bound/main=0.01
+   eta=0.002 |Spec|=7760 (Q^0.921) restricted err=196.2 true=192.1 ratio=1.02 ; abs tail bound/main=0.00
+   eta=0.001 |Spec|=9768 (Q^0.944) restricted err=194.3 true=192.1 ratio=1.01 ; abs tail bound/main=0.00
+   m=3 #clusters=158015 mean size 8.1 : max|Ahat|/sqrt(#c) over all a=3.63, over Spec_0.10=2.27, RMS over Spec=1.01 ; naive bound Q^0.5208/sqrt(#c)=0.40
+   m=3 #clusters=158015 mean size 8.1 : max|Ahat|/sqrt(#c) over all a=3.63, over Spec_0.01=3.17, RMS over Spec=0.97 ; naive bound Q^0.5208/sqrt(#c)=0.40
+
+j=6 Q=117649 theta=j/log_7(1e18)=0.282
+ RMS|Shat|/sqrt|S| = 0.997   max|Shat|/sqrt|S| = 8.45 at a=18 (base7 000024)
+ count in C_j = 44809, main = 44327.3, rel err = 1.09%  (Fourier err 481.7)
+ bounds/main: Linf 3.32  L2 1.6  abs-sum 0.409 ; log_Q(||Chat||_1/|C|) = 0.5222
+ large-spectrum-restricted error (eta = |Chat(a)|/|C| threshold):
+   eta=0.500 |Spec|=12 (Q^0.213) restricted err=319.5 true=481.7 ratio=0.66 ; abs tail bound/main=0.39
+   eta=0.300 |Spec|=62 (Q^0.353) restricted err=429.1 true=481.7 ratio=0.89 ; abs tail bound/main=0.38
+   eta=0.200 |Spec|=130 (Q^0.417) restricted err=392.2 true=481.7 ratio=0.81 ; abs tail bound/main=0.36
+   eta=0.100 |Spec|=464 (Q^0.526) restricted err=272.2 true=481.7 ratio=0.57 ; abs tail bound/main=0.31
+   eta=0.050 |Spec|=1434 (Q^0.623) restricted err=359.4 true=481.7 ratio=0.75 ; abs tail bound/main=0.25
+   eta=0.020 |Spec|=4592 (Q^0.722) restricted err=458.4 true=481.7 ratio=0.95 ; abs tail bound/main=0.16
+   eta=0.010 |Spec|=9428 (Q^0.784) restricted err=398.2 true=481.7 ratio=0.83 ; abs tail bound/main=0.10
+   eta=0.005 |Spec|=16682 (Q^0.833) restricted err=466.1 true=481.7 ratio=0.97 ; abs tail bound/main=0.06
+   eta=0.002 |Spec|=30094 (Q^0.883) restricted err=486.3 true=481.7 ratio=1.01 ; abs tail bound/main=0.03
+   eta=0.001 |Spec|=42804 (Q^0.913) restricted err=482.4 true=481.7 ratio=1.00 ; abs tail bound/main=0.01
+   m=3 #clusters=158015 mean size 8.1 : max|Ahat|/sqrt(#c) over all a=3.63, over Spec_0.10=2.27, RMS over Spec=1.00 ; naive bound Q^0.5208/sqrt(#c)=1.10
+   m=3 #clusters=158015 mean size 8.1 : max|Ahat|/sqrt(#c) over all a=3.63, over Spec_0.01=3.31, RMS over Spec=0.99 ; naive bound Q^0.5208/sqrt(#c)=1.10
+   m=5 #clusters=44031 mean size 28.9 : max|Ahat|/sqrt(#c) over all a=3.30, over Spec_0.10=2.82, RMS over Spec=1.02 ; naive bound Q^0.5208/sqrt(#c)=2.08
+   m=5 #clusters=44031 mean size 28.9 : max|Ahat|/sqrt(#c) over all a=3.30, over Spec_0.01=3.10, RMS over Spec=1.00 ; naive bound Q^0.5208/sqrt(#c)=2.08
+
+j=7 Q=823543 theta=j/log_7(1e18)=0.329
+ RMS|Shat|/sqrt|S| = 0.999   max|Shat|/sqrt|S| = 8.90 at a=117 (base7 0000225)
+ count in C_j = 25390, main = 25329.9, rel err = 0.24%  (Fourier err 60.1)
+ bounds/main: Linf 9.65  L2 5.64  abs-sum 1.13 ; log_Q(||Chat||_1/|C|) = 0.5220
+ large-spectrum-restricted error (eta = |Chat(a)|/|C| threshold):
+   eta=0.500 |Spec|=14 (Q^0.194) restricted err=130.3 true=60.1 ratio=2.17 ; abs tail bound/main=1.12
+   eta=0.300 |Spec|=86 (Q^0.327) restricted err=142.0 true=60.1 ratio=2.36 ; abs tail bound/main=1.09
+   eta=0.200 |Spec|=190 (Q^0.385) restricted err=-81.4 true=60.1 ratio=-1.35 ; abs tail bound/main=1.05
+   eta=0.100 |Spec|=780 (Q^0.489) restricted err=-209.3 true=60.1 ratio=-3.48 ; abs tail bound/main=0.96
+   eta=0.050 |Spec|=2790 (Q^0.582) restricted err=-92.1 true=60.1 ratio=-1.53 ; abs tail bound/main=0.82
+   eta=0.020 |Spec|=10428 (Q^0.679) restricted err=61.0 true=60.1 ratio=1.01 ; abs tail bound/main=0.60
+   eta=0.010 |Spec|=24314 (Q^0.741) restricted err=36.2 true=60.1 ratio=0.60 ; abs tail bound/main=0.42
+   eta=0.005 |Spec|=48466 (Q^0.792) restricted err=40.1 true=60.1 ratio=0.67 ; abs tail bound/main=0.28
+   eta=0.002 |Spec|=102504 (Q^0.847) restricted err=60.0 true=60.1 ratio=1.00 ; abs tail bound/main=0.15
+   eta=0.001 |Spec|=160826 (Q^0.880) restricted err=61.5 true=60.1 ratio=1.02 ; abs tail bound/main=0.08
+   m=3 #clusters=158015 mean size 8.1 : max|Ahat|/sqrt(#c) over all a=4.73, over Spec_0.10=2.71, RMS over Spec=1.06 ; naive bound Q^0.5208/sqrt(#c)=3.03
+   m=3 #clusters=158015 mean size 8.1 : max|Ahat|/sqrt(#c) over all a=4.73, over Spec_0.01=3.77, RMS over Spec=1.00 ; naive bound Q^0.5208/sqrt(#c)=3.03
+   m=5 #clusters=44031 mean size 28.9 : max|Ahat|/sqrt(#c) over all a=3.78, over Spec_0.10=2.82, RMS over Spec=0.99 ; naive bound Q^0.5208/sqrt(#c)=5.74
+   m=5 #clusters=44031 mean size 28.9 : max|Ahat|/sqrt(#c) over all a=3.78, over Spec_0.01=3.34, RMS over Spec=1.00 ; naive bound Q^0.5208/sqrt(#c)=5.74
+
+|S| = 1273210
+fraction of consecutive gaps <7: 0.6113
+runs at gap scale 7^3: 158015, mean size 8.1
+runs at gap scale 7^5: 44031, mean size 28.9
+runs at gap scale 7^9: 4005, mean size 317.9
+
+j=8 Q=5764801 theta=j/log_7(1e18)=0.376
+ RMS|Shat|/sqrt|S| = 1.000   max|Shat|/sqrt|S| = 13.24 at a=366 (base7 00001032)
+ count in C_j = 14620, main = 14474.2, rel err = 1.01%  (Fourier err 145.8)
+ bounds/main: Linf 39.6  L2 19.8  abs-sum 3.15 ; log_Q(||Chat||_1/|C|) = 0.5219
+ large-spectrum-restricted error (eta = |Chat(a)|/|C| threshold):
+   eta=0.500 |Spec|=16 (Q^0.178) restricted err=142.7 true=145.8 ratio=0.98 ; abs tail bound/main=3.12
+   eta=0.300 |Spec|=114 (Q^0.304) restricted err=156.0 true=145.8 ratio=1.07 ; abs tail bound/main=3.08
+   eta=0.200 |Spec|=262 (Q^0.358) restricted err=-37.0 true=145.8 ratio=-0.25 ; abs tail bound/main=3.02
+   eta=0.100 |Spec|=1252 (Q^0.458) restricted err=-24.8 true=145.8 ratio=-0.17 ; abs tail bound/main=2.85
+   eta=0.050 |Spec|=5168 (Q^0.549) restricted err=83.6 true=145.8 ratio=0.57 ; abs tail bound/main=2.55
+   eta=0.020 |Spec|=22008 (Q^0.642) restricted err=158.1 true=145.8 ratio=1.08 ; abs tail bound/main=2.04
+   eta=0.010 |Spec|=57078 (Q^0.704) restricted err=145.0 true=145.8 ratio=0.99 ; abs tail bound/main=1.59
+   eta=0.005 |Spec|=127526 (Q^0.755) restricted err=167.4 true=145.8 ratio=1.15 ; abs tail bound/main=1.15
+   eta=0.002 |Spec|=308970 (Q^0.812) restricted err=161.7 true=145.8 ratio=1.11 ; abs tail bound/main=0.68
+   eta=0.001 |Spec|=534456 (Q^0.847) restricted err=154.9 true=145.8 ratio=1.06 ; abs tail bound/main=0.42
+   m=3 #clusters=158015 mean size 8.1 : max|Ahat|/sqrt(#c) over all a=6.07, over Spec_0.10=3.13, RMS over Spec=1.07 ; naive bound Q^0.5208/sqrt(#c)=8.35
+   m=3 #clusters=158015 mean size 8.1 : max|Ahat|/sqrt(#c) over all a=6.07, over Spec_0.01=6.07, RMS over Spec=1.01 ; naive bound Q^0.5208/sqrt(#c)=8.35
+   m=5 #clusters=44031 mean size 28.9 : max|Ahat|/sqrt(#c) over all a=4.56, over Spec_0.10=2.82, RMS over Spec=0.99 ; naive bound Q^0.5208/sqrt(#c)=15.82
+   m=5 #clusters=44031 mean size 28.9 : max|Ahat|/sqrt(#c) over all a=4.56, over Spec_0.01=3.34, RMS over Spec=1.00 ; naive bound Q^0.5208/sqrt(#c)=15.82
+
+j=9 Q=40353607 theta=j/log_7(1e18)=0.423
+ RMS|Shat|/sqrt|S| = 1.000   max|Shat|/sqrt|S| = 30.31 at a=4 (base7 000000004)
+ count in C_j = 8448, main = 8271.0, rel err = 2.14%  (Fourier err 177.0)
+ bounds/main: Linf 250  L2 69.6  abs-sum 8.7 ; log_Q(||Chat||_1/|C|) = 0.5217
+ large-spectrum-restricted error (eta = |Chat(a)|/|C| threshold):
+   eta=0.500 |Spec|=18 (Q^0.165) restricted err=61.2 true=177.0 ratio=0.35 ; abs tail bound/main=8.67
+   eta=0.300 |Spec|=146 (Q^0.285) restricted err=-39.3 true=177.0 ratio=-0.22 ; abs tail bound/main=8.59
+   eta=0.200 |Spec|=346 (Q^0.334) restricted err=-139.9 true=177.0 ratio=-0.79 ; abs tail bound/main=8.52
+   eta=0.100 |Spec|=1912 (Q^0.431) restricted err=4.7 true=177.0 ratio=0.03 ; abs tail bound/main=8.21
+   eta=0.050 |Spec|=9034 (Q^0.520) restricted err=97.3 true=177.0 ratio=0.55 ; abs tail bound/main=7.62
+   eta=0.020 |Spec|=43628 (Q^0.610) restricted err=122.8 true=177.0 ratio=0.69 ; abs tail bound/main=6.53
+   eta=0.010 |Spec|=125200 (Q^0.670) restricted err=134.7 true=177.0 ratio=0.76 ; abs tail bound/main=5.41
+   eta=0.005 |Spec|=308326 (Q^0.722) restricted err=175.8 true=177.0 ratio=0.99 ; abs tail bound/main=4.25
+   eta=0.002 |Spec|=844970 (Q^0.779) restricted err=188.2 true=177.0 ratio=1.06 ; abs tail bound/main=2.80
+   eta=0.001 |Spec|=1609898 (Q^0.816) restricted err=189.3 true=177.0 ratio=1.07 ; abs tail bound/main=1.90
+   m=3 #clusters=158015 mean size 8.1 : max|Ahat|/sqrt(#c) over all a=10.47, over Spec_0.10=10.47, RMS over Spec=1.19 ; naive bound Q^0.5208/sqrt(#c)=23.00
+   m=3 #clusters=158015 mean size 8.1 : max|Ahat|/sqrt(#c) over all a=10.47, over Spec_0.01=10.47, RMS over Spec=1.02 ; naive bound Q^0.5208/sqrt(#c)=23.00
+   m=5 #clusters=44031 mean size 28.9 : max|Ahat|/sqrt(#c) over all a=5.73, over Spec_0.10=5.69, RMS over Spec=1.04 ; naive bound Q^0.5208/sqrt(#c)=43.58
+   m=5 #clusters=44031 mean size 28.9 : max|Ahat|/sqrt(#c) over all a=5.73, over Spec_0.01=5.69, RMS over Spec=1.00 ; naive bound Q^0.5208/sqrt(#c)=43.58
+
+=== OUTPUT extra9.py ===
+j=9: err=177.0 main=8271.0 sqrt(main)=90.9 err/sqrt(main)=1.95
+Spec_0.50: size 18; max |signed base-7 digit| histogram (0,1,2,3): [0, 18, 0, 0]; examples: ['000000001', '000000010', '000000100', '000001000', '000010000', '000100000']
+Spec_0.10: size 1912; max |signed base-7 digit| histogram (0,1,2,3): [0, 1034, 645, 233]; examples: ['000000001', '000000002', '000000003', '000000004', '000000005', '000000006']
+Spec_0.01: size 125200; max |signed base-7 digit| histogram (0,1,2,3): [0, 8258, 45776, 71166]; examples: ['000000001', '000000002', '000000003', '000000004', '000000005', '000000006']
+m=3 #c=158015 mean size 8.1: max|Ahat|/sqrt(#c)=10.47 at a=000000004; over Spec_0.1: 10.47; |Shat(4)|=34203, size-weighted anchor sum at a=4: 34203, |Ahat(4)|*mean=33524
+m=4 #c=75897 mean size 16.8: max|Ahat|/sqrt(#c)=7.97 at a=125614601; over Spec_0.1: 7.38; |Shat(4)|=34203, size-weighted anchor sum at a=4: 34205, |Ahat(4)|*mean=34127
+m=5 #c=44031 mean size 28.9: max|Ahat|/sqrt(#c)=5.73 at a=541052066; over Spec_0.1: 5.69; |Shat(4)|=34203, size-weighted anchor sum at a=4: 34187, |Ahat(4)|*mean=34503
+m=6 #c=23865 mean size 53.4: max|Ahat|/sqrt(#c)=4.52 at a=125614601; over Spec_0.1: 4.34; |Shat(4)|=34203, size-weighted anchor sum at a=4: 33938, |Ahat(4)|*mean=35795
+m=7 #c=13681 mean size 93.1: max|Ahat|/sqrt(#c)=4.07 at a=116310556; over Spec_0.1: 2.80; |Shat(4)|=34203, size-weighted anchor sum at a=4: 34728, |Ahat(4)|*mean=30451
+m=8 #c=7058 mean size 180.4: max|Ahat|/sqrt(#c)=4.11 at a=221360224; over Spec_0.1: 2.82; |Shat(4)|=34203, size-weighted anchor sum at a=4: 47349, |Ahat(4)|*mean=42794
+m=9 #c=4005 mean size 317.9: max|Ahat|/sqrt(#c)=4.02 at a=032015345; over Spec_0.1: 2.97; |Shat(4)|=34203, size-weighted anchor sum at a=4: 59695, |Ahat(4)|*mean=48471
+
+=== cylinder counts j=1..22 by direct digit filtering, several 4-digit sets ===
+# count of n in S3∩S5∩[0,1e18) whose lowest j base-7 digits all lie in the 4-element digit set; main=(4/7)^j|S|; (count-main)/sqrt(main) in parentheses
+j main | 0123 | 3456 | 1234 | 0246 | 0156 | 2345
+1 727548.6 | 727059 (-0.6) | 728143 (+0.7) | 726722 (-1.0) | 726808 (-0.9) | 728479 (+1.1) | 727150 (-0.5)
+2 415742.0 | 414869 (-1.4) | 416794 (+1.6) | 414545 (-1.9) | 415918 (+0.3) | 415790 (+0.1) | 415386 (-0.6)
+3 237566.9 | 237300 (-0.5) | 237968 (+0.8) | 237045 (-1.1) | 237495 (-0.1) | 237095 (-1.0) | 237375 (-0.4)
+4 135752.5 | 135615 (-0.4) | 135600 (-0.4) | 135866 (+0.3) | 135484 (-0.7) | 135266 (-1.3) | 135889 (+0.4)
+5 77572.9 | 77765 (+0.7) | 77236 (-1.2) | 77387 (-0.7) | 77171 (-1.4) | 77165 (-1.5) | 77643 (+0.3)
+6 44327.3 | 44809 (+2.3) | 44576 (+1.2) | 44419 (+0.4) | 43815 (-2.4) | 43997 (-1.6) | 44654 (+1.6)
+7 25329.9 | 25390 (+0.4) | 25737 (+2.6) | 25002 (-2.1) | 25044 (-1.8) | 25037 (-1.8) | 25568 (+1.5)
+8 14474.2 | 14620 (+1.2) | 14754 (+2.3) | 14322 (-1.3) | 14474 (-0.0) | 14403 (-0.6) | 14565 (+0.8)
+9 8271.0 | 8448 (+1.9) | 8257 (-0.2) | 8263 (-0.1) | 8164 (-1.2) | 8141 (-1.4) | 8171 (-1.1)
+10 4726.3 | 4835 (+1.6) | 4601 (-1.8) | 5069 (+5.0) | 4642 (-1.2) | 4613 (-1.6) | 4686 (-0.6)
+11 2700.7 | 2872 (+3.3) | 2661 (-0.8) | 2999 (+5.7) | 2618 (-1.6) | 2637 (-1.2) | 2544 (-3.0)
+12 1543.3 | 1724 (+4.6) | 1590 (+1.2) | 1722 (+4.5) | 1488 (-1.4) | 1544 (+0.0) | 1426 (-3.0)
+13 881.9 | 982 (+3.4) | 1045 (+5.5) | 1073 (+6.4) | 709 (-5.8) | 907 (+0.8) | 820 (-2.1)
+14 503.9 | 655 (+6.7) | 688 (+8.2) | 713 (+9.3) | 462 (-1.9) | 492 (-0.5) | 480 (-1.1)
+15 288.0 | 428 (+8.3) | 394 (+6.2) | 423 (+8.0) | 322 (+2.0) | 251 (-2.2) | 316 (+1.7)
+16 164.5 | 277 (+8.8) | 243 (+6.1) | 261 (+7.5) | 213 (+3.8) | 158 (-0.5) | 191 (+2.1)
+17 94.0 | 145 (+5.3) | 135 (+4.2) | 164 (+7.2) | 145 (+5.3) | 92 (-0.2) | 120 (+2.7)
+18 53.7 | 112 (+7.9) | 41 (-1.7) | 138 (+11.5) | 101 (+6.4) | 48 (-0.8) | 72 (+2.5)
+19 30.7 | 62 (+5.6) | 39 (+1.5) | 73 (+7.6) | 91 (+10.9) | 42 (+2.0) | 68 (+6.7)
+20 17.5 | 62 (+10.6) | 39 (+5.1) | 37 (+4.6) | 60 (+10.1) | 36 (+4.4) | 27 (+2.3)
+21 10.0 | 62 (+16.4) | 0 (-3.2) | 17 (+2.2) | 60 (+15.8) | 36 (+8.2) | 0 (-3.2)
+22 5.7 | 62 (+23.5) | 0 (-2.4) | 17 (+4.7) | 60 (+22.7) | 36 (+12.6) | 0 (-2.4)
+
+=== run diameters ===
+m=3: runs 158015; fraction of runs with diameter >= 7^m: 0.052; median diam/7^m=0.31; max diam/7^m=1.1; fraction of ELEMENTS in runs with diam>=7^m: 0.056
+m=5: runs 44031; fraction 0.263; median 0.19; max 1.8; elements 0.470
+m=9: runs 4005; fraction 0.192; median 0.17; max 1.6; elements 0.380
+
+Reproduce: gcc -O2 -o isect2 isect2.c && ./isect2 1000000000000000000 > s35_1e18.txt && python3 fourier7.py s35_1e18.txt 9 && python3 extra9.py s35_1e18.txt

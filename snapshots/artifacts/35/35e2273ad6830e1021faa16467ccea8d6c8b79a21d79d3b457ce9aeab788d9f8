@@ -1,0 +1,44 @@
+"""Delsarte LP bound for spherical codes on S^{n-1} with inner products <= s.
+
+Standard formulation: find f(t) = sum_k c_k G_k^{(n)}(t) (Gegenbauer, normalized G_k(1)=1)
+with c_0 = 1, c_k >= 0, f(t) <= 0 on [-1, s].  Then |C| <= f(1) = sum c_k.
+Discretize [-1, s] on a fine grid (this is a relaxation of the exact LP, so the
+printed value is a lower estimate of the true LP optimum; with a fine grid and modest
+degree the discrepancy is negligible at the reported precision).  Not a rigorous
+certificate: it is a numerical baseline only.
+"""
+import numpy as np
+from scipy.optimize import linprog
+from scipy.special import eval_gegenbauer
+
+
+def gegen_norm(k, n, t):
+    lam = (n - 2) / 2.0
+    if abs(lam) < 1e-12:  # n = 2: Chebyshev
+        return np.cos(k * np.arccos(np.clip(t, -1, 1)))
+    return eval_gegenbauer(k, lam, t) / eval_gegenbauer(k, lam, 1.0)
+
+
+def delsarte_bound(n, s, deg, grid=4001):
+    ts = np.linspace(-1.0, s, grid)
+    # variables c_1..c_deg ; objective minimize sum c_k (then bound = 1 + sum)
+    A = np.array([[gegen_norm(k, n, t) for k in range(1, deg + 1)] for t in ts])
+    # constraint: 1 + sum_k c_k G_k(t) <= 0  ->  A c <= -1
+    res = linprog(c=np.ones(deg), A_ub=A, b_ub=-np.ones(grid), bounds=[(0, None)] * deg,
+                  method="highs")
+    if res.status != 0:
+        return None, res.message
+    return 1.0 + res.fun, res.x
+
+
+if __name__ == "__main__":
+    print("Delsarte LP bound, kissing configurations (s = 1/2):")
+    for n in [3, 4, 5, 8]:
+        for deg in [10, 20, 30]:
+            val, _ = delsarte_bound(n, 0.5, deg)
+            print(f"  n={n} deg={deg}: {val:.4f}")
+    print()
+    print("Delsarte LP bound for 'contact neighbour codes' on S^3 (n=4) with s = 1/3:")
+    for deg in [10, 20, 30]:
+        val, _ = delsarte_bound(4, 1.0 / 3.0, deg)
+        print(f"  n=4 s=1/3 deg={deg}: {val:.4f}")

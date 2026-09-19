@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""Experiment 6 (idea I5): reproducible re-derivation of the empty-range statement using only
+(a) the primitive-root lemma (Lean: dvd_of_erdos1142_of_primitiveRoot, hypothesis 2^(p-1)+p < n) and
+(b) BPSW-style probable-prime tests (gmpy2.is_prime, 25 rounds).
+
+For K in [KMIN, KMAX]: let S(K) = {p prime, p <= K+1, 2 primitive root mod p}, M = prod S(K).
+Every solution n in (2^K, 2^{K+1}] with n > 2^K + K + 1 is a multiple of M (lemma (a) for each p in S(K),
+since 2^(p-1) + p <= 2^K + K + 1 < n).  The finitely many n in (2^K, 2^K + K + 1] are tested directly.
+Candidates are tested by early-exit primality of n - 2^k, k = 1..K.
+Assumption: gmpy2.is_prime has no false negatives (true: it is Miller-Rabin; a composite could only be
+reported prime, which would make the search *miss* a failure, i.e. report a false candidate, never miss a true solution).
+Usage: python3 exp6_search.py KMIN KMAX
+"""
+import sys, time, math
+import gmpy2
+from sympy import primerange, n_order
+
+KMIN, KMAX = int(sys.argv[1]), int(sys.argv[2])
+
+def is_solution(n, K):
+    for k in range(1, K + 1):
+        if not gmpy2.is_prime(n - (1 << k), 25):
+            return False
+    return True
+
+total_cand = 0
+for K in range(KMIN, KMAX + 1):
+    t0 = time.time()
+    S = [p for p in primerange(3, K + 2) if n_order(2, p) == p - 1]
+    M = math.prod(S)
+    lo, hi = (1 << K) + 1, 1 << (K + 1)
+    sols = []
+    # small strip handled directly
+    for n in range(lo, min(hi, (1 << K) + K + 1) + 1):
+        if is_solution(n, K):
+            sols.append(n)
+    # multiples of M above the strip
+    start = ((1 << K) + K + 1) // M + 1
+    m = start
+    cand = 0
+    while m * M <= hi:
+        n = m * M
+        cand += 1
+        if is_solution(n, K):
+            sols.append(n)
+        m += 1
+    total_cand += cand
+    print(f"K={K:3d} |S|={len(S):2d} log2M={math.log2(M):6.2f} candidates={cand:9d} solutions={sols}  ({time.time()-t0:.1f}s)", flush=True)
+print("total candidates tested:", total_cand)
+
+
+# ===== OUTPUT (K=13..72) =====
+# K= 13 |S|= 4 log2M= 11.07 candidates=        4 solutions=[]  (0.0s)
+# K= 14 |S|= 4 log2M= 11.07 candidates=        8 solutions=[]  (0.0s)
+# K= 15 |S|= 4 log2M= 11.07 candidates=       15 solutions=[]  (0.0s)
+# K= 16 |S|= 4 log2M= 11.07 candidates=       31 solutions=[]  (0.0s)
+# K= 17 |S|= 4 log2M= 11.07 candidates=       61 solutions=[]  (0.0s)
+# K= 18 |S|= 5 log2M= 15.31 candidates=        6 solutions=[]  (0.0s)
+# K= 19 |S|= 5 log2M= 15.31 candidates=       13 solutions=[]  (0.0s)
+# K= 20 |S|= 5 log2M= 15.31 candidates=       26 solutions=[]  (0.0s)
+# K= 21 |S|= 5 log2M= 15.31 candidates=       51 solutions=[]  (0.0s)
+# K= 22 |S|= 5 log2M= 15.31 candidates=      103 solutions=[]  (0.0s)
+# K= 23 |S|= 5 log2M= 15.31 candidates=      206 solutions=[]  (0.0s)
+# K= 24 |S|= 5 log2M= 15.31 candidates=      412 solutions=[]  (0.0s)
+# K= 25 |S|= 5 log2M= 15.31 candidates=      823 solutions=[]  (0.0s)
+# K= 26 |S|= 5 log2M= 15.31 candidates=     1647 solutions=[]  (0.0s)
+# K= 27 |S|= 5 log2M= 15.31 candidates=     3293 solutions=[]  (0.0s)
+# K= 28 |S|= 6 log2M= 20.17 candidates=      227 solutions=[]  (0.0s)
+# K= 29 |S|= 6 log2M= 20.17 candidates=      454 solutions=[]  (0.0s)
+# K= 30 |S|= 6 log2M= 20.17 candidates=      908 solutions=[]  (0.0s)
+# K= 31 |S|= 6 log2M= 20.17 candidates=     1817 solutions=[]  (0.0s)
+# K= 32 |S|= 6 log2M= 20.17 candidates=     3634 solutions=[]  (0.0s)
+# K= 33 |S|= 6 log2M= 20.17 candidates=     7268 solutions=[]  (0.0s)
+# K= 34 |S|= 6 log2M= 20.17 candidates=    14536 solutions=[]  (0.0s)
+# K= 35 |S|= 6 log2M= 20.17 candidates=    29072 solutions=[]  (0.0s)
+# K= 36 |S|= 7 log2M= 25.38 candidates=     1571 solutions=[]  (0.0s)
+# K= 37 |S|= 7 log2M= 25.38 candidates=     3143 solutions=[]  (0.0s)
+# K= 38 |S|= 7 log2M= 25.38 candidates=     6286 solutions=[]  (0.0s)
+# K= 39 |S|= 7 log2M= 25.38 candidates=    12572 solutions=[]  (0.0s)
+# K= 40 |S|= 7 log2M= 25.38 candidates=    25143 solutions=[]  (0.0s)
+# K= 41 |S|= 7 log2M= 25.38 candidates=    50286 solutions=[]  (0.0s)
+# K= 42 |S|= 7 log2M= 25.38 candidates=   100572 solutions=[]  (0.1s)
+# K= 43 |S|= 7 log2M= 25.38 candidates=   201145 solutions=[]  (0.1s)
+# K= 44 |S|= 7 log2M= 25.38 candidates=   402290 solutions=[]  (0.3s)
+# K= 45 |S|= 7 log2M= 25.38 candidates=   804580 solutions=[]  (0.6s)
+# K= 46 |S|= 7 log2M= 25.38 candidates=  1609160 solutions=[]  (1.2s)
+# K= 47 |S|= 7 log2M= 25.38 candidates=  3218320 solutions=[]  (2.4s)
+# K= 48 |S|= 7 log2M= 25.38 candidates=  6436639 solutions=[]  (4.8s)
+# K= 49 |S|= 7 log2M= 25.38 candidates= 12873279 solutions=[]  (9.5s)
+# K= 50 |S|= 7 log2M= 25.38 candidates= 25746557 solutions=[]  (19.0s)
+# K= 51 |S|= 7 log2M= 25.38 candidates= 51493114 solutions=[]  (40.2s)
+# K= 52 |S|= 8 log2M= 31.11 candidates=  1943136 solutions=[]  (1.7s)
+# K= 53 |S|= 8 log2M= 31.11 candidates=  3886273 solutions=[]  (3.3s)
+# K= 54 |S|= 8 log2M= 31.11 candidates=  7772546 solutions=[]  (6.5s)
+# K= 55 |S|= 8 log2M= 31.11 candidates= 15545091 solutions=[]  (13.2s)
+# K= 56 |S|= 8 log2M= 31.11 candidates= 31090182 solutions=[]  (26.3s)
+# K= 57 |S|= 8 log2M= 31.11 candidates= 62180365 solutions=[]  (52.7s)
+# K= 58 |S|= 9 log2M= 36.99 candidates=  2107809 solutions=[]  (1.8s)
+# K= 59 |S|= 9 log2M= 36.99 candidates=  4215618 solutions=[]  (3.7s)
+# K= 60 |S|=10 log2M= 42.92 candidates=   138217 solutions=[]  (0.1s)
+# K= 61 |S|=10 log2M= 42.92 candidates=   276434 solutions=[]  (0.2s)
+# K= 62 |S|=10 log2M= 42.92 candidates=   552868 solutions=[]  (0.5s)
+# K= 63 |S|=10 log2M= 42.92 candidates=  1105736 solutions=[]  (0.9s)
+# K= 64 |S|=10 log2M= 42.92 candidates=  2211472 solutions=[]  (3.4s)
+# K= 65 |S|=10 log2M= 42.92 candidates=  4422943 solutions=[]  (6.6s)
+# K= 66 |S|=11 log2M= 48.99 candidates=   132028 solutions=[]  (0.2s)
+# K= 67 |S|=11 log2M= 48.99 candidates=   264056 solutions=[]  (0.4s)
+# K= 68 |S|=11 log2M= 48.99 candidates=   528113 solutions=[]  (0.8s)
+# K= 69 |S|=11 log2M= 48.99 candidates=  1056225 solutions=[]  (1.6s)
+# K= 70 |S|=11 log2M= 48.99 candidates=  2112451 solutions=[]  (3.2s)
+# K= 71 |S|=11 log2M= 48.99 candidates=  4224901 solutions=[]  (6.4s)
+# K= 72 |S|=11 log2M= 48.99 candidates=  8449802 solutions=[]  (12.9s)
+# total candidates tested: 257265538
+
+# ===== OUTPUT (K=73..77) =====
+# K= 73 |S|=11 log2M= 48.99 candidates= 16899605 solutions=[]  (25.1s)
+# K= 74 |S|=11 log2M= 48.99 candidates= 33799209 solutions=[]  (51.5s)
+# K= 75 |S|=11 log2M= 48.99 candidates= 67598419 solutions=[]  (103.4s)
+# K= 76 |S|=11 log2M= 48.99 candidates=135196837 solutions=[]  (206.8s)
+# K= 77 |S|=11 log2M= 48.99 candidates=270393675 solutions=[]  (417.1s)
+# total candidates tested: 523887745

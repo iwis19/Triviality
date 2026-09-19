@@ -1,0 +1,28 @@
+// For all closures F of 3-uniform hypergraphs on [6] that are D-stable and not power sets (as in search6.c),
+// test whether F contains three 3-sets whose union has at most 5 elements (Morris 2006 Thm 1(a): any three 3-subsets
+// of a 5-set generate an FC-family; Poonen: three 3-subsets of a 4-set). Also report min |F| and frequency check.
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+#define N 6
+#define NS 64
+typedef uint64_t fam;
+static int popc(uint64_t x){return __builtin_popcountll(x);}
+static int is_uc(fam F){ for(int A=0;A<NS;A++) if(F>>A&1) for(int B=A+1;B<NS;B++) if(F>>B&1) if(!(F>>(A|B)&1)) return 0; return 1; }
+static fam closure(fam G){ fam F=G; int ch=1; while(ch){ ch=0; for(int A=0;A<NS;A++) if(F>>A&1) for(int B=A+1;B<NS;B++) if(F>>B&1){ int C=A|B; if(!(F>>C&1)){F|=1ull<<C;ch=1;} } } return F; }
+static int compress_ok(fam F,int S){ fam im=0; int changed=0; for(int A=0;A<NS;A++) if(F>>A&1){ int B=A&~S; int t; if(!(F>>B&1)){t=B;changed=1;} else t=A; if(im>>t&1) return 0; im|=1ull<<t; } if(!changed) return 0; return is_uc(im); }
+static int dstable(fam F){ for(int S=1;S<NS;S++) if(compress_ok(F,S)) return 0; return 1; }
+static int is_powerset(fam F){ int U=0; for(int A=0;A<NS;A++) if(F>>A&1) U|=A; for(int A=0;A<NS;A++){int in=F>>A&1; int sub=((A&~U)==0); if(in!=sub) return 0;} return 1; }
+int main(){ int edges[20],k=0; for(int A=0;A<NS;A++) if(popc(A)==3) edges[k++]=A;
+  long long nds=0,nfc=0,nofc=0; int minsz=99;
+  for(uint32_t m=1;m<(1u<<20);m++){ fam G=0; for(int i=0;i<20;i++) if(m>>i&1) G|=1ull<<edges[i]; fam F=closure(G);
+    if(!dstable(F)||is_powerset(F)) continue; nds++; int sz=popc(F); if(sz<minsz) minsz=sz;
+    int fc=0; for(int i=0;i<20&&!fc;i++) if(m>>i&1) for(int j=i+1;j<20&&!fc;j++) if(m>>j&1) for(int l=j+1;l<20&&!fc;l++) if(m>>l&1) if(popc(edges[i]|edges[j]|edges[l])<=5) fc=1;
+    if(fc) nfc++; else { nofc++; if(nofc<=5){ printf("D-stable, no FC(a)-triple: |F|=%d 3-sets:",sz); for(int i=0;i<20;i++) if(m>>i&1){printf(" "); for(int t=0;t<N;t++) if(edges[i]>>t&1) printf("%d",t+1);} printf("\n"); } }
+  }
+  printf("D-stable non-powerset 3-uniform closures on [6]: %lld; min |F| = %d; containing three 3-sets inside a 5-set: %lld; not: %lld\n",nds,minsz,nfc,nofc);
+}
+
+/* OUTPUT:
+D-stable non-powerset 3-uniform closures on [6]: 76080; min |F| = 14; containing three 3-sets inside a 5-set: 76080; not: 0
+*/

@@ -1,0 +1,50 @@
+"""Check the 7-atom Delsarte dual measure for n=5 (claims 492b4184 / 4c0ef7f4).
+G_k(t) = C_k^{(3/2)}(t) / C_k^{(3/2)}(1), C_k^{(3/2)}(1) = (k+1)(k+2)/2.
+Recurrence: (k+1) C_{k+1} = 2(k+lam) t C_k - (k+2lam-1) C_{k-1}, lam = 3/2.
+"""
+import mpmath as mp
+mp.mp.dps = 40
+atoms = [(-0.7735, 4.6356), (-0.7731, 0.2549), (-0.4397, 5.0892), (-0.4394, 2.2054),
+         (-0.0887, 5.8243), (-0.0884, 12.1647), (0.5, 15.1634)]
+T = [mp.mpf(t) for t, _ in atoms]
+M = [mp.mpf(m) for _, m in atoms]
+total = sum(M)
+print("total mass", total)
+lam = mp.mpf(3)/2
+
+def geg_seq(t, K):
+    c0, c1 = mp.mpf(1), 2*lam*t
+    out = [c0, c1]
+    for k in range(1, K):
+        c2 = (2*(k+lam)*t*c1 - (k+2*lam-1)*c0)/(k+1)
+        out.append(c2); c0, c1 = c1, c2
+    return out
+
+K = 2000
+seqs = [geg_seq(t, K) for t in T]
+def G(k, i):
+    return seqs[i][k] / (mp.mpf(k+1)*(k+2)/2)
+
+for scale in [1 - mp.mpf('1e-6'), 1 - mp.mpf('3e-4')]:
+    worst = None
+    negs = []
+    for k in range(1, K+1):
+        val = 1 + scale*sum(M[i]*G(k, i) for i in range(7))
+        if val < 0:
+            negs.append((k, mp.nstr(val, 6)))
+        if worst is None or val < worst[1]:
+            worst = (k, val)
+    print("scale", mp.nstr(scale, 10), "bound", mp.nstr(1 + scale*total, 12), "min over k<=%d" % K, worst[0], mp.nstr(worst[1], 8), "negatives:", negs[:10])
+
+# find the largest scale s such that min_k (1 + s*sum) >= 0 for k <= K
+S = [sum(M[i]*G(k, i) for i in range(7)) for k in range(1, K+1)]
+smax = min(-1/s for s in S if s < 0)
+print("max feasible scale (k<=%d)" % K, mp.nstr(smax, 12), "-> bound", mp.nstr(1 + smax*total, 12))
+# tail sizes
+for lo, hi in [(100, 300), (300, 600), (600, 1000), (1000, 2000)]:
+    mx = max(abs(G(k, i)) for k in range(lo, hi+1) for i in range(7))
+    print("max |G_k| atoms k in [%d,%d]" % (lo, hi), mp.nstr(mx, 6), " times mass:", mp.nstr(mx*total, 6))
+# scaled tail behaviour: k^{3/2} |G_k|
+for i, t in enumerate(T):
+    mx = max(abs(G(k, i))*mp.mpf(k)**1.5 for k in range(300, K+1))
+    print("atom", mp.nstr(t, 6), "sup_{300<=k<=K} k^1.5 |G_k| =", mp.nstr(mx, 6), " (1-t^2)^(3/4)=", mp.nstr((1-t*t)**0.75, 6))

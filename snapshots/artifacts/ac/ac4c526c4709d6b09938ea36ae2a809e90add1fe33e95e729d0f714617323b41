@@ -1,0 +1,46 @@
+"""Diagnose the mod-3 autocorrelation pattern of delta(N) as a residue-class (major-arc) effect.
+Model: delta_q(N) = mean over pairs (a,b), a+b = N mod q, a,b nonzero, of (eps_a(N)+eps_b(N)),
+eps_a(x) = (q-1) pi(x;q,a)/pi'(x) - 1  (pi' = primes coprime to q).  Then regress delta on
+sum_q delta_q and recompute autocorrelations of the residual."""
+import sys, json, math
+import numpy as np
+sys.argv = [sys.argv[0], sys.argv[1] if len(sys.argv) > 1 else "1000000"]
+exec(open("/home/ubuntu/critic/rigidity_critic.py").read().split("# ---------------- E-C")[0])
+
+primes = np.nonzero(isp)[0]
+res = {}
+model = np.zeros(n)
+for q in (3, 5, 7, 11, 13):
+    cnt = np.zeros((q, X + 1))
+    for a in range(1, q):
+        ind = np.zeros(X + 1); ind[primes[primes % q == a]] = 1
+        cnt[a] = np.cumsum(ind)
+    tot = cnt[1:].sum(axis=0)
+    eps = (q - 1) * cnt[1:, Ns] / tot[Ns] - 1          # shape (q-1, n), eps[a-1]
+    dq = np.zeros(n)
+    for a in range(1, q):
+        b = (Ns - a) % q
+        ok = b != 0
+        dq[ok] += eps[a - 1, ok] + eps[b[ok] - 1, ok]
+    npairs = np.array([sum(1 for a in range(1, q) if (N - a) % q != 0) for N in range(q)])[Ns % q]
+    dq /= npairs
+    res[q] = dict(corr_delta_vs_dq=float(np.corrcoef(delta, dq)[0, 1]), sd_dq=float(dq.std()))
+    model += dq
+beta = float((delta - delta.mean()) @ (model - model.mean()) / ((model - model.mean()) ** 2).sum())
+resid = delta - beta * model
+resid -= resid.mean()
+K = 500
+acr = np.array([(resid[:n-k] * resid[k:]).mean() / resid.var() for k in range(K + 1)])
+out = dict(X=X, per_modulus=res, beta_fit=beta, beta_expected=1.0,
+           R2=float(1 - resid.var() / delta.var()), sd_delta=float(delta.std()), sd_resid=float(resid.std()),
+           resid_corr_first12=[float(x) for x in acr[1:13]],
+           resid_mean_corr_3_divides_k=float(acr[3:K+1:3].mean()),
+           resid_mean_corr_3_notdiv_k=float(np.mean([acr[k] for k in range(1, K+1) if k % 3])),
+           resid_mean_corr_k_1_500=float(acr[1:].mean()), se=1/math.sqrt(n),
+           resid_fit_c_times_S2=float((acr[1:] * Sk[2:2*K+1:2]).sum() / (Sk[2:2*K+1:2]**2).sum()),
+           c_pred_twin_model=1 / (2 * Sbar * logN))
+print(json.dumps(out, indent=1))
+
+
+# ---- output at X=1e6 ----
+# {"X": 1000000, "per_modulus": {"3": {"corr_delta_vs_dq": 0.2720074179432496, "sd_dq": 0.002232003948658726}, "5": {"corr_delta_vs_dq": 0.13062168905366325, "sd_dq": 0.0010100897015247073}, "7": {"corr_delta_vs_dq": 0.08528166255137674, "sd_dq": 0.0006391596560619818}, "11": {"corr_delta_vs_dq": 0.07890866840995668, "sd_dq": 0.0006197496058116565}, "13": {"corr_delta_vs_dq": 0.05941149196086005, "sd_dq": 0.0004310828510368673}}, "beta_fit": 0.9947289628375267, "beta_expected": 1.0, "R2": 0.10804593928965045, "sd_delta": 0.007992054510728501, "sd_resid": 0.0075479615799575244, "resid_corr_first12": [0.00428450778271014, 0.010197449658456911, 0.002580750174663675, 0.01443056177852609, -0.0020410570579144556, 0.0024103840554748125, 0.010125546235597088, 0.012079660868920919, -0.004907158528328554, 0.003728314887646248, 0.00507549559822815, -0.005669124029000758], "resid_mean_corr_3_divides_k": 0.006323207655410072, "resid_mean_corr_3_notdiv_k": 0.006689121558474469, "resid_mean_corr_k_1_500": 0.00656763814265709, "se": 0.002, "resid_fit_c_times_S2": 0.002889805994877517, "c_pred_twin_model": 0.01848044519747514}

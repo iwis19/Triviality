@@ -1,0 +1,11 @@
+python3 gallop.py 10**130 T130.txt  (82 s wall, 5,997,306 galloping steps)
+count incl 0: 107858
+sha256 (one per line, trailing newline, incl 0) = 86c90ac3e4f7c91a17d13b1b635e35c32893b11f1d8b641963c8ae2be5a89241
+A(10^30)=134 A(10^70)=1373 A(10^80)=4833 A(10^90)=10214 A(10^100)=14273 A(10^110)=24130 A(10^120)=95860 A(10^130)=107857
+first 1374 terms (incl 0) == OEIS b030979.txt (fetched 2026-09-19, 'complete up to 10^70')
+clusters (consecutive ratio<1.001): 19 (<10^30, largest 48), 28 (<10^70, largest 675), 41 (<10^90, largest 1699), 51 (<10^130, largest 31904)
+births per 10-decade block i=0..12: [11, 4, 4, 3, 3, 2, 1, 5, 8, 1, 3, 4, 2]
+longest birthless interval: 10.93 decades starting at 10^32.5
+inter-birth gaps < 0.05 decades: [0.001, 0.004, 0.009, 0.005, 0.015, 0.002, 0.012, 0.005]
+S3∩S5∩[0,10^18): 1,273,210 elements (isect2.c, 0.6 s); gap statistics: 61.1% of consecutive gaps <7, 77.6% <49, 87.6% <343, 94.0% <7^4, 99.7% <7^9;
+maximal runs with gaps <7^9: 4005 (mean size 318); <7^5: 44031 (mean size 29).

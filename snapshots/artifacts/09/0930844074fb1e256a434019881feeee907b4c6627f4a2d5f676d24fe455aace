@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""Experiment 7 (idea I5): estimated cost of a wheel-sieve search of block (2^K, 2^{K+1}].
+For a prime p with omega(p) = min(K, ord_p(2)) excluded residues (all 2^k mod p, k<=K; see I5 claim C9),
+the survivor fraction is f_p = (p - omega(p))/p  (f_p = 1/p for primitive-root primes p <= K+1).
+Greedy knapsack: choose wheel primes maximizing -log f_p per log p subject to prod p <= 2^K
+(so that allowed residue classes mod the wheel can be enumerated directly).  Cost ~ 2^K * prod f_p.
+"""
+import math
+from sympy import primerange, n_order
+for K in [44, 64, 72, 80, 100, 120, 128, 150, 200]:
+    items = []
+    for p in primerange(3, 20 * K):
+        w = min(K, n_order(2, p))
+        f = (p - w) / p
+        if f <= 0:  # only possible if p <= K+1 and w = p-1?  then f = 1/p handled below
+            f = 1 / p
+        if p <= K + 1 and w == p - 1:
+            f = 1 / p
+        items.append((-math.log(f) / math.log(p), p, f))
+    items.sort(reverse=True)
+    budget = K * math.log(2); used = 0.0; logf = 0.0; wheel = []
+    for ratio, p, f in items:
+        if used + math.log(p) <= budget:
+            used += math.log(p); logf += math.log(f); wheel.append(p)
+    print(f"K={K:4d} wheel primes={len(wheel):3d} largest={max(wheel):5d} log2(wheel)={used/math.log(2):7.2f} "
+          f"log2(survivors)~{(K*math.log(2)+logf)/math.log(2):7.2f}")
+
+
+# ===== OUTPUT =====
+# K=  44 wheel primes= 10 largest=   61 log2(wheel)=  42.92 log2(survivors)~  12.24
+# K=  64 wheel primes= 14 largest=   83 log2(wheel)=  62.26 log2(survivors)~  12.74
+# K=  72 wheel primes= 15 largest=  107 log2(wheel)=  71.57 log2(survivors)~  15.88
+# K=  80 wheel primes= 16 largest=  107 log2(wheel)=  75.66 log2(survivors)~  20.24
+# K= 100 wheel primes= 19 largest=  149 log2(wheel)=  97.03 log2(survivors)~  26.80
+# K= 120 wheel primes= 22 largest=  179 log2(wheel)= 119.30 log2(survivors)~  35.47
+# K= 128 wheel primes= 23 largest=  181 log2(wheel)= 126.80 log2(survivors)~  37.83
+# K= 150 wheel primes= 26 largest=  211 log2(wheel)= 146.66 log2(survivors)~  41.61
+# K= 200 wheel primes= 33 largest=  317 log2(wheel)= 196.13 log2(survivors)~  54.51

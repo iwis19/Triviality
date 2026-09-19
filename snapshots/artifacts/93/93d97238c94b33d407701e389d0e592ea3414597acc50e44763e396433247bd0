@@ -1,0 +1,88 @@
+"""
+Empirical check of the idea's proposed experiment: for even N, compare
+   B(N; theta-bin) = #{(p1,p2): p1 in bin, p2 prime, p2 <= N/p1, N - p1 p2 prime}
+with the Hardy-Littlewood-type prediction
+   HL_int = sum_{p1 in bin, p1 odd, p1 !| N} S(N) (p1-1)/(p1-2) * int_2^{N/p1} dt / (log t * log(N - p1 t))
+and with the crude prediction in the idea text:
+   HL_crude = S(N) * sum_{p1 in bin} (N/p1) / (log(N/p1) * log N).
+Purpose (critic): the heuristic is expected to hold in EVERY theta-bin, so the
+experiment cannot single out a "Type II range a proof must reach".
+"""
+import math, sys
+
+def sieve(n):
+    s = bytearray([1]) * (n + 1)
+    s[0] = s[1] = 0
+    for i in range(2, int(n**0.5) + 1):
+        if s[i]:
+            s[i*i::i] = bytearray(len(s[i*i::i]))
+    return s
+
+def singular_series(N, primes_small):
+    # S(N) = 2 C2 prod_{p|N, p>2} (p-1)/(p-2), C2 = prod_{p>2} (1 - 1/(p-1)^2)
+    C2 = 1.0
+    for p in primes_small:
+        if p > 2:
+            C2 *= 1 - 1 / (p - 1) ** 2
+    s = 2 * C2
+    m = N
+    for p in primes_small:
+        if m % p == 0:
+            if p > 2:
+                s *= (p - 1) / (p - 2)
+            while m % p == 0:
+                m //= p
+    return s
+
+def hl_int(N, p1, steps=2000):
+    # int_2^{N/p1} dt / (log t log(N - p1 t)), midpoint rule in log-scale
+    a, b = 2.0, N / p1 - 1.0
+    if b <= a:
+        return 0.0
+    la, lb = math.log(a), math.log(b)
+    h = (lb - la) / steps
+    tot = 0.0
+    for i in range(steps):
+        t = math.exp(la + (i + 0.5) * h)
+        tot += t / (math.log(t) * math.log(N - p1 * t))
+    return tot * h
+
+def run(N):
+    isp = sieve(N)
+    primes = [i for i in range(2, N + 1) if isp[i]]
+    small = [p for p in primes if p <= 10**5]
+    S = singular_series(N, small)
+    bins = {}
+    logN = math.log(N)
+    for p1 in primes:
+        if p1 * p1 > N:
+            break
+        th = math.log(p1) / logN
+        k = int(th / 0.05)
+        cnt = 0
+        for p2 in primes:
+            if p1 * p2 >= N:
+                break
+            if isp[N - p1 * p2]:
+                cnt += 1
+        if p1 == 2 or N % p1 == 0:
+            pred_i = 0.0
+            pred_c = 0.0
+        else:
+            pred_i = S * (p1 - 1) / (p1 - 2) * hl_int(N, p1)
+            pred_c = S * (N / p1) / (math.log(N / p1) * logN)
+        c, pi_, pc = bins.get(k, (0, 0.0, 0.0))
+        bins[k] = (c + cnt, pi_ + pred_i, pc + pred_c)
+    print("N=%d  S(N)=%.4f" % (N, S))
+    print(" theta-bin      count    HL_int   ratio_int   HL_crude  ratio_crude")
+    tot = [0, 0.0, 0.0]
+    for k in sorted(bins):
+        c, pi_, pc = bins[k]
+        tot[0] += c; tot[1] += pi_; tot[2] += pc
+        print(" [%.2f,%.2f)  %8d  %9.1f   %.3f     %9.1f   %.3f" % (
+            k * 0.05, (k + 1) * 0.05, c, pi_, c / pi_ if pi_ else float('nan'), pc, c / pc if pc else float('nan')))
+    print(" total        %8d  %9.1f   %.3f     %9.1f   %.3f" % (tot[0], tot[1], tot[0] / tot[1], tot[2], tot[0] / tot[2]))
+
+if __name__ == "__main__":
+    for N in [int(x) for x in (sys.argv[1:] or ["100000", "1000000", "2000010"])]:
+        run(N)

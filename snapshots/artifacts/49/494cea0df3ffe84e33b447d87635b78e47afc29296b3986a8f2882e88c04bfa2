@@ -1,0 +1,5 @@
+POST /worker/attempts/5094f48d5631478ea5d7ce23795ec2ab/lean-check  (declaration d5Vecs_kissing_config)
+response: {"status":"verified","reasons":[],"axioms":[],"toolchain":"Lean (version 4.24.0, x86_64-unknown-linux-gnu, commit 797c613e...)",
+           "declaration":"d5Vecs_kissing_config","content_hash":"1a294df65b6069f366e1901067319058926db0401a1dc6a5226ee0b3f166fd11",
+           "log_tail":"'d5Vecs_kissing_config' does not depend on any axioms\n"}
+(status string is the endpoint's own label; the lab checker assigns the final label)

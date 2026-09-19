@@ -1,0 +1,81 @@
+"""Hall witnesses for T5 failures.
+
+T5 at x: an injection f: F_{not x} -> F_x with A subset f(A).
+Hall: for every G subset F_{not x}, |N(G)| >= |G| where N(G) = {B in F_x : B contains some A in G}.
+Since N is antitone in A, WLOG G is an up-set of (F_{not x}, subset).
+Single-interval test: G_e = {A in F_{not x}: A contains e}; N(G_e) = {B in F_x : B contains e}.
+So a NECESSARY condition for T5 at x is: x is abundant in F ∩ up(e) for every set e (equivalently for every e in F, e not containing x).
+We check whether the single-interval test already explains every T5 failure found.
+"""
+import itertools, sys
+
+def closure(gens):
+    F = set(gens)
+    changed = True
+    while changed:
+        changed = False
+        for a in list(F):
+            for b in list(F):
+                if a | b not in F:
+                    F.add(a | b); changed = True
+    return F
+
+def fam_from_str(s, n):
+    F = set()
+    for tok in s.split():
+        if tok == 'e': F.add(0)
+        else: F.add(sum(1 << (int(c) - 1) for c in tok))
+    return F
+
+def single_interval_witness(F, n, x):
+    """return (e, count_without_x, count_with_x) with count_without > count_with, or None"""
+    best = None
+    for e in F:
+        if e >> x & 1: continue
+        up = [A for A in F if A & e == e]
+        w = sum(1 for A in up if not (A >> x & 1))
+        v = len(up) - w
+        if w > v and (best is None or bin(e).count('1') < bin(best[0]).count('1')):
+            best = (e, w, v)
+    return best
+
+def hall_violator(F, n, x):
+    """brute force over up-sets? too many; instead find a violating G via max-matching deficiency (Konig).
+    Here: minimal violating up-set by BFS on antichains would be complex; we only report single-interval witnesses."""
+    return single_interval_witness(F, n, x)
+
+def fmt(A):
+    return ''.join(str(i + 1) for i in range(8) if A >> i & 1) or 'e'
+
+def analyze(name, F, n):
+    print(f"== {name}: |F|={len(F)}")
+    for x in range(n):
+        w = single_interval_witness(F, n, x)
+        Fx = sum(1 for A in F if A >> x & 1)
+        if w is None:
+            print(f"  x={x+1}: freq {Fx}/{len(F)}; NO single-interval witness")
+        else:
+            print(f"  x={x+1}: freq {Fx}/{len(F)}; witness e={fmt(w[0])}: in up(e), #without x = {w[1]} > #with x = {w[2]}")
+
+def cycle(m):
+    return closure([(1 << i) | (1 << ((i + 1) % m)) for i in range(m)])
+
+if __name__ == '__main__':
+    for m in [5, 6, 7, 8]:
+        analyze(f"C_{m} closure", cycle(m), m)
+    # the other n=6 graph obstructions found by gen.c
+    theta = closure([0b001001, 0b010001, 0b100001, 0b000110, 0b010010, 0b100010, 0b001100])  # 14 15 16 23 25 26 34
+    analyze("theta graph (C5 + path 1-6-2) closure", theta, 6)
+    prism = closure([0b001001, 0b010001, 0b100001, 0b000110, 0b010010, 0b100010, 0b001100, 0b100100, 0b011000])
+    analyze("prism closure", prism, 6)
+
+if __name__ == '__main__':
+    extra = {
+      "3-uniform obstruction A (6 triples)": ("136 145 156 234 236 245 13456 1356 12346 1236 123456 1456 12345 1245 12356 12456 2346 2345 23456", 6),
+      "3-uniform obstruction B (8 triples)": ("124 136 145 156 235 236 246 345 12346 1245 12456 12345 1246 13456 1356 12356 1236 123456 1456 1345 2356 23456 2345 2346", 6),
+      "random n=6 #1": ("13456 15 156 456 25 136 46 12456 125 23 36 245 145 123456 1456 1356 1235 1245 1256 12356 2456 23456 3456 235 2356 1346 1236 2346 346 12346 236 2345 12345", 6),
+      "random n=6 #2": ("45 26 245 1235 256 126 2456 136 34 134 23456 12345 12456 13456 345 1345 12356 1236 2346 12346 123456 2345 1256 1346", 6),
+      "random n=7": ("1345 12346 247 1567 1235 67 1245 147 236 356 123456 123457 134567 12345 13457 13456 123467 1234567 124567 2467 12457 1247 23467 234567 123567 14567 13567 12356 1467 2367 3567 12467 2356 23567", 7),
+    }
+    for name,(s,n) in extra.items():
+        analyze(name, fam_from_str(s,n), n)

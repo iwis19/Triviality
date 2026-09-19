@@ -1,0 +1,14 @@
+"""Largest numerically found code on S^3 with pairwise inner product <= 1/3
+(= possible sets of exact-contact neighbours of one point in a kissing config in R^5)."""
+import sys, numpy as np
+import search41 as S
+S.DIM = 4
+rng = np.random.default_rng(5)
+target = np.degrees(np.arccos(1/3))
+print(f"target angle arccos(1/3) = {target:.4f} deg")
+for N in [12, 13, 14, 15, 16]:
+    best = -1
+    for r in range(40):
+        X = S.optimize(S.normalize(rng.standard_normal((N, 4))))
+        best = max(best, S.min_angle_deg(S.polish(X)))
+    print(f"N={N}: best min angle = {best:.4f} deg  {'(feasible)' if best >= target - 1e-3 else '(infeasible so far)'}")

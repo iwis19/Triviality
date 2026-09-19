@@ -1,0 +1,120 @@
+"""Exact (up to truncation of negligible tails) computation of P(k-fold union of independent uniform samples lies in F)
+for layered families F on [n] consisting of full size-layers.  Because a uniform random set of a given size union another
+independent uniform random set is again uniform given its size, only the size chain matters; |A cap B| is hypergeometric.
+
+Families:
+  'stated'   : windows centred at (1-(1-p)^j) n, half-width 2.5 sqrt(n), j=1..K, plus [n]   (claim fe8d2fe8)
+  'recentred': window 1 as above; window j+1 centred at the size of the union of two top-corner sets of windows j and 1
+               (a + b - ab/n), half-width c*sqrt(n)                                             (claim 658edff, first variant)
+  'upset'    : window 1 = sizes [pn - w, pn + w] plus the full up-set of sizes >= (2p - p^2) n - n^(2/3) (Chase-Lovett-type)
+Assumptions: samples uniform on F (all sets of an allowed size are in F); sizes with relative probability < 1e-14 of the
+layer maximum are dropped (they carry negligible mass); floating-point log-binomials.
+"""
+import numpy as np
+from scipy.stats import hypergeom, norm
+from scipy.special import gammaln
+import sys
+
+def logC(n,k):
+    return gammaln(n+1)-gammaln(k+1)-gammaln(n-k+1)
+
+def allowed_sizes(n,p,K,kind,c=2.5):
+    S=set()
+    if kind=='stated':
+        for j in range(1,K+1):
+            m=(1-(1-p)**j)*n
+            for k in range(int(np.floor(m-c*np.sqrt(n))),int(np.ceil(m+c*np.sqrt(n)))+1):
+                if 0<=k<=n: S.add(k)
+        S.add(n)
+    elif kind=='recentred':
+        top=[p*n+c*np.sqrt(n)]
+        for k in range(int(np.floor(p*n-c*np.sqrt(n))),int(np.ceil(p*n+c*np.sqrt(n)))+1): S.add(k)
+        a=p*n+c*np.sqrt(n)  # top corner of L1
+        cur=a
+        for j in range(2,K+1):
+            cur=cur+a-cur*a/n
+            for k in range(int(np.floor(cur-c*np.sqrt(n))),int(np.ceil(cur+c*np.sqrt(n)))+1):
+                if 0<=k<=n: S.add(k)
+        S.add(n)
+    elif kind=='upset':
+        for k in range(int(np.floor(p*n-c*np.sqrt(n))),int(np.ceil(p*n+c*np.sqrt(n)))+1): S.add(k)
+        thr=(2*p-p*p)*n-n**(2/3)
+        for k in range(int(np.floor(thr)),n+1): S.add(k)
+    return np.array(sorted(S))
+
+def size_law(n,sizes):
+    lw=logC(n,sizes); lw-=lw.max(); w=np.exp(lw); w/=w.sum(); return w
+
+def union_law(n,law1,law2,tol=1e-9):
+    """law: dict size->prob.  returns dict for |A u B| (numpy-accumulated)."""
+    acc=np.zeros(n+1)
+    for a,pa in law1.items():
+        if pa<tol: continue
+        for b,pb in law2.items():
+            if pb<tol: continue
+            lo=max(0,a+b-n); hi=min(a,b)
+            j=np.arange(lo,hi+1)
+            # restrict to j within 12 sd of the mean to save time (mass outside < 1e-30)
+            m=a*b/n; sd=np.sqrt(max(1.0,a*b*(n-a)*(n-b)/(n*n*(n-1))))
+            j=j[(j>m-12*sd)&(j<m+12*sd)]
+            pj=hypergeom.pmf(j,n,a,b)
+            np.add.at(acc,a+b-j,pa*pb*pj)
+    return {int(s):float(x) for s,x in enumerate(acc) if x>0}
+
+def run(n,p,K,kind,kmax,c=2.5):
+    sizes=allowed_sizes(n,p,K,kind,c)
+    w=size_law(n,sizes)
+    mu={int(s):float(x) for s,x in zip(sizes,w) if x>1e-16}
+    allowed=set(int(s) for s in sizes)
+    maxfreq=sum(pr*s for s,pr in mu.items())/n   # by symmetry every element has frequency E|A|/n
+    cur=dict(mu); res=[]
+    for k in range(2,kmax+1):
+        cur=union_law(n,cur,mu)
+        res.append(sum(pr for s,pr in cur.items() if s in allowed))
+    return maxfreq,res
+
+if __name__=="__main__":
+    psi=(3-5**0.5)/2
+    print("psi=",psi)
+    for p in [0.39,0.40,0.45]:
+        pred=norm.cdf(-2.5*(1-2*p)/(p*(1-p)))
+        print(f"\n--- p={p}  idea's predicted limit Phi(-2.5(1-2p)/(p(1-p))) = {pred:.4f}")
+        for n in [1000,4000,16000]:
+            mf,res=run(n,p,2,'stated',2)
+            print(f"stated K=2   n={n:6d} maxfreq={mf:.4f}  P(AuB in F)={res[0]:.5f}")
+    p=0.40
+    print("\n--- recentred windows, half-width 2.5 sqrt n, K=3, k-fold unions k=2,3")
+    for n in [1000,4000,16000]:
+        mf,res=run(n,p,3,'recentred',3)
+        print(f"recentred n={n:6d} maxfreq={mf:.4f}  P(2-fold)={res[0]:.6f} P(3-fold)={res[1]:.6f}")
+    print("recentred with half-width 5 sqrt n:")
+    for n in [4000,16000]:
+        mf,res=run(n,p,3,'recentred',3,c=5.0)
+        print(f"recentred c=5 n={n:6d} maxfreq={mf:.4f}  P(2-fold)={res[0]:.6f} P(3-fold)={res[1]:.6f}")
+    print("\n--- up-set version (L1 plus up-set above (2p-p^2)n - n^(2/3)), k=2,3,4")
+    for n in [1000,4000,16000]:
+        mf,res=run(n,p,1,'upset',3)
+        print(f"upset n={n:6d} maxfreq={mf:.4f}  P(2-fold)={res[0]:.6f} P(3-fold)={res[1]:.6f}")
+
+# OUTPUT (main run, stated K=2 only; the recentred/upset lines were produced by barrier2.py calling run() with n in {1000,4000}):
+# psi= 0.3819660112501051
+# 
+# --- p=0.39  idea's predicted limit Phi(-2.5(1-2p)/(p(1-p))) = 0.0104
+# stated K=2   n=  1000 maxfreq=0.4679  P(AuB in F)=0.24009
+# stated K=2   n=  4000 maxfreq=0.4290  P(AuB in F)=0.05374
+# stated K=2   n= 16000 maxfreq=0.4097  P(AuB in F)=0.02398
+# 
+# --- p=0.4  idea's predicted limit Phi(-2.5(1-2p)/(p(1-p))) = 0.0186
+# stated K=2   n=  1000 maxfreq=0.4729  P(AuB in F)=0.41954
+# stated K=2   n=  4000 maxfreq=0.4389  P(AuB in F)=0.09298
+# stated K=2   n= 16000 maxfreq=0.4196  P(AuB in F)=0.04150
+# 
+# --- p=0.45  idea's predicted limit Phi(-2.5(1-2p)/(p(1-p))) = 0.1562
+# stated K=2   n=  1000 maxfreq=0.4990  P(AuB in F)=0.98839
+# stated K=2   n=  4000 maxfreq=0.4861  P(AuB in F)=0.61587
+# --- p=0.40 recentred windows (half-width 2.5 sqrt n), K=3, k-fold unions k=2,3
+# recentred n=  1000 maxfreq=0.4729  P(2-fold)=1.000000 P(3-fold)=1.000000
+# recentred n=  4000 maxfreq=0.4389  P(2-fold)=1.000000 P(3-fold)=1.000000
+# --- p=0.40 up-set version (L1 plus up-set above (2p-p^2)n - n^(2/3)), k=2,3
+# upset n=  1000 maxfreq=0.4768  P(2-fold)=1.000000 P(3-fold)=1.000000
+# upset n=  4000 maxfreq=0.4389  P(2-fold)=1.000000 P(3-fold)=1.000000

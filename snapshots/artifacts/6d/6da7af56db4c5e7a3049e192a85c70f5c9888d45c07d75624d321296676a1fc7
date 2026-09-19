@@ -1,0 +1,84 @@
+"""Greedy + local-search upper bounds on u(L) = min #uncovered residues in Z/L when one
+class is chosen for every divisor d>1 of L (idea I1), and the fibre-peeling budget test
+(idea I3): if the top prime p of L=p*M satisfies u(M) > (sigma(M)-M)/(p-1) then u(L)>=1.
+
+Usage: python3 greedy_cover.py L [iters]
+"""
+import sys, random
+import numpy as np
+from sat_cover import divisors, sigma
+
+
+def counts_mod(uncovered_idx, d):
+    return np.bincount(uncovered_idx % d, minlength=d)
+
+
+def greedy(L, order='desc', seed=0):
+    ds = [d for d in divisors(L)[0] if d > 1]
+    if order == 'desc':
+        ds = sorted(ds, reverse=True)
+    elif order == 'asc':
+        ds = sorted(ds)
+    else:
+        random.Random(seed).shuffle(ds)
+    covered = np.zeros(L, dtype=bool)
+    idx = np.arange(L, dtype=np.int64)
+    choice = {}
+    for d in ds:
+        unc = idx[~covered]
+        c = counts_mod(unc, d)
+        r = int(np.argmax(c))
+        choice[d] = r
+        covered[idx % d == r] = True
+    return int((~covered).sum()), choice
+
+
+def local_search(L, choice, iters=2000, seed=1):
+    """Repeatedly re-optimise one modulus given all the others (coordinate descent with
+    random restarts on the order)."""
+    rng = random.Random(seed)
+    ds = list(choice)
+    idx = np.arange(L, dtype=np.int64)
+    # cover count per residue
+    cnt = np.zeros(L, dtype=np.int32)
+    for d, r in choice.items():
+        cnt[idx % d == r] += 1
+    best = int((cnt == 0).sum())
+    for it in range(iters):
+        d = rng.choice(ds)
+        r_old = choice[d]
+        mask_old = idx % d == r_old
+        cnt[mask_old] -= 1
+        unc = idx[cnt == 0]
+        c = counts_mod(unc, d)
+        r_new = int(np.argmax(c))
+        # allow sideways moves
+        cands = np.flatnonzero(c == c[r_new])
+        r_new = int(rng.choice(list(cands)))
+        choice[d] = r_new
+        cnt[idx % d == r_new] += 1
+        cur = int((cnt == 0).sum())
+        if cur < best:
+            best = cur
+    return best, choice
+
+
+if __name__ == '__main__':
+    L = int(sys.argv[1])
+    iters = int(sys.argv[2]) if len(sys.argv) > 2 else 2000
+    ds, fac = divisors(L)
+    p = max(fac)
+    M = L // p ** fac[p]
+    print('L=%d = %s  tau=%d  sigma/L=%.4f' % (L, fac, len(ds), sigma(L) / L))
+    best = None
+    for order in ['desc', 'asc', 'rand']:
+        u, ch = greedy(L, order)
+        u2, ch = local_search(L, ch, iters)
+        print('  greedy(%s) uncovered=%d (%.4f)  after local search=%d (%.5f)' % (order, u, u / L, u2, u2 / L))
+        if best is None or u2 < best:
+            best = u2
+    if fac[p] == 1:
+        budget = (sigma(M) - M) / (p - 1)
+        print('  top prime p=%d, M=%d: fibre budget (sigma(M)-M)/(p-1) = %.1f residues of Z/M (density %.4f)'
+              % (p, M, budget, budget / M))
+    print('  best upper bound on u(L): %d' % best)

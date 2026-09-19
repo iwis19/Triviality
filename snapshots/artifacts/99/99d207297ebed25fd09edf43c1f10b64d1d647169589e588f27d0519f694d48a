@@ -1,0 +1,361 @@
+# ===== search_discrepancy.py =====
+"""Search for generator families A on [5] where the 'recalled' LP (UC H with A ⊆ H ⊆ P(U(A)))
+and Poonen's LP (UC B ⊆ P(U(A)) with B ⊎ A ⊆ B) give different FC verdicts or different values.
+Generators: all families of 1..4 sets of size >=3 on [5] (plus optionally the 5-set), up to S_5 symmetry."""
+import itertools, sys, time
+import numpy as np
+from scipy.optimize import linprog
+import poonen_lp as P
+
+N, M = P.N, P.M
+FAMS = P.FAMS
+H = ((FAMS[:, None] >> P.BITS[None, :]) & 1).astype(bool)      # 2.77M x 32 membership
+NMAT_ALL, SIZE_ALL = P.features(FAMS)
+
+def cls_mask(A, cls, X):
+    allowed = np.uint32(sum(1 << s for s in range(M) if (s & ~X) == 0))
+    ok = (FAMS & ~allowed) == 0
+    if cls == 'recalled':
+        for s in A: ok &= H[:, s]
+        return ok
+    for S in A:
+        for b in range(M):
+            if b | S == b: continue
+            ok &= ~(H[:, b] & ~H[:, b | S])
+    return ok
+
+def lp(ok):
+    Nmat = NMAT_ALL[ok]; rhs = SIZE_ALL[ok] / 2
+    cobj = np.zeros(N + 1); cobj[-1] = -1
+    active = np.arange(min(len(Nmat), 200))
+    bounds = [(0, None)] * N + [(None, None)]
+    for it in range(300):
+        Aub = np.hstack([-Nmat[active], np.ones((len(active), 1))])
+        res = linprog(cobj, A_ub=Aub, b_ub=-rhs[active], A_eq=[[1] * N + [0]], b_eq=[1], bounds=bounds, method='highs')
+        c = res.x[:N]; t = res.x[-1]
+        margin = Nmat @ c - rhs
+        worst = np.argsort(margin)[:50]
+        if margin[worst[0]] >= t - 1e-9:
+            return t, c
+        active = np.union1d(active, worst)
+    raise RuntimeError
+
+def canon(A):
+    best = None
+    for perm in itertools.permutations(range(N)):
+        img = tuple(sorted(sum(1 << perm[i] for i in range(N) if s >> i & 1) for s in A))
+        if best is None or img < best: best = img
+    return best
+
+sets = [s for s in range(M) if bin(s).count('1') >= 3]
+seen = set(); results = []
+t0 = time.time()
+for k in range(1, 5):
+    for A in itertools.combinations(sets, k):
+        cA = canon(A)
+        if cA in seen: continue
+        seen.add(cA)
+        X = 0
+        for s in cA: X |= s
+        tp, cp = lp(cls_mask(cA, 'poonen', X))
+        tr, cr = lp(cls_mask(cA, 'recalled', X))
+        fc_p, fc_r = tp >= -1e-9, tr >= -1e-9
+        flag = ''
+        if fc_p != fc_r: flag = 'VERDICT DIFFERS'
+        elif tr < tp - 1e-7: flag = 'recalled < poonen (unexpected)'
+        elif abs(tr - tp) > 1e-7: flag = 'values differ'
+        name = ','.join(''.join(str(i + 1) for i in range(N) if s >> i & 1) for s in cA)
+        results.append((name, tp, tr, flag))
+        print(f"{name:26s} poonen={tp:8.4f} recalled={tr:8.4f} {flag}"); sys.stdout.flush()
+print('classes:', len(results), 'time', time.time() - t0)
+print('verdict differs:', sum(1 for r in results if r[3] == 'VERDICT DIFFERS'))
+print('values differ  :', sum(1 for r in results if r[3] != ''))
+
+# ===== search.log (k=1..4) =====
+123                        poonen= -0.1667 recalled= -0.1667 
+1234                       poonen= -0.5000 recalled= -0.5000 
+12345                      poonen= -1.1000 recalled= -1.1000 
+123,124                    poonen= -0.0714 recalled= -0.0714 
+123,1234                   poonen= -0.2692 recalled= -0.2692 
+123,145                    poonen= -0.1667 recalled= -0.1667 
+123,1245                   poonen= -0.3000 recalled= -0.3000 
+123,12345                  poonen= -0.5000 recalled= -0.5000 
+1234,1235                  poonen= -0.5811 recalled= -0.5811 
+1234,12345                 poonen= -0.8333 recalled= -0.8333 
+123,124,134                poonen= -0.0000 recalled= -0.0000 
+123,124,1234               poonen= -0.0714 recalled= -0.0714 
+123,124,125                poonen= -0.0000 recalled= -0.0000 
+123,124,135                poonen= -0.0000 recalled= -0.0000 
+123,124,1235               poonen= -0.1261 recalled= -0.1261 
+123,124,345                poonen= -0.0000 recalled= -0.0000 
+123,124,1345               poonen= -0.0000 recalled= -0.0000 
+123,124,12345              poonen= -0.1316 recalled= -0.1316 
+123,1234,1235              poonen= -0.4516 recalled= -0.4516 
+123,1234,145               poonen= -0.1138 recalled= -0.1138 
+123,1234,1245              poonen= -0.2632 recalled= -0.2632 
+123,1234,12345             poonen= -0.4730 recalled= -0.4730 
+123,145,2345               poonen= -0.0000 recalled= -0.0000 
+123,145,12345              poonen= -0.1667 recalled= -0.1667 
+123,1245,1345              poonen= -0.1078 recalled= -0.1078 
+123,1245,12345             poonen= -0.3000 recalled= -0.3000 
+1234,1235,1245             poonen= -0.3421 recalled= -0.3421 
+1234,1235,12345            poonen= -0.5811 recalled= -0.5811 
+123,124,134,234            poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234           poonen= -0.0000 recalled= -0.0000 
+123,124,134,125            poonen= -0.0000 recalled= -0.0000 
+123,124,134,235            poonen= -0.0000 recalled= -0.0000 
+123,124,134,1235           poonen= -0.0000 recalled= -0.0000 
+123,124,134,2345           poonen= -0.0000 recalled= -0.0000 
+123,124,134,12345          poonen= -0.0000 recalled= -0.0000 
+123,124,1234,125           poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135           poonen= -0.0000 recalled= -0.0000 
+123,124,1234,1235          poonen= -0.1261 recalled= -0.1261 
+123,124,1234,345           poonen= -0.0000 recalled= -0.0000 
+123,124,1234,1345          poonen= -0.0000 recalled= -0.0000 
+123,124,1234,12345         poonen= -0.1316 recalled= -0.1316 
+123,124,125,345            poonen= -0.0000 recalled= -0.0000 
+123,124,125,1345           poonen= -0.0000 recalled= -0.0000 
+123,124,125,12345          poonen= -0.0000 recalled= -0.0000 
+123,124,135,145            poonen= -0.0000 recalled= -0.0000 
+123,124,135,245            poonen= -0.0000 recalled= -0.0000 
+123,124,135,1245           poonen= -0.0000 recalled= -0.0000 
+123,124,135,2345           poonen= -0.0000 recalled= -0.0000 
+123,124,135,12345          poonen= -0.0000 recalled= -0.0000 
+123,124,1235,1245          poonen= -0.1204 recalled= -0.1204 
+123,124,1235,345           poonen= -0.0000 recalled= -0.0000 
+123,124,1235,1345          poonen= -0.0000 recalled= -0.0000 
+123,124,1235,12345         poonen= -0.1261 recalled= -0.1261 
+123,124,345,1345           poonen= -0.0000 recalled= -0.0000 
+123,124,345,12345          poonen= -0.0000 recalled= -0.0000 
+123,124,1345,2345          poonen= -0.0000 recalled= -0.0000 
+123,124,1345,12345         poonen= -0.0000 recalled= -0.0000 
+123,1234,1235,145          poonen= -0.0732 recalled= -0.0732 
+123,1234,1235,1245         poonen= -0.2342 recalled= -0.2342 
+123,1234,1235,12345        poonen= -0.4516 recalled= -0.4516 
+123,1234,145,1245          poonen= -0.0547 recalled= -0.0547 
+123,1234,145,2345          poonen= -0.0000 recalled= -0.0000 
+123,1234,145,12345         poonen= -0.1138 recalled= -0.1138 
+123,1234,1245,1345         poonen= -0.0623 recalled= -0.0623 
+123,1234,1245,12345        poonen= -0.2632 recalled= -0.2632 
+123,145,2345,12345         poonen= -0.0000 recalled= -0.0000 
+123,1245,1345,2345         poonen= -0.0000 recalled= -0.0000 
+123,1245,1345,12345        poonen= -0.1078 recalled= -0.1078 
+1234,1235,1245,1345        poonen= -0.1154 recalled= -0.1154 
+1234,1235,1245,12345       poonen= -0.3421 recalled= -0.3421 
+classes: 70 time 63.00372314453125
+verdict differs: 0
+values differ  : 0
+
+# ===== search_k56.log (k=5..6; same script with `for k in range(5, 7)`) =====
+123,124,134,234,1234       poonen= -0.0000 recalled= -0.0000 
+123,124,134,234,125        poonen= -0.0000 recalled= -0.0000 
+123,124,134,234,1235       poonen= -0.0000 recalled= -0.0000 
+123,124,134,234,12345      poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,125       poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,235       poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,1235      poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,2345      poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,12345     poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,135        poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,235        poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,1235       poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,345        poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,1345       poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,2345       poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,12345      poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,1235       poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,245        poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,1245       poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,2345       poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,12345      poonen= -0.0000 recalled= -0.0000 
+123,124,134,1235,1245      poonen= -0.0000 recalled= -0.0000 
+123,124,134,1235,2345      poonen= -0.0000 recalled= -0.0000 
+123,124,134,1235,12345     poonen= -0.0000 recalled= -0.0000 
+123,124,134,2345,12345     poonen= -0.0000 recalled= -0.0000 
+123,124,1234,125,1235      poonen= -0.0000 recalled= -0.0000 
+123,124,1234,125,345       poonen= -0.0000 recalled= -0.0000 
+123,124,1234,125,1345      poonen= -0.0000 recalled= -0.0000 
+123,124,1234,125,12345     poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,1235      poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,145       poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,245       poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,1245      poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,345       poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,1345      poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,2345      poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,12345     poonen= -0.0000 recalled= -0.0000 
+123,124,1234,1235,1245     poonen= -0.1204 recalled= -0.1204 
+123,124,1234,1235,345      poonen= -0.0000 recalled= -0.0000 
+123,124,1234,1235,1345     poonen= -0.0000 recalled= -0.0000 
+123,124,1234,1235,12345    poonen= -0.1261 recalled= -0.1261 
+123,124,1234,345,1345      poonen= -0.0000 recalled= -0.0000 
+123,124,1234,345,12345     poonen= -0.0000 recalled= -0.0000 
+123,124,1234,1345,2345     poonen= -0.0000 recalled= -0.0000 
+123,124,1234,1345,12345    poonen= -0.0000 recalled= -0.0000 
+123,124,125,345,1345       poonen= -0.0000 recalled= -0.0000 
+123,124,125,345,12345      poonen= -0.0000 recalled= -0.0000 
+123,124,125,1345,2345      poonen= -0.0000 recalled= -0.0000 
+123,124,125,1345,12345     poonen= -0.0000 recalled= -0.0000 
+123,124,135,145,2345       poonen= -0.0000 recalled= -0.0000 
+123,124,135,145,12345      poonen= -0.0000 recalled= -0.0000 
+123,124,135,245,345        poonen= -0.0000 recalled= -0.0000 
+123,124,135,245,1345       poonen= -0.0000 recalled= -0.0000 
+123,124,135,245,12345      poonen= -0.0000 recalled= -0.0000 
+123,124,135,1245,1345      poonen= -0.0000 recalled= -0.0000 
+123,124,135,1245,2345      poonen= -0.0000 recalled= -0.0000 
+123,124,135,1245,12345     poonen= -0.0000 recalled= -0.0000 
+123,124,135,2345,12345     poonen= -0.0000 recalled= -0.0000 
+123,124,1235,1245,345      poonen= -0.0000 recalled= -0.0000 
+123,124,1235,1245,1345     poonen= -0.0000 recalled= -0.0000 
+123,124,1235,1245,12345    poonen= -0.1204 recalled= -0.1204 
+123,124,1235,345,1345      poonen= -0.0000 recalled= -0.0000 
+123,124,1235,345,12345     poonen= -0.0000 recalled= -0.0000 
+123,124,1235,1345,2345     poonen= -0.0000 recalled= -0.0000 
+123,124,1235,1345,12345    poonen= -0.0000 recalled= -0.0000 
+123,124,345,1345,2345      poonen= -0.0000 recalled= -0.0000 
+123,124,345,1345,12345     poonen= -0.0000 recalled= -0.0000 
+123,124,1345,2345,12345    poonen= -0.0000 recalled= -0.0000 
+123,1234,1235,145,1245     poonen= -0.0091 recalled= -0.0091 
+123,1234,1235,145,2345     poonen= -0.0000 recalled= -0.0000 
+123,1234,1235,145,12345    poonen= -0.0732 recalled= -0.0732 
+123,1234,1235,1245,1345    poonen= -0.0264 recalled= -0.0264 
+123,1234,1235,1245,12345   poonen= -0.2342 recalled= -0.2342 
+123,1234,145,1245,2345     poonen= -0.0000 recalled= -0.0000 
+123,1234,145,1245,12345    poonen= -0.0547 recalled= -0.0547 
+123,1234,145,2345,12345    poonen= -0.0000 recalled= -0.0000 
+123,1234,1245,1345,2345    poonen= -0.0000 recalled= -0.0000 
+123,1234,1245,1345,12345   poonen= -0.0623 recalled= -0.0623 
+123,1245,1345,2345,12345   poonen= -0.0000 recalled= -0.0000 
+1234,1235,1245,1345,2345   poonen= -0.0000 recalled= -0.0000 
+1234,1235,1245,1345,12345  poonen= -0.1154 recalled= -0.1154 
+123,124,134,234,1234,125   poonen= -0.0000 recalled= -0.0000 
+123,124,134,234,1234,1235  poonen= -0.0000 recalled= -0.0000 
+123,124,134,234,1234,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,234,125,135    poonen= -0.0000 recalled= -0.0000 
+123,124,134,234,125,1235   poonen= -0.0000 recalled= -0.0000 
+123,124,134,234,125,345    poonen= -0.0000 recalled= -0.0000 
+123,124,134,234,125,1345   poonen= -0.0000 recalled= -0.0000 
+123,124,134,234,125,12345  poonen= -0.0000 recalled= -0.0000 
+123,124,134,234,1235,1245  poonen= -0.0000 recalled= -0.0000 
+123,124,134,234,1235,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,125,135   poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,125,235   poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,125,1235  poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,125,345   poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,125,1345  poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,125,2345  poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,125,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,235,1235  poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,235,245   poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,235,1245  poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,235,2345  poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,235,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,1235,1245 poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,1235,2345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,1235,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,1234,2345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,135,145    poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,135,245    poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,135,1245   poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,135,2345   poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,135,12345  poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,235,1245   poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,235,345    poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,235,1345   poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,235,12345  poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,1235,1245  poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,1235,345   poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,1235,1345  poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,1235,2345  poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,1235,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,345,1345   poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,345,2345   poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,345,12345  poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,1345,2345  poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,1345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,125,2345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,1235,245   poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,1235,1245  poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,1235,2345  poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,1235,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,245,345    poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,245,1345   poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,245,2345   poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,245,12345  poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,1245,1345  poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,1245,2345  poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,1245,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,235,2345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,1235,1245,1345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,1235,1245,2345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,1235,1245,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,134,1235,2345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,125,1235,1245 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,125,1235,345  poonen= -0.0000 recalled= -0.0000 
+123,124,1234,125,1235,1345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,125,1235,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,125,345,1345  poonen= -0.0000 recalled= -0.0000 
+123,124,1234,125,345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,125,1345,2345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,125,1345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,1235,145  poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,1235,245  poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,1235,1245 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,1235,2345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,1235,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,145,1345  poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,145,2345  poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,145,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,245,345   poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,245,1345  poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,245,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,1245,345  poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,1245,1345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,1245,2345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,1245,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,345,1345  poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,345,2345  poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,1345,2345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,1345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,135,2345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,1235,1245,345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,1235,1245,1345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,1235,1245,12345 poonen= -0.1204 recalled= -0.1204 
+123,124,1234,1235,345,1345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,1235,345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,1235,1345,2345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,1235,1345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,345,1345,2345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,345,1345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1234,1345,2345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,125,345,1345,2345  poonen= -0.0000 recalled= -0.0000 
+123,124,125,345,1345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,125,1345,2345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,135,145,2345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,135,245,345,12345  poonen= -0.0000 recalled= -0.0000 
+123,124,135,245,1345,2345  poonen= -0.0000 recalled= -0.0000 
+123,124,135,245,1345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,135,1245,1345,2345 poonen= -0.0000 recalled= -0.0000 
+123,124,135,1245,1345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,135,1245,2345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1235,1245,345,1345 poonen= -0.0000 recalled= -0.0000 
+123,124,1235,1245,345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1235,1245,1345,2345 poonen= -0.0000 recalled= -0.0000 
+123,124,1235,1245,1345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1235,345,1345,2345 poonen= -0.0000 recalled= -0.0000 
+123,124,1235,345,1345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,1235,1345,2345,12345 poonen= -0.0000 recalled= -0.0000 
+123,124,345,1345,2345,12345 poonen= -0.0000 recalled= -0.0000 
+123,1234,1235,145,1245,1345 poonen= -0.0000 recalled= -0.0000 
+123,1234,1235,145,1245,2345 poonen= -0.0000 recalled= -0.0000 
+123,1234,1235,145,1245,12345 poonen= -0.0091 recalled= -0.0091 
+123,1234,1235,145,2345,12345 poonen= -0.0000 recalled= -0.0000 
+123,1234,1235,1245,1345,2345 poonen= -0.0000 recalled= -0.0000 
+123,1234,1235,1245,1345,12345 poonen= -0.0264 recalled= -0.0264 
+123,1234,145,1245,2345,12345 poonen= -0.0000 recalled= -0.0000 
+123,1234,1245,1345,2345,12345 poonen= -0.0000 recalled= -0.0000 
+1234,1235,1245,1345,2345,12345 poonen= -0.0000 recalled= -0.0000 
+classes: 209 time 244.53824162483215
+verdict differs: 0
+values differ  : 0

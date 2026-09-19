@@ -1,0 +1,59 @@
+"""Critic re-check of claim e3108ee6 (Delsarte LP for kappa(5)).
+
+Primal (degree d, grid T):  min sum_k c_k  s.t. c_0 = 1, c_k >= 0,
+    f(t) = sum_k c_k G_k(t) <= 0 for t in T subset [-1,1/2],   G_k normalised so G_k(1)=1.
+Grid-relaxed value is a LOWER bound on the true degree-d LP value (fewer constraints),
+and the degree-d value is an UPPER bound on the LP infimum over all degrees.
+So the grid number alone does not bound the LP infimum from below.
+
+Dual certificate (valid for ALL degrees): a nonneg measure nu on [-1,1/2] with
+    1 + int G_k dnu >= 0  for all k >= 1   =>   LP_inf >= 1 + nu([-1,1/2]).
+We extract nu from the grid LP dual and check the moment condition for k up to KMAX.
+"""
+import numpy as np
+from scipy.optimize import linprog
+from scipy.special import eval_gegenbauer
+
+n = 5
+alpha = (n - 2) / 2.0
+
+def G(k, t):
+    return eval_gegenbauer(k, alpha, t) / eval_gegenbauer(k, alpha, 1.0)
+
+def solve(d, m, verbose=True):
+    T = np.linspace(-1, 0.5, m)
+    ks = np.arange(1, d + 1)
+    A = np.array([[G(k, t) for k in ks] for t in T])          # f(t) - 1 = A c <= -1
+    c = np.ones(d)
+    res = linprog(c, A_ub=A, b_ub=-np.ones(m), bounds=[(0, None)] * d, method="highs")
+    coef = res.x
+    val = 1 + coef.sum()
+    # post-hoc check of f <= 0 on a much finer grid
+    Tf = np.linspace(-1, 0.5, 200001)
+    f = 1 + sum(coef[i] * G(ks[i], Tf) for i in range(d))
+    maxviol = f.max()
+    # dual multipliers (HiGHS marginals for A_ub rows are <= 0): nu = -marginals
+    nu = -res.ineqlin.marginals
+    mass = nu.sum()
+    if verbose:
+        print(f"d={d:3d} grid={m:5d}  grid-LP value = {val:.6f}   max f on fine grid = {maxviol:.3e}   dual mass 1+nu = {1+mass:.6f}")
+    return val, maxviol, T, nu
+
+if __name__ == "__main__":
+    for d in (12, 20, 30, 40, 60):
+        solve(d, 4001)
+    val, maxviol, T, nu = solve(30, 4001, verbose=False)
+    supp = T[nu > 1e-9]
+    print("dual atoms (t, mass):", [(round(float(t), 4), round(float(w), 4)) for t, w in zip(supp, nu[nu > 1e-9])])
+    KMAX = 400
+    mom = np.array([1 + sum(w * G(k, t) for t, w in zip(T, nu)) for k in range(1, KMAX + 1)])
+    print(f"min over k=1..{KMAX} of 1+int G_k dnu = {mom.min():.6f} at k={mom.argmin()+1}")
+    print("negative moments at k =", list(np.where(mom < -1e-9)[0] + 1)[:20])
+    print("dual bound valid for all degrees if all moments >= 0:", 1 + nu.sum())
+    # robustified certificate: scale nu by (1-delta) so that every moment is >= delta - |min moment|
+    delta = 1e-6
+    mom_s = 1 + (1 - delta) * (mom - 1)
+    print(f"scaled nu (delta={delta}): min moment k<=400 = {mom_s.min():.3e}, bound = {1 + (1-delta)*nu.sum():.6f}")
+    # tail: |G_k(t)| for t in supp, k large, decays like k^{-3/2}; report sup over supp at k=400..1000
+    tail = max(abs(G(k, t)) for k in range(400, 1001, 50) for t in supp)
+    print(f"max |G_k(t)| over atoms, k in 400..1000 step 50: {tail:.3e}  (need < 1/nu_total = {1/nu.sum():.4f})")

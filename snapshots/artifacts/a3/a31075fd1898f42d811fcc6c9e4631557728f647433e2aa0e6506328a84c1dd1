@@ -1,0 +1,41 @@
+k=3 Q=7^3=343 L=5 m=3  |A3|=32 |A5|=27 |A7|=64
+   triple: exact=3  main=0.4700  trivial_err_bound=48.9  log_Q(err/main)=0.7956
+   pair 3,7: exact=9 main=5.971 trivial_err=16.84 log_Q(err/main)=0.1776
+   pair 5,7: exact=10 main=5.038 trivial_err=19.23 log_Q(err/main)=0.2295
+   pair 3,5: exact=9 main=2.519 trivial_err=14.42 log_Q(err/main)=0.2989
+   L1 exponents (log_Q sum|F|/|A|): ['0.6259', '0.6275', '0.5236']   L2: ['0.4063', '0.4354', '0.2876']   (0.0s)
+k=4 Q=7^4=2401 L=7 m=4  |A3|=128 |A5|=81 |A7|=256
+   triple: exact=3  main=0.4604  trivial_err_bound=191.8  log_Q(err/main)=0.7750
+   pair 3,7: exact=28 main=13.648 trivial_err=54.62 log_Q(err/main)=0.1782
+   pair 5,7: exact=16 main=8.636 trivial_err=50.35 log_Q(err/main)=0.2265
+   pair 3,5: exact=14 main=4.318 trivial_err=40.79 log_Q(err/main)=0.2885
+   L1 exponents (log_Q sum|F|/|A|): ['0.6082', '0.6283', '0.5229']   L2: ['0.3766', '0.4354', '0.2876']   (0.0s)
+k=5 Q=7^5=16807 L=8 m=6  |A3|=256 |A5|=729 |A7|=1024
+   triple: exact=9  main=0.6765  trivial_err_bound=836.9  log_Q(err/main)=0.7318
+   pair 3,7: exact=52 main=15.597 trivial_err=130.9 log_Q(err/main)=0.2186
+   pair 5,7: exact=59 main=44.416 trivial_err=194.7 log_Q(err/main)=0.1519
+   pair 3,5: exact=28 main=11.104 trivial_err=120.6 log_Q(err/main)=0.2451
+   L1 exponents (log_Q sum|F|/|A|): ['0.6420', '0.5548', '0.5225']   L2: ['0.4301', '0.3225', '0.2876']   (0.0s)
+k=6 Q=7^6=117649 L=10 m=7  |A3|=1024 |A5|=2187 |A7|=4096
+   triple: exact=13  main=0.6627  trivial_err_bound=3239  log_Q(err/main)=0.7275
+   pair 3,7: exact=103 main=35.651 trivial_err=379.7 log_Q(err/main)=0.2026
+   pair 5,7: exact=167 main=76.141 trivial_err=541.2 log_Q(err/main)=0.1680
+   pair 3,5: exact=67 main=19.035 trivial_err=317.2 log_Q(err/main)=0.2410
+   L1 exponents (log_Q sum|F|/|A|): ['0.6274', '0.5674', '0.5222']   L2: ['0.4063', '0.3413', '0.2876']   (0.0s)
+k=7 Q=7^7=823543 L=12 m=8  |A3|=4096 |A5|=6561 |A7|=16384
+   triple: exact=13  main=0.6492  trivial_err_bound=1.253e+04  log_Q(err/main)=0.7245
+   pair 3,7: exact=146 main=81.488 trivial_err=1057 log_Q(err/main)=0.1882
+   pair 5,7: exact=249 main=130.528 trivial_err=1285 log_Q(err/main)=0.1679
+   pair 3,5: exact=115 main=32.632 trivial_err=829.7 log_Q(err/main)=0.2375
+   L1 exponents (log_Q sum|F|/|A|): ['0.6170', '0.5764', '0.5220']   L2: ['0.3894', '0.3548', '0.2876']   (0.2s)
+k=8 Q=7^8=5764801 L=14 m=9  |A3|=16384 |A5|=19683 |A7|=65536
+   triple: exact=13  main=0.6359  trivial_err_bound=4.847e+04  log_Q(err/main)=0.7221
+   pair 3,7: exact=197 main=186.258 trivial_err=2941 log_Q(err/main)=0.1773
+   pair 5,7: exact=633 main=223.762 trivial_err=3190 log_Q(err/main)=0.1707
+   pair 3,5: exact=170 main=55.941 trivial_err=2079 log_Q(err/main)=0.2322
+   L1 exponents (log_Q sum|F|/|A|): ['0.6092', '0.5831', '0.5219']   L2: ['0.3766', '0.3649', '0.2876']   (1.3s)
+9 15 10 13 0.3114853919015861 144602.7984927542 0.74504689209765
+3,7 294 212.8665869199747 6297.623239367614 0.19341203408192179
+5,7 940 383.5925015575435 7530.34755355328 0.16999275701753674
+3,5 318 47.94906269469294 4044.6515936822407 0.2532383363564267
+[0.6278690053184619, 0.5883685953009163, 0.521738111243456] [0.40632135481996307, 0.37269440660713377, 0.28758562578395563]

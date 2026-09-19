@@ -1,0 +1,43 @@
+identity check u=0.1: 1.0000 (should be 1)
+identity check u=0.2: 1.0000 (should be 1)
+identity check u=0.3: 1.0000 (should be 1)
+no Type II at all (Chen-type scheme, primes): best = (np.float64(0.0), np.float64(0.5))
+W=[0.300,0.500]: best bound -0.870 at u=0.300
+W=[0.333,0.500]: best bound -0.693 at u=0.333
+W=[0.130,0.430]: best bound +0.019 at u=0.022
+W=[0.130,0.500]: best bound +0.865 at u=0.022
+W=[0.100,0.400]: best bound -0.226 at u=0.024
+W=[0.150,0.450]: best bound +0.044 at u=0.143
+W=[0.200,0.500]: best bound -0.185 at u=0.200
+minimal window length giving positive bound, by left endpoint a:
+  a=0.05: b_min=0.42  length=0.37
+  a=0.06: b_min=0.42  length=0.36
+  a=0.07: b_min=0.42  length=0.35
+  a=0.08: b_min=0.42  length=0.34
+  a=0.09: b_min=0.42  length=0.33
+  a=0.10: b_min=0.42  length=0.32
+  a=0.11: b_min=0.42  length=0.31
+  a=0.12: b_min=0.425  length=0.305
+  a=0.13: b_min=0.43  length=0.3
+  a=0.14: b_min=0.44  length=0.3
+  a=0.15: b_min=0.45  length=0.3
+  a=0.16: b_min=0.46  length=0.3
+  a=0.17: b_min=0.475  length=0.305
+  a=0.18: b_min=0.485  length=0.305
+  a=0.19: b_min=0.5  length=0.31
+  a=0.20: b_min=None  length=None
+  a=0.21: b_min=None  length=None
+  a=0.22: b_min=None  length=None
+  a=0.23: b_min=None  length=None
+  a=0.24: b_min=None  length=None
+  a=0.25: b_min=None  length=None
+  a=0.26: b_min=None  length=None
+  a=0.27: b_min=None  length=None
+  a=0.28: b_min=None  length=None
+  a=0.29: b_min=None  length=None
+  a=0.30: b_min=None  length=None
+  a=0.31: b_min=None  length=None
+  a=0.32: b_min=None  length=None
+  a=0.33: b_min=None  length=None
+  a=0.34: b_min=None  length=None
+  a=0.35: b_min=None  length=None

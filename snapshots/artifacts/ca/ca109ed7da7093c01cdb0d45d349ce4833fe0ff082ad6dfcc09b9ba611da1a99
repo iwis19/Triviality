@@ -1,0 +1,151 @@
+"""
+Experiment A: reproduce, at small scale, the mechanism of the lattice construction
+sketched on erdosproblems.com/1 (exposition by T. Bloom of the GPT construction):
+
+  admissible lattice Lambda in V_d = {sum x_i = 0}, Lambda ∩ (-1,1)^d = {0}
+  -> scale by Q (Q even so Q*Lambda is integral)
+  -> perturb basis to a *primitive* rank-(d-1) integer lattice L = u^perp ∩ Z^d
+  -> u is Q'-dissociated for Q' close to Q  (check: x -> x.u injective on [0,Q'-1]^d)
+  -> A = {2^j u_i : 0<=j<l, 1<=i<=d} with 2^l <= Q' is dissociated with |A| = l d
+     and max A / 2^{|A|-1} = max(u)/2^{l(d-1)}  (predicted ~ Delta = covol(Lambda)/sqrt d)
+
+We build Lambda_1 (b=3,5 base pairs, Delta=(1+2^-b)/(3/2)) and the iterated Lambda_2
+for b=3 (d=9, Delta=(9/8)^4/(9/4)).  All checks are exact integer arithmetic.
+"""
+from fractions import Fraction as Fr
+from itertools import product
+from math import gcd, sqrt
+import random, sys
+
+def T_apply(z, b):
+    # (Tz)_i = z_i + z_{i-1}/2, cyclic
+    return [Fr(z[i]) + Fr(z[(i-1) % b], 2) for i in range(b)]
+
+def base_pair(b):
+    # Lambda_0 basis e_i - e_{i+1}, i=0..b-2 ; Lambda_1 = T(Lambda_0); v_1 = T e_0
+    basis = []
+    for i in range(b-1):
+        z = [0]*b; z[i] = 1; z[i+1] = -1
+        basis.append(T_apply(z, b))
+    v = T_apply([1]+[0]*(b-1), b)
+    return basis, v
+
+def iterate_pair(Lb, vb, b, Ls, vs, d):
+    # Lambda_{s+1} in R^{db}: blocks (lam_j + beta_j v_s), lam_j in Lambda_s, beta in Lambda_1(=Lb)
+    basis = []
+    for j in range(b):
+        for g in Ls:
+            vec = [Fr(0)]*(d*b)
+            vec[j*d:(j+1)*d] = g
+            basis.append(vec)
+    for beta in Lb:
+        vec = []
+        for j in range(b):
+            vec += [beta[j]*c for c in vs]
+        basis.append(vec)
+    vnew = list(vs) + [Fr(0)]*(d*(b-2)) + [c/2 for c in vs]
+    return basis, vnew
+
+def det_bareiss(M):
+    # exact integer determinant
+    M = [row[:] for row in M]; n = len(M); sign = 1; prev = 1
+    for k in range(n-1):
+        if M[k][k] == 0:
+            sw = next((i for i in range(k+1, n) if M[i][k] != 0), None)
+            if sw is None: return 0
+            M[k], M[sw] = M[sw], M[k]; sign = -sign
+        for i in range(k+1, n):
+            for j in range(k+1, n):
+                M[i][j] = (M[i][j]*M[k][k] - M[i][k]*M[k][j]) // prev
+        prev = M[k][k]
+    return sign*M[n-1][n-1]
+
+def normal_vector(B):
+    # B: list of d-1 integer vectors in Z^d; return u = vector of signed maximal minors (in u^perp)
+    d = len(B[0])
+    u = []
+    for i in range(d):
+        minor = [[row[j] for j in range(d) if j != i] for row in B]
+        u.append((-1)**i * det_bareiss(minor))
+    return u
+
+def content(v):
+    g = 0
+    for x in v: g = gcd(g, abs(x))
+    return g
+
+def max_dissoc_Q(u, Qmax):
+    """largest Q <= Qmax such that x -> x.u is injective on [0,Q-1]^d (u is Q-dissociated)."""
+    d = len(u)
+    best = 1
+    for Q in range(2, Qmax+1):
+        S = {0}
+        for ui in u:
+            S = {s + k*ui for s in S for k in range(Q)}
+        if len(S) == Q**d: best = Q
+        else: break
+    return best
+
+def brute_dissociated(A):
+    S = {0}
+    for a in A:
+        S2 = S | {s + a for s in S}
+        if len(S2) != 2*len(S): return False
+        S = S2
+    return True
+
+def run(name, Lam, d, Q, Delta, trials=400, seed=1):
+    rnd = random.Random(seed)
+    # integral basis of Q*Lambda
+    B = [[c*Q for c in g] for g in Lam]
+    assert all(x.denominator == 1 for row in B for x in row), "Q does not clear denominators"
+    B = [[int(x) for x in row] for row in B]
+    u0 = normal_vector(B)
+    g0 = content(u0)
+    print(f"\n== {name}: d={d}, Q={Q}, predicted Delta={float(Delta):.4f}")
+    print("   unperturbed normal / content:", [x//g0 for x in u0], " content =", g0)
+    best = None
+    for t in range(trials):
+        # dense small perturbation: every entry moved by an integer in {-1,0,1}
+        # (needed to kill the common factors of the minors of Q*Lambda; still O(1) << Q)
+        Bp = [[x + rnd.choice([-1, 0, 0, 1]) for x in row] for row in B]
+        u = normal_vector(Bp)
+        if content(u) != 1:  # not primitive
+            continue
+        if any(x <= 0 for x in u) and any(x >= 0 for x in u):
+            u = [-x for x in u] if sum(u) < 0 else u
+        if any(x <= 0 for x in u): continue
+        Qd = max_dissoc_Q(u, Q)
+        if Qd < 2: continue
+        # l = floor(log2 Qd)
+        l = Qd.bit_length() - 1
+        ratio = max(u) / 2**(l*(d-1))
+        cand = (ratio, Qd, l, u)
+        if best is None or cand < best: best = cand
+    if best is None:
+        print("   no primitive perturbation found"); return
+    ratio, Qd, l, u = best
+    print(f"   best u = {u}\n   Q-dissociated up to Q'={Qd} (target Q={Q}); using l={l} (2^l={2**l})")
+    A = sorted(2**j * ui for j in range(l) for ui in u)
+    n = len(A)
+    print(f"   A has n={n} elements, max A = {max(A)}, max A / 2^(n-1) = {ratio:.4f}  (Delta={float(Delta):.4f})")
+    if n <= 22:
+        print("   brute-force distinct subset sums:", brute_dissociated(A))
+    return ratio
+
+if __name__ == "__main__":
+    # b=3 base pair, d=3
+    L3, v3 = base_pair(3)
+    run("Lambda_1, b=3", L3, 3, 16, Fr(1+Fr(1,8), Fr(3,2)))
+    run("Lambda_1, b=3", L3, 3, 64, Fr(1+Fr(1,8), Fr(3,2)), trials=300, seed=2)
+    # b=5 base pair, d=5
+    L5, v5 = base_pair(5)
+    run("Lambda_1, b=5", L5, 5, 8, Fr(1+Fr(1,32), Fr(3,2)))
+    run("Lambda_1, b=5", L5, 5, 16, Fr(1+Fr(1,32), Fr(3,2)), trials=200, seed=3)
+    # iterated: b=3, s=2, d=9
+    L9, v9 = iterate_pair(L3, v3, 3, L3, v3, 3)
+    assert len(L9) == 8 and all(sum(g) == 0 for g in L9)
+    run("Lambda_2, b=3,s=2", L9, 9, 4, Fr(9,8)**4 / Fr(9,4), trials=150)
+    # b=7 base, d=7
+    L7, v7 = base_pair(7)
+    run("Lambda_1, b=7", L7, 7, 4, Fr(1+Fr(1,128), Fr(3,2)), trials=150)

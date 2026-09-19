@@ -1,0 +1,124 @@
+"""
+Exact check of claim fe8d2fe8 (layered barrier family F_n(p,K)).
+
+F_n(p,K) = L_1 u ... u L_K u {[n]},  L_j = { A subset [n] : | |A| - (1-(1-p)^j) n | <= w },  w = 2.5 sqrt(n).
+
+Under the uniform measure on F, we compute EXACTLY (up to floating point):
+  * P(A u B in F) for A, B independent uniform on F, by summing over the sizes (a, b)
+    (P(|A|=a) proportional to C(n,a) for a in the size-support of F) and using the
+    hypergeometric law of |A n B| given (a, b):  |A u B| = a + b - |A n B|.
+  * the max element frequency  = E|A| / n  (by symmetry of F under S_n).
+  * the size distribution of A within L_1 (to exhibit the corner concentration).
+We also test a corner-aware repair (windows re-centred on the corner mean) and
+the Chase-Lovett style repair (L_1 plus the full up-set above a threshold).
+"""
+import numpy as np
+from scipy.special import gammaln
+from scipy.stats import hypergeom
+import sys
+
+PSI = (3 - 5 ** 0.5) / 2
+
+
+def logC(n, k):
+    k = np.asarray(k, dtype=float)
+    return gammaln(n + 1) - gammaln(k + 1) - gammaln(n - k + 1)
+
+
+def windows_stated(n, p, K):
+    w = 2.5 * np.sqrt(n)
+    return [(int(np.ceil((1 - (1 - p) ** j) * n - w)), int(np.floor((1 - (1 - p) ** j) * n + w))) for j in range(1, K + 1)]
+
+
+def windows_corner(n, p, K):
+    """Re-centre window j+1 on the union of two samples sitting at the TOP corner of window j
+    (top corner because C(n,k) increases in k for k<n/2) / bottom corner if above n/2."""
+    w = 2.5 * np.sqrt(n)
+    wins = []
+    lo, hi = int(np.ceil(p * n - w)), int(np.floor(p * n + w))
+    wins.append((lo, hi))
+    for j in range(2, K + 1):
+        # dominant size inside the previous window
+        plo, phi = wins[-1]
+        ks = np.arange(plo, phi + 1)
+        lw = logC(n, ks)
+        wts = np.exp(lw - lw.max()); wts /= wts.sum()
+        dom = float((ks * wts).sum())
+        # union of two independent samples of size dom (dominant of L_1 for the base) -> we use
+        # base-layer dominant size s1 for the second operand, as unions are L_{j-1} u L_1 typically
+        s1 = dom if j == 2 else dom1
+        if j == 2:
+            dom1 = dom
+        mean_union = n - (n - dom) * (n - s1) / n
+        wins.append((int(np.ceil(mean_union - w)), int(np.floor(mean_union + w))))
+    return wins
+
+
+def size_support(wins, n):
+    supp = set()
+    for lo, hi in wins:
+        for k in range(max(lo, 0), min(hi, n) + 1):
+            supp.add(k)
+    supp.add(n)
+    return np.array(sorted(supp))
+
+
+def analyse(n, wins, label, upset_from=None):
+    supp = size_support(wins, n)
+    if upset_from is not None:
+        supp = np.array(sorted(set(supp.tolist()) | set(range(upset_from, n + 1))))
+    lw = logC(n, supp)
+    wts = np.exp(lw - lw.max()); wts /= wts.sum()          # P(|A| = a)
+    in_F = np.zeros(n + 1, dtype=bool); in_F[supp] = True
+    # keep pairs (a,b) with non-negligible mass
+    keep = wts > 1e-14
+    S, W = supp[keep], wts[keep]
+    pa, pb = np.meshgrid(S, S, indexing="ij")
+    wa, wb = np.meshgrid(W, W, indexing="ij")
+    joint = (wa * wb).ravel(); pa = pa.ravel(); pb = pb.ravel()
+    # P(|A u B| in F | a, b) = sum over u in F of P(|A n B| = a + b - u)
+    # intersections range: max(0,a+b-n) .. min(a,b)
+    prob_in = np.zeros_like(joint)
+    # iterate over maximal runs of consecutive sizes in F to use cdf differences
+    runs = []
+    start = None
+    for k in range(n + 1):
+        if in_F[k] and start is None:
+            start = k
+        if (not in_F[k] or k == n) and start is not None:
+            end = k if in_F[k] else k - 1
+            runs.append((start, end)); start = None
+    for (ulo, uhi) in runs:
+        # u in [ulo, uhi]  <=>  x = a+b-u in [a+b-uhi, a+b-ulo]
+        xlo = pa + pb - uhi
+        xhi = pa + pb - ulo
+        prob_in += hypergeom.cdf(xhi, n, pa, pb) - hypergeom.cdf(xlo - 1, n, pa, pb)
+    P_union_in_F = float((joint * prob_in).sum())
+    freq = float((S * W).sum()) / n
+    # corner concentration inside first window
+    lo1, hi1 = wins[0]
+    m1 = (supp >= lo1) & (supp <= hi1)
+    mass1 = wts[m1].sum()
+    cond = wts[m1] / mass1
+    mean_sz1 = float((supp[m1] * cond).sum())
+    print(f"[{label}] n={n}: P(A u B in F) = {P_union_in_F:.6f} | max freq = {freq:.5f} | mass(L_1)={mass1:.6f} "
+          f"| E[|A| | L_1] - centre = {mean_sz1 - (lo1 + hi1) / 2:+.2f} (half-width {(hi1 - lo1) / 2:.1f})")
+    return P_union_in_F, freq
+
+
+if __name__ == "__main__":
+    p = float(sys.argv[1]) if len(sys.argv) > 1 else 0.40
+    K = int(sys.argv[2]) if len(sys.argv) > 2 else 3
+    print(f"p={p}  (psi={PSI:.5f})  K={K}")
+    for n in [400, 1600, 6400, 25600]:
+        analyse(n, windows_stated(n, p, K), "stated windows")
+    print()
+    for n in [400, 1600, 6400, 25600]:
+        analyse(n, windows_corner(n, p, K), "corner-recentred windows")
+    print()
+    for n in [400, 1600, 6400, 25600]:
+        # Chase-Lovett style: L_1 window + up-set above (1-(1-p_top)^2) n - 3 sqrt(n), p_top = top corner of L_1
+        w = 2.5 * np.sqrt(n)
+        ptop = (p * n + w) / n
+        thr = int(np.floor(n - (n - ptop * n) ** 2 / n - 3 * np.sqrt(n)))
+        analyse(n, windows_stated(n, p, 1), f"L_1 + up-set(>= {thr})", upset_from=thr)

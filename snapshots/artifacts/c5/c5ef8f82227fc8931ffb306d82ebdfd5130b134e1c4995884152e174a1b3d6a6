@@ -1,0 +1,21 @@
+import Mathlib
+import MathLab.Basic
+
+/-- CRT lemma behind the odd-part projection: if `S` is closed under subtracting
+multiples of `C` (i.e. `x + C*t ∈ S → x ∈ S`), `T` is closed under adding multiples
+of `M`, `C` and `M` are coprime, `T ≠ univ`, and `S ∪ T = univ`, then `S = univ`. -/
+theorem mem_of_period_coprime (S T : Set ℤ) (C M : ℤ) (hCM : IsCoprime C M)
+    (hS : ∀ x t : ℤ, x + C * t ∈ S → x ∈ S) (hT : ∀ x t : ℤ, x ∈ T → x + M * t ∈ T)
+    (hTne : ∃ b, b ∉ T) (hcov : ∀ x, x ∈ S ∨ x ∈ T) : ∀ x, x ∈ S := by
+  intro x
+  obtain ⟨b, hb⟩ := hTne
+  obtain ⟨u, v, huv⟩ := hCM
+  apply hS x (u * (b - x))
+  rcases hcov (x + C * (u * (b - x))) with h | h
+  · exact h
+  · exfalso
+    apply hb
+    have hmem := hT _ (v * (b - x)) h
+    have heq : x + C * (u * (b - x)) + M * (v * (b - x)) = b := by
+      linear_combination (b - x) * huv
+    rwa [heq] at hmem

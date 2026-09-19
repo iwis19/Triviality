@@ -1,0 +1,68 @@
+// Enumerate integers < N whose base-b_i digits are all <= d_i for several bases,
+// by iterated "next element >= x" jumps (galloping intersection of digit-restricted sets).
+// Optional per-base shift t_i: condition becomes (x - t_i) in S_{b_i} (i.e. x in S_{b_i}+t_i).
+// usage: isect N nb b1 d1 t1 b2 d2 t2 ... [--count-only] [--mod7 k]
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+typedef unsigned __int128 u128;
+typedef unsigned long long u64;
+
+static u128 parse128(const char *s){u128 v=0;while(*s){v=v*10+(*s-'0');s++;}return v;}
+static void print128(u128 v,char*buf){char t[64];int i=0;if(v==0){strcpy(buf,"0");return;}while(v){t[i++]='0'+(int)(v%10);v/=10;}int j=0;while(i)buf[j++]=t[--i];buf[j]=0;}
+
+// smallest y >= x with all base-b digits <= d
+static u128 nextd(u128 x, unsigned b, unsigned d){
+  unsigned dig[128]; int len=0; u128 v=x;
+  while(v){dig[len++]=(unsigned)(v%b); v/=b;}
+  int bad=-1;
+  for(int i=len-1;i>=0;i--){ if(dig[i]>d){bad=i;break;} }
+  if(bad<0) return x;
+  // find lowest position j>bad with dig[j]<d
+  int j=bad+1;
+  while(j<len && dig[j]>=d) j++;
+  if(j>=len){ dig[len++]=1; for(int i=0;i<len-1;i++)dig[i]=0; }
+  else { dig[j]++; for(int i=0;i<j;i++)dig[i]=0; }
+  u128 r=0; for(int i=len-1;i>=0;i--) r=r*b+dig[i];
+  return r;
+}
+
+int main(int argc,char**argv){
+  u128 N=parse128(argv[1]); int nb=atoi(argv[2]);
+  unsigned b[8],d[8]; u128 t[8];
+  int ai=3;
+  for(int i=0;i<nb;i++){b[i]=atoi(argv[ai++]);d[i]=atoi(argv[ai++]);t[i]=parse128(argv[ai++]);}
+  int countonly=0; unsigned long long steps=0; int modk=0;
+  for(;ai<argc;ai++){ if(!strcmp(argv[ai],"--count-only"))countonly=1; if(!strcmp(argv[ai],"--mod7")){modk=atoi(argv[++ai]);} }
+  u128 x=0; unsigned long long cnt=0; char buf[64];
+  // histogram of x mod 7^modk (only if modk small)
+  u64 M=1; for(int i=0;i<modk;i++)M*=7; u64 *hist=NULL; if(modk){hist=calloc(M,sizeof(u64));}
+  while(x<N){
+    int changed=1;
+    while(changed){
+      changed=0;
+      for(int i=0;i<nb;i++){
+        // require x - t_i >= 0 and in S_{b_i}
+        u128 base = (x < t[i]) ? 0 : x-t[i];
+        u128 y=nextd(base,b[i],d[i]);
+        u128 nx = y+t[i];
+        steps++;
+        if(nx!=x){x=nx;changed=1;break;}
+      }
+      if(x>=N){changed=0;
+      }
+    }
+    if(x>=N)break;
+    cnt++;
+    if(modk) hist[(u64)(x%M)]++;
+    if(!countonly){print128(x,buf);printf("%s\n",buf);}
+    x++;
+  }
+  fprintf(stderr,"count=%llu steps=%llu\n",cnt,steps);
+  if(modk){ // print chi-square-ish stats: max/min/mean over residues that are admissible
+    double mean=(double)cnt/M; double chi=0; u64 mx=0,mn=~0ULL;
+    for(u64 r=0;r<M;r++){double e=(double)hist[r]-mean;chi+=e*e/mean; if(hist[r]>mx)mx=hist[r]; if(hist[r]<mn)mn=hist[r];}
+    fprintf(stderr,"mod %llu: mean=%.3f max=%llu min=%llu chi2=%.2f (df=%llu)\n",M,mean,mx,mn,chi,M-1);
+  }
+  return 0;
+}

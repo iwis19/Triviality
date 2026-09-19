@@ -1,0 +1,88 @@
+"""Independent re-implementation of the 'one-step Buchstab + switching' scheme of idea
+6acb943d / claim e10b335e, to check the reported numbers.
+
+A = {N - p : p <= N},  r(N) = S(A, N^{1/2}).  Everything in units of HL(N).
+Heuristic sizes (own derivation; Buchstab function omega):
+   S(A, N^u)     ~ HL * omega(1/u)/u
+   S(A_q, q)     ~ HL * omega((1-th)/th)/th^2 dth   summed over q ~ N^th  (density in th)
+Sieve inputs (linear sieve, level D = N^{1/2}, i.e. Bombieri-Vinogradov for {N-p}):
+   lower bound   S(A, N^u)  >= HL * f(1/(2u)) e^{-gamma} / u
+   upper bound   S(A_q, q)  <= HL * F((1/2-th)/th) e^{-gamma} / th^2 dth
+   switching     S(A_q, q)  <= 4 * (heuristic size),  th >= 1/3 (cofactor prime), level N^{1/2}
+Type II window W=[a,b]: S(A_q,q) evaluated asymptotically for th in W.
+bound(u,a,b) = f-term - int_u^a F-term - int_a^b truth - int_b^{1/2} min(F-term, 4*truth if th>=1/3)
+"""
+import numpy as np, math
+from scipy.integrate import quad
+from functools import lru_cache
+
+EG = math.exp(0.5772156649015329)
+
+# Buchstab omega on a grid, omega(s)=1/s on [1,2], (s omega(s))' = omega(s-1)
+H = 1e-3; SMAX = 40.0
+grid = np.arange(1.0, SMAX + H, H)
+om = np.empty_like(grid); om[grid <= 2.0] = 1.0 / grid[grid <= 2.0]
+so = grid * om
+for i in range(len(grid)):
+    if grid[i] > 2.0:
+        j = i - int(round(1.0 / H))
+        so[i] = so[i - 1] + H * 0.5 * (om[j] + om[j - 1])
+        om[i] = so[i] / grid[i]
+def omega(s):
+    if s <= 1: return 1.0 / s  # not used
+    if s >= SMAX: return 0.5614594835668851
+    return float(np.interp(s, grid, om))
+
+# linear sieve F,f: F(s)=2e^g/s (s<=3), f(s)=2e^g log(s-1)/s (2<=s<=4), f=0 (s<=2),
+# (sF)'=f(s-1), (sf)'=F(s-1)
+sg = np.arange(0.5, 20.0 + H, H)
+Fv = np.empty_like(sg); fv = np.empty_like(sg)
+for i, s in enumerate(sg):
+    if s <= 3.0: Fv[i] = 2 * EG / s
+    if s <= 2.0: fv[i] = 0.0
+    elif s <= 4.0: fv[i] = 2 * EG * math.log(s - 1) / s
+for i, s in enumerate(sg):
+    j = i - int(round(1.0 / H))
+    if s > 3.0:
+        Fv[i] = ((s - H) * Fv[i - 1] + H * 0.5 * (fv[j] + fv[j - 1])) / s
+    if s > 4.0:
+        fv[i] = ((s - H) * fv[i - 1] + H * 0.5 * (Fv[j] + Fv[j - 1])) / s
+def F(s):
+    if s <= 0.5: return 2 * EG / max(s, 1e-12)
+    return float(np.interp(s, sg, Fv))
+def f(s):
+    if s <= 2.0: return 0.0
+    return float(np.interp(s, sg, fv))
+
+def truth_density(th): return omega((1 - th) / th) / th**2
+def F_density(th): return F((0.5 - th) / th) / EG / th**2
+def upper_density(th):
+    v = F_density(th)
+    if th >= 1/3: v = min(v, 4 * truth_density(th))
+    return v
+
+def bound(u, a, b):
+    val = f(1 / (2 * u)) / EG / u
+    if a > u: val -= quad(upper_density, u, a, points=[1/3] if u < 1/3 < a else None, limit=200)[0]
+    val -= quad(truth_density, a, b, limit=200)[0]
+    if b < 0.5: val -= quad(upper_density, b, 0.5, points=[1/3] if b < 1/3 else None, limit=200)[0]
+    return val
+
+def best(a, b):
+    us = np.linspace(0.02, a, 60)
+    vals = [bound(u, a, b) for u in us]
+    i = int(np.argmax(vals)); return vals[i], us[i]
+
+if __name__ == "__main__":
+    # sanity: Buchstab identity  omega(1/u)/u - int_u^{1/2} truth = 1
+    for u in (0.1, 0.2, 0.3):
+        print(f"identity check u={u}: {omega(1/u)/u - quad(truth_density, u, 0.5)[0]:.4f} (should be 1)")
+    print("no Type II at all (Chen-type scheme, primes): best =", best(0.5, 0.5))
+    for (a, b) in [(0.30, 0.50), (1/3, 0.5), (0.13, 0.43), (0.13, 0.5), (0.10, 0.40), (0.15, 0.45), (0.20, 0.5)]:
+        v, u = best(a, b); print(f"W=[{a:.3f},{b:.3f}]: best bound {v:+.3f} at u={u:.3f}")
+    print("minimal window length giving positive bound, by left endpoint a:")
+    for a in np.arange(0.05, 0.36, 0.01):
+        found = None
+        for b in np.arange(a + 0.01, 0.5001, 0.005):
+            if best(a, b)[0] > 0: found = b; break
+        print(f"  a={a:.2f}: b_min={found if found is None else round(found,3)}  length={None if found is None else round(found-a,3)}")

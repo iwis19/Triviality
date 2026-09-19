@@ -1,0 +1,34 @@
+"""
+Monte-Carlo check (exact sampling of the size process) of k-fold unions of independent uniform
+samples from the layered family F_n(p,K) of claim fe8d2fe8, with the windows as stated
+(centre (1-(1-p)^j) n, half-width 2.5 sqrt n) and with corner-recentred windows.
+Only sizes matter: |U u A| = |U| + |A| - Hypergeom(n, |U|, |A|).
+"""
+import numpy as np, sys
+from layered_check import logC, windows_stated, windows_corner, size_support
+
+rng = np.random.default_rng(1)
+
+
+def kfold(n, wins, K, N=400_000):
+    supp = size_support(wins, n)
+    lw = logC(n, supp)
+    wts = np.exp(lw - lw.max()); wts /= wts.sum()
+    in_F = np.zeros(n + 1, dtype=bool); in_F[supp] = True
+    u = rng.choice(supp, size=N, p=wts)
+    out = []
+    for k in range(2, K + 2):
+        a = rng.choice(supp, size=N, p=wts)
+        inter = rng.hypergeometric(u, n - u, a)
+        u = u + a - inter
+        out.append(in_F[u].mean())
+    return out  # P(k-fold union in F) for k = 2..K+1
+
+
+if __name__ == "__main__":
+    p = float(sys.argv[1]) if len(sys.argv) > 1 else 0.40
+    K = int(sys.argv[2]) if len(sys.argv) > 2 else 3
+    print(f"p={p} K={K}; columns: P(k-fold union in F) for k=2..{K + 1} (k=K+1 is NOT claimed)")
+    for n in [1600, 6400, 25600, 102400]:
+        print(f"  stated  n={n}: ", ["%.4f" % x for x in kfold(n, windows_stated(n, p, K), K)])
+        print(f"  corner  n={n}: ", ["%.4f" % x for x in kfold(n, windows_corner(n, p, K), K)])

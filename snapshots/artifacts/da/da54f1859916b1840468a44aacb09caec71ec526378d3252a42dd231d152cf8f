@@ -1,0 +1,120 @@
+// Analyses over all union-closed families on [n] (n<=5) produced by enum_uc.
+// Tests:
+//  T1 Frankl sanity: max frequency >= |F|/2 for every F != {} , {emptyset}.
+//  T2 Injection lemma: exists x and S in F_x such that A -> A|S is injective on F_{not x}.
+//  T3 Equality rigidity: if max freq == |F|/2 exactly, does F have a "free" element x
+//     (i.e. F_x == { A|{x} : A in F_{not x} })? Also weaker: exists x with |F_x|=|F|/2 and F_{not x}+x subset F.
+//  T4 Shifting: for ordered pairs (x,y), shift y->x: A with y in A, x notin A becomes A-y+x if that is not in F.
+//     Count how often the shifted family is union-closed.
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+
+static int n, N;
+
+static int is_uc(uint32_t fam) {
+    int sets[32], k = 0;
+    for (int s = 0; s < N; s++) if ((fam >> s) & 1) sets[k++] = s;
+    for (int i = 0; i < k; i++) for (int j = i + 1; j < k; j++)
+        if (!((fam >> (sets[i] | sets[j])) & 1)) return 0;
+    return 1;
+}
+
+static void print_fam(uint32_t fam) {
+    printf("{");
+    for (int s = 0; s < N; s++) if ((fam >> s) & 1) {
+        printf("{");
+        for (int x = 0; x < n; x++) if ((s >> x) & 1) printf("%d", x + 1);
+        printf("}");
+    }
+    printf("}");
+}
+
+int main(int argc, char **argv) {
+    n = atoi(argv[1]); N = 1 << n;
+    FILE *f = fopen(argv[2], "rb");
+    uint32_t fam;
+    long total = 0, t1_fail = 0, t2_fail = 0, t2_printed = 0;
+    long eq_cases = 0, eq_free_fail = 0, eq_weak_fail = 0, eq_printed = 0;
+    long t4_pairs = 0, t4_uc = 0, t4_nontriv = 0, t4_nontriv_uc = 0, t4_nontriv_uc_maxnoninc = 0;
+    long fam_with_good_shift = 0, fam_with_nontriv_shift = 0;
+    while (fread(&fam, 4, 1, f) == 1) {
+        if (fam == 0 || fam == 1) continue; // empty family or {emptyset}
+        total++;
+        int sets[32], k = 0;
+        for (int s = 0; s < N; s++) if ((fam >> s) & 1) sets[k++] = s;
+        int cnt[8] = {0};
+        for (int i = 0; i < k; i++) for (int x = 0; x < n; x++) if ((sets[i] >> x) & 1) cnt[x]++;
+        int mx = 0; for (int x = 0; x < n; x++) if (cnt[x] > mx) mx = cnt[x];
+        if (2 * mx < k) { t1_fail++; printf("T1 FAIL: "); print_fam(fam); printf("\n"); }
+        // T2
+        int ok2 = 0;
+        for (int x = 0; x < n && !ok2; x++) {
+            if (cnt[x] == 0) continue;
+            for (int i = 0; i < k && !ok2; i++) {
+                int S = sets[i]; if (!((S >> x) & 1)) continue;
+                uint32_t seen = 0; int inj = 1;
+                for (int j = 0; j < k; j++) {
+                    int A = sets[j]; if ((A >> x) & 1) continue;
+                    int u = A | S;
+                    if ((seen >> u) & 1) { inj = 0; break; }
+                    seen |= (1u << u);
+                }
+                if (inj) ok2 = 1;
+            }
+        }
+        if (!ok2) { t2_fail++; if (t2_printed < 8) { t2_printed++; printf("T2 no injective (x,S): |F|=%d maxfreq=%d ", k, mx); print_fam(fam); printf("\n"); } }
+        // T3
+        if (2 * mx == k) {
+            eq_cases++;
+            int free_ok = 0, weak_ok = 0;
+            for (int x = 0; x < n; x++) {
+                if (2 * cnt[x] != k) continue;
+                int allin = 1;
+                for (int j = 0; j < k; j++) { int A = sets[j]; if ((A >> x) & 1) continue; if (!((fam >> (A | (1 << x))) & 1)) { allin = 0; break; } }
+                if (allin) { weak_ok = 1; free_ok = 1; } // |F_x| = |F_notx| and F_notx + x subset F_x  => equality of sets
+            }
+            if (!free_ok) { eq_free_fail++; if (eq_printed < 12) { eq_printed++; printf("T3 equality case without free element: |F|=%d ", k); print_fam(fam); printf("\n"); } }
+            if (!weak_ok) eq_weak_fail++;
+        }
+        // T4
+        int good = 0, nontriv_any = 0;
+        for (int x = 0; x < n; x++) for (int y = 0; y < n; y++) {
+            if (x == y) continue;
+            if (cnt[x] == 0 && cnt[y] == 0) continue;
+            t4_pairs++;
+            uint32_t g = 0; int changed = 0;
+            for (int j = 0; j < k; j++) {
+                int A = sets[j];
+                if (((A >> y) & 1) && !((A >> x) & 1)) {
+                    int B = (A & ~(1 << y)) | (1 << x);
+                    if (!((fam >> B) & 1)) { g |= (1u << B); changed = 1; continue; }
+                }
+                g |= (1u << A);
+            }
+            int uc = is_uc(g);
+            if (uc) t4_uc++;
+            if (changed) {
+                t4_nontriv++; nontriv_any = 1;
+                if (uc) {
+                    t4_nontriv_uc++; good = 1;
+                    int c2[8] = {0}, m2 = 0;
+                    for (int s = 0; s < N; s++) if ((g >> s) & 1) for (int z = 0; z < n; z++) if ((s >> z) & 1) c2[z]++;
+                    for (int z = 0; z < n; z++) if (c2[z] > m2) m2 = c2[z];
+                    if (m2 <= mx) t4_nontriv_uc_maxnoninc++;
+                }
+            }
+        }
+        if (good) fam_with_good_shift++;
+        if (nontriv_any) fam_with_nontriv_shift++;
+    }
+    printf("n=%d families tested: %ld\n", n, total);
+    printf("T1 Frankl failures: %ld\n", t1_fail);
+    printf("T2 families with no injective (x,S) pair: %ld\n", t2_fail);
+    printf("T3 equality cases (maxfreq == |F|/2): %ld ; without free element: %ld ; weak-fail: %ld\n", eq_cases, eq_free_fail, eq_weak_fail);
+    printf("T4 shift pairs: %ld ; shifted family union-closed: %ld ; nontrivial shifts: %ld ; nontrivial & UC: %ld ; nontrivial & UC & maxfreq non-increasing: %ld\n",
+           t4_pairs, t4_uc, t4_nontriv, t4_nontriv_uc, t4_nontriv_uc_maxnoninc);
+    printf("T4 families admitting a nontrivial shift: %ld ; admitting a nontrivial UC-preserving shift: %ld\n", fam_with_nontriv_shift, fam_with_good_shift);
+    return 0;
+}

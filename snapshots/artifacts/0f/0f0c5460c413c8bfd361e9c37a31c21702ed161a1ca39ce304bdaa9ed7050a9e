@@ -1,0 +1,137 @@
+"""Check public 41-point records on S^4: Cohn's spherical-codes.org (5,41) and Sloane's pack.5.41 / pack.5.40.
+Also: contact graph statistics and a crude rigidity test (rank of the contact-stress/constraint Jacobian)."""
+import numpy as np
+
+def load_cohn(fn):
+    X = np.loadtxt(fn, delimiter=',')
+    return X / np.linalg.norm(X, axis=1, keepdims=True)
+
+def load_sloane(fn, n=5):
+    v = np.loadtxt(fn)
+    X = v.reshape(-1, n)
+    return X / np.linalg.norm(X, axis=1, keepdims=True)
+
+def report(name, X, tol=1e-6):
+    N = len(X)
+    G = X @ X.T
+    iu = np.triu_indices(N, 1)
+    mx = G[iu].max()
+    ang = np.degrees(np.arccos(mx))
+    ncontact = int(np.sum(G[iu] > mx - tol))
+    antip = int(np.sum(G[iu] < -1 + 1e-6))
+    print(f"{name}: N={N}, max cos={mx:.12f}, min angle={ang:.4f} deg, #pairs at max (tol {tol})={ncontact}, antipodal pairs={antip}")
+    # contact degrees
+    C = (G > mx - tol) & ~np.eye(N, dtype=bool)
+    deg = C.sum(1)
+    print("   contact degrees: min", deg.min(), "max", deg.max(), "mean", round(deg.mean(), 3))
+    # infinitesimal rigidity test (CJKT Sect. 2): motions v_i with <x_i, v_i> = 0 and <x_i - x_j, v_i - v_j> >= 0 for contacts.
+    # Necessary condition for being locally jammed at a strict local optimum: check rank of contact constraint matrix.
+    n = X.shape[1]
+    rows = []
+    for i, j in zip(*np.where(np.triu(C, 1))):
+        r = np.zeros(N * n)
+        r[i * n:(i + 1) * n] = X[j]
+        r[j * n:(j + 1) * n] = X[i]
+        rows.append(r)
+    A = np.array(rows)
+    # tangency constraints
+    T = np.zeros((N, N * n))
+    for i in range(N):
+        T[i, i * n:(i + 1) * n] = X[i]
+    M = np.vstack([A, T])
+    rank = np.linalg.matrix_rank(M, tol=1e-8)
+    dof = N * (n - 1) - n * (n - 1) // 2
+    print(f"   contacts={len(rows)}, rank of [contact; tangency] Jacobian={rank}, N(n-1)={N*(n-1)}, minus rotations={dof}")
+    return G
+
+X41 = load_cohn('cohn_5_41.txt')
+report("Cohn (5,41)", X41)
+S41 = load_sloane('sloane_5_41.txt')
+report("Sloane pack.5.41", S41)
+S40 = load_sloane('sloane_5_40.txt')
+G40 = report("Sloane pack.5.40", S40)
+vals, cnt = np.unique(np.round(G40[np.triu_indices(40, 1)], 6), return_counts=True)
+print("   pack.5.40 inner-product spectrum:", dict(zip(vals.tolist(), cnt.tolist())))
+
+# ---- extra_checks.py ----
+import numpy as np, itertools, sys
+sys.path.insert(0,'.')
+from lp_tools import delsarte_lp
+# LP checks for claim b54c / 48b2
+g1 = np.linspace(-0.55, 0.5, 2101)
+print("LP domain [-0.55,0.5]:", delsarte_lp(5, g1, 30)[0])
+g2 = np.concatenate([np.linspace(-1,-0.95,101), np.linspace(-0.55,0.5,2101)])
+print("LP domain [-1,-.95]u[-.55,.5]:", delsarte_lp(5, g2, 30)[0])
+# symmetry group order via backtracking on Gram matrix
+def symgroup_order(P, tol=1e-7):
+    N = len(P); G = P @ P.T
+    # choose a basis of 5 points (greedy independent)
+    basis=[]; 
+    for i in range(N):
+        if np.linalg.matrix_rank(P[basis+[i]], tol=1e-6) == len(basis)+1: basis.append(i)
+        if len(basis)==5: break
+    B = P[basis]  # 5x5
+    Binv = np.linalg.inv(B)
+    count=0
+    def rec(k, img):
+        nonlocal count
+        if k==5:
+            # orthogonal map M with M B_i = P[img_i]: M = (P[img]^T) (B^T)^{-1}  (row conv: x M^T)
+            M = np.linalg.solve(B, P[img])  # B M = P[img]
+            Q = P @ M
+            # check Q is a permutation of P
+            D = np.linalg.norm(Q[:,None,:]-P[None,:,:],axis=2)
+            if np.all(D.min(axis=1) < 1e-6): count+=1
+            return
+        for j in range(N):
+            if j in img: continue
+            if all(abs(G[basis[k],basis[m]]-G[j,img[m]])<tol for m in range(k)):
+                rec(k+1, img+[j])
+    rec(0, [])
+    return count
+"""Construct D5 and C5-40b (Leech / Cohn-Jiao-Kumar-Torquato 2011) kissing configurations on S^4,
+list their inner-product spectra and estimate their covering radii (deepest holes)."""
+import itertools
+import numpy as np
+
+r2 = np.sqrt(2.0)
+# 24-cell: permutations of (+-1,+-1,0,0)/sqrt2
+cell24 = []
+for i, j in itertools.combinations(range(4), 2):
+    for si in (1, -1):
+        for sj in (1, -1):
+            v = np.zeros(4); v[i] = si; v[j] = sj
+            cell24.append(v / r2)
+cell24 = np.array(cell24)
+coset_a = np.array([s * np.eye(4)[i] for i in range(4) for s in (1, -1)])  # +-e_i
+half = np.array([np.array(s) / 2.0 for s in itertools.product((1, -1), repeat=4)])
+coset_b = np.array([w for w in half if np.prod(np.sign(w)) > 0])  # even number of minus signs
+coset_c = np.array([w for w in half if np.prod(np.sign(w)) < 0])
+
+
+def layered(E, A, B, cA=1 / r2, cB=-1 / r2):
+    pts = [np.append(v, 0.0) for v in E]
+    pts += [np.append(np.sqrt(1 - cA ** 2) * u, cA) for u in A]
+    pts += [np.append(np.sqrt(1 - cB ** 2) * u, cB) for u in B]
+    return np.array(pts)
+
+
+D5 = layered(cell24, coset_a, coset_a)
+C540b = layered(cell24, coset_a, coset_b)
+for name,P in [("D5",D5),("C5-40b",C540b)]:
+    P = P/np.linalg.norm(P,axis=1,keepdims=True)
+    print(name, "symmetry group order (O(5) maps permuting the set):", symgroup_order(P))
+
+# ---- output ----
+# python3 c540b.py ; extra_checks.py
+D5     N=40 max ip=0.5 spectrum {-1:20, -1/2:240, 0:280, 1/2:240}; deepest hole cos=0.632456=2/sqrt10 (50.7685 deg), dir (-1,-1,1,1,-1)/sqrt5
+C5-40b N=40 max ip=0.5 spectrum {-1:12, -3/4:32, -1/2:192, -1/4:32, 0:272, 1/2:240}; inner products NOT inside {-1,-1/2,0,1/2};
+       deepest hole cos=0.632456=2/sqrt10 (50.7685 deg), dir (0,0,0,2,-1)/sqrt5
+24-cell covering radius: max cos = 0.707107 = 1/sqrt2 (45.0000 deg)
+D5     symmetry group order (elements of O(5) permuting the set, found by Gram-matrix backtracking): 3840
+C5-40b symmetry group order: 384
+# records.py (public data)
+Cohn spherical-codes.org (5,41): max cos=0.514705973641, min angle=59.0222 deg, #pairs at max=183, antipodal pairs=0
+Sloane pack.5.41: max cos=0.514994652697, min angle=59.0029 deg, #pairs at max=153, antipodal pairs=0
+Sloane pack.5.40: max cos=0.5, spectrum {-1:20,-1/2:240,0:280,1/2:240} (= D5 spectrum), antipodal pairs=20
+spherical-codes.org (4,14): max cos=0.319519 (71.3662 deg); (4,15): max cos=0.350992 (69.4520 deg)

@@ -1,0 +1,39 @@
+"""Exact minimum number u(L) of residues mod L left uncovered by classes with distinct moduli d | L, d > 1
+(one class per modulus), via MaxSAT (RC2, python-sat).  u(L) = L - r(L) with r(L) as in McNew-Setty (arXiv:2507.23041, Sec. 4).
+Usage: python3 exact_u.py 15 21 45 63 105 135 165 189 195
+"""
+import sys
+from sympy import divisors
+from pysat.formula import WCNF
+from pysat.card import CardEnc
+from pysat.examples.rc2 import RC2
+
+def u(L):
+    ds = [d for d in divisors(L) if d > 1]
+    var = {}; nv = 0
+    for d in ds:
+        for r in range(d):
+            nv += 1; var[(d, r)] = nv
+    w = WCNF()
+    for d in ds:
+        enc = CardEnc.atmost([var[(d, r)] for r in range(d)], 1, top_id=nv)
+        nv = max(nv, enc.nv)
+        for c in enc.clauses:
+            w.append(c)
+    for j in range(L):
+        w.append([var[(d, j % d)] for d in ds], weight=1)     # soft: residue j covered
+    with RC2(w) as rc2:
+        rc2.compute()
+        return rc2.cost
+
+if __name__ == '__main__':
+    for L in map(int, sys.argv[1:]):
+        print(f"u({L}) = {u(L)}", flush=True)
+
+# ---- output of: python3 exact_u.py 15 21 45 63 105 135 165 189 195  (killed by 900 s timeout after 135) ----
+# u(15) = 7
+# u(21) = 11
+# u(45) = 16
+# u(63) = 26
+# u(105) = 35
+# u(135) = 43

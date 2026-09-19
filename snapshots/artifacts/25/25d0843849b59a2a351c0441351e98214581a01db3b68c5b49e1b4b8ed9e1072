@@ -1,0 +1,13 @@
+N  count(0,0,0)  [random shifts t,u,v<N/2: mean, sd, frac_nonzero, max]  heuristic N^alpha
+10^10  15   mean=3.05 sd=4.76 frac_nonzero=0.463 max=33   1.82
+10^15  18   mean=4.12 sd=7.14 frac_nonzero=0.393 max=34   2.45
+10^20  62   mean=6.71 sd=13.94 frac_nonzero=0.357 max=78   3.30
+10^25  81   mean=7.38 sd=17.77 frac_nonzero=0.273 max=139   4.45
+10^30  135   mean=9.30 sd=20.90 frac_nonzero=0.287 max=112   6.00
+10^35  176   mean=9.68 sd=22.63 frac_nonzero=0.260 max=153   8.10
+
+---- shifts2_out.txt ----
+N=10^30, full-range random shifts (t,u,v) of S3,S5,S7; count at (0,0,0): 135
+random: n=300 mean=9.4 median=0.0 sd=21.1 min=0 max=133 zeros=209
+fraction >= count(0,0,0): 0.0
+heuristic mean (product of densities * N) = 6.0048200890754275

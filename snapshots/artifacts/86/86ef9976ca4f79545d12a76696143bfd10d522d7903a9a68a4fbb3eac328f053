@@ -1,0 +1,6 @@
+range N in [10^4, 200000], 95001 even N
+max |r-HL/2|/sqrt(N) = 1.5305 at N=180180
+max |r-HL/2|/sqrt(HL/2) = 11.598 at N=173250
+z=(r-HL/2)/sqrt(HL/2): mean=5.554  std=1.617  (Poisson-like would have std ~ 1)
+histogram of floor(z): {0: 2, 1: 363, 2: 4076, 3: 11586, 4: 20612, 5: 24567, 6: 16020, 7: 9608, 8: 5928, 9: 1856, 10: 363, 11: 20}
+max minimal Goldbach prime p(N) = 383 at N=194470
