@@ -1,0 +1,30 @@
+import Mathlib
+
+/-!
+Erdős #677: if `M(m,k) = M(n,k)` with `m ≥ n + k` then the upper interval
+`{m+1, ..., m+k}` contains no prime (any such prime would have to divide some element of
+`{n+1, ..., n+k}`, all of which are smaller than it).
+-/
+
+def lcmInterval (n k : ℕ) : ℕ := (Finset.Ico (n + 1) (n + k + 1)).lcm id
+
+lemma lcmInterval_dvd_prod (n k : ℕ) :
+    lcmInterval n k ∣ ∏ x ∈ Finset.Ico (n + 1) (n + k + 1), x := by
+  unfold lcmInterval
+  apply Finset.lcm_dvd
+  intro b hb
+  exact Finset.dvd_prod_of_mem (fun x => x) hb
+
+theorem erdos_677_no_prime_in_upper_interval (m n k p : ℕ) (hp : p.Prime) (hmn : m ≥ n + k)
+    (hpl : m + 1 ≤ p) (hpu : p ≤ m + k) (heq : lcmInterval m k = lcmInterval n k) : False := by
+  have hmem : p ∈ Finset.Ico (m + 1) (m + k + 1) := by
+    rw [Finset.mem_Ico]; omega
+  have h1 : p ∣ lcmInterval m k := by
+    unfold lcmInterval
+    exact Finset.dvd_lcm (f := id) hmem
+  rw [heq] at h1
+  have h2 : p ∣ ∏ x ∈ Finset.Ico (n + 1) (n + k + 1), x := h1.trans (lcmInterval_dvd_prod n k)
+  obtain ⟨a, ha, hpa⟩ := (Prime.dvd_finset_prod_iff hp.prime _).1 h2
+  rw [Finset.mem_Ico] at ha
+  have := Nat.le_of_dvd (by omega) hpa
+  omega

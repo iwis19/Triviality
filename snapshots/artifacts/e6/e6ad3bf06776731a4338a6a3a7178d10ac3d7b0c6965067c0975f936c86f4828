@@ -1,0 +1,85 @@
+K= 2 |S|=1 M=3 typeB empty
+K= 3 |S|=1 M=3 N_B=1 (exact path) t=0.0s
+K= 4 |S|=2 M=15 N_B=1 (exact path) t=0.0s
+K= 5 |S|=2 M=15 N_B=2 (exact path) t=0.0s
+K= 6 |S|=2 M=15 N_B=4 (exact path) t=0.0s
+K= 7 |S|=2 M=15 N_B=8 (exact path) t=0.0s
+K= 8 |S|=2 M=15 N_B=17 (exact path) t=0.0s
+K= 9 |S|=2 M=15 N_B=34 (exact path) t=0.0s
+K=10 |S|=3 M=165 N_B=6 (exact path) t=0.0s
+K=11 |S|=3 M=165 N_B=12 (exact path) t=0.0s
+K=12 |S|=4 M=2145 N_B=2 (exact path) t=0.0s
+K=13 |S|=4 M=2145 N_B=4 (exact path) t=0.0s
+K=14 |S|=4 M=2145 N_B=8 (exact path) t=0.0s
+K=15 |S|=4 M=2145 N_B=15 (exact path) t=0.0s
+K=16 |S|=4 M=2145 N_B=31 (exact path) t=0.0s
+K=17 |S|=4 M=2145 N_B=61 (exact path) t=0.0s
+K=18 |S|=5 M=40755 N_B=6 (exact path) t=0.0s
+K=19 |S|=5 M=40755 N_B=13 (exact path) t=0.0s
+K=20 |S|=5 M=40755 N_B=26 (exact path) t=0.0s
+K=21 |S|=5 M=40755 N_B=51 (exact path) t=0.0s
+K=22 |S|=5 M=40755 N_B=103 (exact path) t=0.0s
+K=23 |S|=5 M=40755 N_B=206 (exact path) t=0.0s
+K=24 |S|=5 M=40755 N_B=412 (exact path) t=0.0s
+K=25 |S|=5 M=40755 N_B=823 (exact path) t=0.0s
+K=26 |S|=5 M=40755 N_B=1647 (exact path) t=0.0s
+K=27 |S|=5 M=40755 N_B=3293 (exact path) t=0.0s
+K=28 |S|=6 M=1181895 N_B=227 (exact path) t=0.0s
+K=29 |S|=6 M=1181895 N_B=454 (exact path) t=0.0s
+K=30 |S|=6 M=1181895 N_B=908 (exact path) t=0.0s
+K=31 |S|=6 M=1181895 N_B=1817 (exact path) t=0.0s
+K=32 |S|=6 log2M=20.17 N_B=3634 killed_k1=2913 (80.16%) survivors_after_k<=31=0 t=0.0s
+K=33 |S|=6 log2M=20.17 N_B=7268 killed_k1=5842 (80.38%) survivors_after_k<=31=0 t=0.0s
+K=34 |S|=6 log2M=20.17 N_B=14536 killed_k1=11654 (80.17%) survivors_after_k<=31=0 t=0.0s
+K=35 |S|=6 log2M=20.17 N_B=29072 killed_k1=23292 (80.12%) survivors_after_k<=31=0 t=0.0s
+K=36 |S|=7 log2M=25.38 N_B=1571 killed_k1=1250 (79.57%) survivors_after_k<=31=0 t=0.0s
+K=37 |S|=7 log2M=25.38 N_B=3143 killed_k1=2503 (79.64%) survivors_after_k<=31=0 t=0.0s
+K=38 |S|=7 log2M=25.38 N_B=6286 killed_k1=4989 (79.37%) survivors_after_k<=31=0 t=0.0s
+K=39 |S|=7 log2M=25.38 N_B=12572 killed_k1=10031 (79.79%) survivors_after_k<=31=0 t=0.0s
+K=40 |S|=7 log2M=25.38 N_B=25143 killed_k1=20021 (79.63%) survivors_after_k<=31=0 t=0.0s
+K=41 |S|=7 log2M=25.38 N_B=50286 killed_k1=40063 (79.67%) survivors_after_k<=31=0 t=0.0s
+K=42 |S|=7 log2M=25.38 N_B=100572 killed_k1=80079 (79.62%) survivors_after_k<=31=0 t=0.0s
+K=43 |S|=7 log2M=25.38 N_B=201145 killed_k1=160303 (79.70%) survivors_after_k<=31=0 t=0.0s
+K=44 |S|=7 log2M=25.38 N_B=402290 killed_k1=320527 (79.68%) survivors_after_k<=31=0 t=0.1s
+K=45 |S|=7 log2M=25.38 N_B=804580 killed_k1=641122 (79.68%) survivors_after_k<=31=0 t=0.1s
+K=46 |S|=7 log2M=25.38 N_B=1609160 killed_k1=1281983 (79.67%) survivors_after_k<=31=0 t=0.3s
+K=47 |S|=7 log2M=25.38 N_B=3218320 killed_k1=2564287 (79.68%) survivors_after_k<=31=0 t=0.6s
+K=48 |S|=7 log2M=25.38 N_B=6436639 killed_k1=5128178 (79.67%) survivors_after_k<=31=0 t=1.2s
+K=49 |S|=7 log2M=25.38 N_B=12873279 killed_k1=10256104 (79.67%) survivors_after_k<=31=0 t=2.3s
+K=50 |S|=7 log2M=25.38 N_B=25746557 killed_k1=20513180 (79.67%) survivors_after_k<=31=0 t=4.5s
+K=51 |S|=7 log2M=25.38 N_B=51493114 killed_k1=41025851 (79.67%) survivors_after_k<=31=0 t=10.4s
+K=52 |S|=8 log2M=31.11 N_B=1943136 killed_k1=1540561 (79.28%) survivors_after_k<=31=0 t=0.3s
+K=53 |S|=8 log2M=31.11 N_B=3886273 killed_k1=3081127 (79.28%) survivors_after_k<=31=0 t=0.7s
+K=54 |S|=8 log2M=31.11 N_B=7772546 killed_k1=6162154 (79.28%) survivors_after_k<=31=0 t=1.5s
+K=55 |S|=8 log2M=31.11 N_B=15545091 killed_k1=12324495 (79.28%) survivors_after_k<=31=0 t=2.8s
+K=56 |S|=8 log2M=31.11 N_B=31090182 killed_k1=24649595 (79.28%) survivors_after_k<=31=0 t=5.8s
+K=57 |S|=8 log2M=31.11 N_B=62180365 killed_k1=49297675 (79.28%) survivors_after_k<=31=0 t=13.8s
+K=58 |S|=9 log2M=36.99 N_B=2107809 killed_k1=1663575 (78.92%) survivors_after_k<=31=0 t=0.4s
+K=59 |S|=9 log2M=36.99 N_B=4215618 killed_k1=3327271 (78.93%) survivors_after_k<=31=0 t=0.8s
+K=60 |S|=10 log2M=42.92 N_B=138217 killed_k1=108581 (78.56%) survivors_after_k<=31=0 t=0.0s
+K=61 |S|=10 log2M=42.92 N_B=276434 killed_k1=217343 (78.62%) survivors_after_k<=31=0 t=0.1s
+K=62 |S|=10 log2M=42.92 N_B=552868 killed_k1=434459 (78.58%) survivors_after_k<=31=0 t=0.1s
+K=63 |S|=10 log2M=42.92 N_B=1105736 killed_k1=868813 (78.57%) survivors_after_k<=31=0 t=0.2s
+K=64 |S|=10 log2M=42.92 N_B=2211472 killed_k1=1737594 (78.57%) survivors_after_k<=31=0 t=0.4s
+K=65 |S|=10 log2M=42.92 N_B=4422943 killed_k1=3475046 (78.57%) survivors_after_k<=31=0 t=0.9s
+K=66 |S|=11 log2M=48.99 N_B=132028 killed_k1=103345 (78.28%) survivors_after_k<=31=0 t=0.0s
+K=67 |S|=11 log2M=48.99 N_B=264056 killed_k1=206686 (78.27%) survivors_after_k<=31=0 t=0.1s
+K=68 |S|=11 log2M=48.99 N_B=528113 killed_k1=413214 (78.24%) survivors_after_k<=31=0 t=0.1s
+K=69 |S|=11 log2M=48.99 N_B=1056225 killed_k1=826508 (78.25%) survivors_after_k<=31=0 t=0.2s
+K=70 |S|=11 log2M=48.99 N_B=2112451 killed_k1=1653008 (78.25%) survivors_after_k<=31=0 t=0.4s
+K=71 |S|=11 log2M=48.99 N_B=4224901 killed_k1=3306095 (78.25%) survivors_after_k<=31=0 t=0.8s
+K=72 |S|=11 log2M=48.99 N_B=8449802 killed_k1=6611739 (78.25%) survivors_after_k<=31=0 t=1.8s
+K=73 |S|=11 log2M=48.99 N_B=16899605 killed_k1=13223701 (78.25%) survivors_after_k<=31=0 t=3.4s
+K=74 |S|=11 log2M=48.99 N_B=33799209 killed_k1=26447824 (78.25%) survivors_after_k<=31=0 t=7.1s
+K=75 |S|=11 log2M=48.99 N_B=67598419 killed_k1=52894608 (78.25%) survivors_after_k<=31=0 t=16.9s
+K=76 |S|=11 log2M=48.99 N_B=135196837 killed_k1=105790331 (78.25%) survivors_after_k<=31=0 t=45.7s
+K=77 |S|=11 log2M=48.99 N_B=270393675 killed_k1=211579794 (78.25%) survivors_after_k<=31=0 t=87.9s
+
+=== SUMMARY ===
+blocks K=2..77
+type A candidates: 3078  type B candidates: 781153370  total: 781156448
+solutions found (exact re-check): [7, 15, 21, 45, 75, 105]
+candidates with NO (k<=min(K,31), q<=997) proper-divisor witness and not a solution: []
+type-B kills by k (count, %%):  {1: (614047516, 78.61), 2: (98359047, 12.59), 3: (41915480, 5.37), 4: (13910495, 1.78), 5: (6788994, 0.87), 6: (3153239, 0.4), 7: (1555549, 0.2), 8: (749418, 0.1), 9: (323371, 0.04), 10: (166969, 0.02), 11: (88389, 0.01), 12: (41228, 0.01), 13: (23484, 0.0), 14: (13283, 0.0), 15: (7147, 0.0), 16: (4166, 0.0), 17: (2411, 0.0), 18: (1344, 0.0), 19: (809, 0.0), 20: (451, 0.0), 21: (259, 0.0), 22: (132, 0.0), 23: (74, 0.0), 24: (44, 0.0), 25: (29, 0.0), 26: (19, 0.0), 27: (6, 0.0), 28: (5, 0.0), 29: (6, 0.0), 30: (1, 0.0), 31: (1, 0.0)}
+max k needed: 31
+total time 212.1s

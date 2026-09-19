@@ -1,0 +1,218 @@
+#!/usr/bin/env python3
+"""
+Union-closed sets conjecture: small-case experiments for hypothesis generation.
+
+Families are represented as Python sets of bitmasks over ground set [n] = {0..n-1}.
+Every family tested is union-closed, contains the empty set (WLOG, this only makes the
+conjecture harder), and has a non-empty top (union of all members).
+
+Tests (each returns per-family pass/fail):
+  I1  fiber/induction statements about C = A u B for A,B uniform iid on F:
+        L1a  2 * E_C[log2 |F_{<=C}|] >= log2 |F|                 (should always hold: it is a theorem)
+        L1b  exists i : sum_C P(C) * freq_i(F_{<=C}) >= 1/2
+        L1c  exists i : P_C( freq_i(F_{<=C}) >= 1/2 ) >= 1/2   (freq in a 1-element family {∅} counts as 0)
+  I2  weighted lattice averages over join-irreducibles J of (F, subset):
+        sum_J w(J) |up(J)| >= (|F|/2) sum_J w(J) for w in several rules
+  I3  Horn-clause induction lemma (union-closed form):
+        F = F' \ {B : B ∩ X = ∅, y ∈ B}; if z abundant in F' then some element of {z} ∪ X abundant in F
+  I4  compression/unmatched-set rules:
+        r_i = #{B ∈ F: i ∈ B, B\{i} ∉ F},  m_i = #{A ∈ F: i ∉ A, A∪{i} ∉ F}; freq_i >= 1/2 iff r_i >= m_i
+        rules: argmin m_i, argmax r_i, exists m_i = 0
+"""
+import itertools, math, random, sys
+from collections import Counter, defaultdict
+
+def union_closure(gens):
+    fam = {0}
+    frontier = list(set(gens))
+    fam.update(frontier)
+    changed = True
+    while changed:
+        changed = False
+        cur = list(fam)
+        for a in cur:
+            for b in cur:
+                u = a | b
+                if u not in fam:
+                    fam.add(u); changed = True
+    return fam
+
+def is_union_closed(fam):
+    for a in fam:
+        for b in fam:
+            if (a | b) not in fam:
+                return False
+    return True
+
+def all_union_closed_families(n):
+    """Exhaustive: all union-closed families on [n] containing ∅ with nonempty top. Feasible for n<=4."""
+    N = 1 << n
+    masks = list(range(1, N))
+    out = []
+    # enumerate all subfamilies of nonempty sets: 2^(2^n - 1)
+    for code in range(1 << (N - 1)):
+        fam = {0}
+        for j in range(N - 1):
+            if code >> j & 1:
+                fam.add(masks[j])
+        if len(fam) > 1 and is_union_closed(fam):
+            out.append(frozenset(fam))
+    return out
+
+def random_union_closed(n, k, rng):
+    gens = [rng.randrange(1, 1 << n) for _ in range(k)]
+    return frozenset(union_closure(gens))
+
+def freqs(fam, n):
+    return [sum(1 for A in fam if A >> i & 1) for i in range(n)]
+
+def top(fam):
+    t = 0
+    for A in fam: t |= A
+    return t
+
+def popcount(x): return bin(x).count("1")
+
+# ---------------- I1 ----------------
+def test_I1(fam, n):
+    fam = list(fam); F = len(fam)
+    down = {C: [A for A in fam if A & ~C == 0] for C in fam}
+    cnt = Counter()
+    for A in fam:
+        for B in fam:
+            cnt[A | B] += 1
+    tot = F * F
+    # L1a
+    lhs = 2 * sum(c / tot * math.log2(len(down[C])) for C, c in cnt.items())
+    L1a = lhs >= math.log2(F) - 1e-12
+    # L1b, L1c
+    L1b = False; L1c = False
+    for i in range(n):
+        s = 0.0; mass = 0.0
+        for C, c in cnt.items():
+            d = down[C]
+            fr = sum(1 for A in d if A >> i & 1) / len(d)
+            s += c / tot * fr
+            if fr >= 0.5: mass += c / tot
+        if s >= 0.5 - 1e-12: L1b = True
+        if mass >= 0.5 - 1e-12: L1c = True
+    return dict(L1a=L1a, L1b=L1b, L1c=L1c)
+
+# ---------------- I2 ----------------
+def join_irreducibles(fam):
+    fam = list(fam)
+    out = []
+    for J in fam:
+        if J == 0: continue
+        lower = [A for A in fam if A != J and A & ~J == 0]
+        # lower covers: maximal proper subsets in fam
+        covers = [A for A in lower if not any(B != A and B & ~A == 0 and A & ~B == 0 for B in lower if B != A and (B & A) == A and B != A)]
+        covers = [A for A in lower if not any((A | B) == B and B != A and B != J for B in lower)]
+        if len(covers) == 1:
+            out.append((J, covers[0]))
+    return out
+
+def test_I2(fam, n):
+    fam = list(fam); F = len(fam)
+    JI = join_irreducibles(fam)
+    res = {}
+    up = {J: sum(1 for A in fam if (A | J) == A) for J, _ in JI}
+    dn = {J: sum(1 for A in fam if A & ~J == 0) for J, _ in JI}
+    rules = {
+        "w=1/|down J|": lambda J, Jm: 1.0 / dn[J],
+        "w=1/|J|": lambda J, Jm: 1.0 / popcount(J),
+        "w=|J \\ J-|": lambda J, Jm: popcount(J & ~Jm),
+        "w=1/|up J|": lambda J, Jm: 1.0 / up[J],
+        "w=1": lambda J, Jm: 1.0,
+        "w=1/|down J|^2": lambda J, Jm: 1.0 / dn[J] ** 2,
+        "w=2^-|J|": lambda J, Jm: 2.0 ** (-popcount(J)),
+    }
+    for name, w in rules.items():
+        W = sum(w(J, Jm) for J, Jm in JI)
+        S = sum(w(J, Jm) * up[J] for J, Jm in JI)
+        res[name] = S >= (F / 2) * W - 1e-9
+    return res
+
+# ---------------- I3 ----------------
+def test_I3(famp, n):
+    """famp = F'. Try all clauses (X,y) with X nonempty, y not in X such that removal is nontrivial.
+    Return (num_clauses_tested, num_failures, example_failure)."""
+    famp = list(famp); Fp = len(famp)
+    fr_p = freqs(famp, n)
+    abundant_p = [z for z in range(n) if 2 * fr_p[z] >= Fp]
+    tested = 0; fails = 0; ex = None
+    for X in range(1, 1 << n):
+        for y in range(n):
+            if X >> y & 1: continue
+            removed = [B for B in famp if (B & X) == 0 and (B >> y & 1)]
+            if not removed: continue
+            fam = [B for B in famp if not ((B & X) == 0 and (B >> y & 1))]
+            if len(fam) <= 1: continue
+            F = len(fam); fr = freqs(fam, n)
+            for z in abundant_p:
+                tested += 1
+                cands = [z] + [x for x in range(n) if X >> x & 1]
+                if not any(2 * fr[c] >= F for c in cands):
+                    fails += 1
+                    if ex is None:
+                        ex = dict(Fprime=sorted(famp), X=X, y=y, z=z, F=sorted(fam), freqs=fr)
+    return tested, fails, ex
+
+# ---------------- I4 ----------------
+def test_I4(fam, n):
+    fam_s = set(fam); F = len(fam)
+    fr = freqs(fam, n)
+    t = top(fam)
+    elems = [i for i in range(n) if t >> i & 1]
+    r = {i: sum(1 for B in fam if (B >> i & 1) and (B & ~(1 << i)) not in fam_s) for i in elems}
+    m = {i: sum(1 for A in fam if not (A >> i & 1) and (A | (1 << i)) not in fam_s) for i in elems}
+    # sanity: r_i - m_i == 2 fr_i - F
+    for i in elems:
+        assert r[i] - m[i] == 2 * fr[i] - F, (r, m, fr, F)
+    ab = lambda i: 2 * fr[i] >= F
+    res = {}
+    mn = min(m.values()); res["argmin m_i all abundant"] = all(ab(i) for i in elems if m[i] == mn)
+    res["argmin m_i some abundant"] = any(ab(i) for i in elems if m[i] == mn)
+    mx = max(r.values()); res["argmax r_i some abundant"] = any(ab(i) for i in elems if r[i] == mx)
+    res["exists m_i = 0"] = mn == 0
+    # element of a smallest nonempty set
+    smallest = min((popcount(A) for A in fam if A), default=0)
+    small_elems = set()
+    for A in fam:
+        if A and popcount(A) == smallest:
+            small_elems.update(i for i in elems if A >> i & 1)
+    res["smallest-set element abundant"] = any(ab(i) for i in small_elems)
+    # ratio-based rule: argmax r_i / (m_i + 1)
+    best = max(elems, key=lambda i: r[i] / (m[i] + 1))
+    res["argmax r/(m+1) abundant"] = ab(best)
+    return res
+
+def run(families, n, label):
+    print(f"== {label}: {len(families)} families on n={n}")
+    agg = defaultdict(lambda: [0, 0]); examples = {}
+    i3_tested = i3_fail = 0; i3_ex = None
+    for fam in families:
+        for grp, fn in (("I1", test_I1), ("I2", test_I2), ("I4", test_I4)):
+            for k, v in fn(fam, n).items():
+                key = f"{grp}:{k}"; agg[key][1] += 1
+                if v: agg[key][0] += 1
+                elif key not in examples: examples[key] = sorted(fam)
+        t, f, ex = test_I3(fam, n)
+        i3_tested += t; i3_fail += f
+        if ex and i3_ex is None: i3_ex = ex
+    for k in sorted(agg):
+        p, tot = agg[k]
+        print(f"  {k:40s} pass {p}/{tot}" + ("" if p == tot else f"   first failure: {examples[k]}"))
+    print(f"  I3:Horn-induction lemma              pass {i3_tested - i3_fail}/{i3_tested}" + ("" if i3_fail == 0 else f"   first failure: {i3_ex}"))
+
+if __name__ == "__main__":
+    rng = random.Random(20260919)
+    for n in (2, 3, 4):
+        fams = all_union_closed_families(n)
+        run(fams, n, f"exhaustive n={n}")
+    for n, k, N in ((5, 4, 3000), (5, 7, 3000), (6, 5, 1500), (6, 9, 1500), (7, 6, 600), (8, 6, 200)):
+        fams = set()
+        while len(fams) < N:
+            f = random_union_closed(n, k, rng)
+            if len(f) > 1: fams.add(f)
+        run(sorted(fams, key=sorted), n, f"random n={n} k={k}")

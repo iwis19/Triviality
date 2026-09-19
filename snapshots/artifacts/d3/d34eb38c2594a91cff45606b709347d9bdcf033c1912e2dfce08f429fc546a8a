@@ -1,0 +1,59 @@
+# Hardy-Littlewood-type heuristic for Erdos #1142.
+# For n in (2^L, 2^{L+1}] the condition is: n - 2^k prime for k = 1..L.
+# Model: P(all prime) ~ S_L * prod_k 1/log(n - 2^k), with singular series
+#   S_L = prod_p (1 - nu_L(p)/p) / (1 - 1/p)^L,  nu_L(p) = #{2^k mod p : 1<=k<=L} = min(L, ord_p(2)) (p odd), nu_L(2)=1.
+# Also the purely local density D(L) = (1/2) prod_{p odd : 2^{ord_p(2)} + p < 2^L} (1 - ord_p(2)/p)
+# of n ~ 2^L passing every forced small-prime obstruction (no primality used).
+import math, sys
+from mpmath import mp, mpf, log, quad, li, exp
+mp.dps = 30
+B = 2_000_000
+sieve = bytearray([1]) * (B + 1); sieve[0] = sieve[1] = 0
+for i in range(2, int(B ** 0.5) + 1):
+    if sieve[i]: sieve[i*i::i] = bytearray(len(sieve[i*i::i]))
+primes = [i for i in range(3, B + 1) if sieve[i]]
+so = {}
+for line in open('smallorder.txt'):
+    p, o = map(int, line.split()); so[p] = o
+LMAX = int(sys.argv[1]) if len(sys.argv) > 1 else 100
+def ordp(p):
+    return so.get(p, 10**9)   # not in list => ord > 100 >= L for our purposes
+# precompute sum over primes <= B of log(1-1/p) and of 1/p^2 tail etc.
+rows = []
+actual = {2:1, 3:1, 4:1, 5:1, 6:2}
+total_tail = mpf(0)
+print("L  log10(S_L)  log10(E_L)  E_L  log2(D(L))/L  actual_count")
+for L in range(2, LMAX + 1):
+    logS = (L - 1) * math.log(2)     # p = 2 factor
+    for p in primes:
+        nu = min(L, ordp(p))
+        logS += math.log(1 - nu / p) - L * math.log(1 - 1 / p)
+    # large primes in smallorder list beyond B (nu = ord < L possible): include them
+    for p, o in so.items():
+        if p > B and o < L:
+            logS += math.log(1 - o / p) - L * math.log(1 - 1 / p)   # (other large primes: nu=L, factor ~ 1)
+    # tail p > B with nu = L: log((1-L/p)/(1-1/p)^L) ~ -(L^2-L)/(2p^2); sum_{p>B} 1/p^2 ~ 1/(B log B)
+    logS -= (L * L - L) / 2 / (B * math.log(B))
+    S = exp(mpf(logS))
+    # E_L = S * int_{y=3}^{2^L} dy / (log y * prod_{k<L} log(2^L + y - 2^k))
+    two_L = mpf(2) ** L
+    def f(y):
+        v = 1 / log(y)
+        for k in range(1, L):
+            v /= log(two_L + y - mpf(2) ** k)
+        return v
+    # integrate in u = log y for stability
+    g = lambda u: f(exp(u)) * exp(u)
+    I = quad(g, [log(3), log(two_L) / 2, log(two_L)])
+    E = S * I
+    # local density
+    logD = -math.log(2)
+    for p, o in so.items():
+        if 2 ** o + p < 2 ** L:
+            logD += math.log(1 - o / p)
+    rows.append((L, float(log(S) / log(10)), float(log(E) / log(10)), E, logD / math.log(2) / L, actual.get(L, 0)))
+    print("%3d %10.3f %10.3f %12.4e %8.4f %d" % rows[-1])
+    if L >= 7: total_tail += E
+print("predicted expected number of solutions n > 128 (L>=7 .. %d): %s" % (LMAX, mp.nstr(total_tail, 6)))
+t44 = sum(r[3] for r in rows if r[0] >= 44); t64 = sum(r[3] for r in rows if r[0] >= 64); t96 = sum(r[3] for r in rows if r[0] >= 96)
+print("expected number with n > 2^44: %s ; n > 2^64: %s ; n > 2^96: %s" % (mp.nstr(t44, 6), mp.nstr(t64, 6), mp.nstr(t96, 6)))

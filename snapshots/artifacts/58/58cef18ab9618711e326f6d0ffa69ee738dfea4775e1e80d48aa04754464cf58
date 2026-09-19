@@ -1,0 +1,194 @@
+##### eta_experiment.py #####
+#!/usr/bin/env python3
+"""
+Experiment for idea dda56e2b (eta-uniformity peeling), Erdos #7 lab.
+
+For odd M we build near-optimal distinct systems (one class per divisor d>1 of M),
+greedy + simulated annealing, and for the uncovered set U in Z/M compute
+  eta_d(U) = d * max_r |U cap (r mod d)| / |U|      for each d | M, d > 1
+  eta(U)   = max_d eta_d(U)                        (C10's global eta)
+and the three fibre bounds for adjoining a new prime p (a = 1, g = 1):
+  crude(U)   = (p-1)|U| - (sigma(M)-M)                       [claim 949c4495]
+  qlb_f(U)   = (p-1)|U| - sum_d min(M/d, |U|)                [claim 12f90ae9]
+  profile(U) = (p-1)|U| - sum_d max_r |U cap (r mod d)|      [best possible C1-type bound for this U]
+  C10(U)     = (p-1)|U| - eta(U)*|U|*(sigma(M)/M - 1)        [claim 0f0390fc]
+"""
+import sys, json, math, random, time
+import numpy as np
+
+def divisors(n):
+    ds = [d for d in range(1, int(math.isqrt(n)) + 1) if n % d == 0]
+    ds = sorted(set(ds + [n // d for d in ds]))
+    return ds
+
+def sigma(n):
+    return sum(divisors(n))
+
+class System:
+    def __init__(self, M, seed=0):
+        self.M = M
+        self.ds = [d for d in divisors(M) if d > 1]
+        self.rng = random.Random(seed)
+        self.r = {d: 0 for d in self.ds}
+        self.cov = np.zeros(M, dtype=np.int32)
+        for d in self.ds:
+            self.cov[self.r[d]::d] += 1
+
+    def uncovered(self):
+        return int((self.cov == 0).sum())
+
+    def greedy(self, order="inc"):
+        self.cov[:] = 0
+        ds = sorted(self.ds) if order == "inc" else sorted(self.ds, reverse=True)
+        for d in ds:
+            best, bestr = -1, 0
+            for rr in range(d):
+                gain = int((self.cov[rr::d] == 0).sum())
+                if gain > best:
+                    best, bestr = gain, rr
+            self.r[d] = bestr
+            self.cov[bestr::d] += 1
+
+    def delta(self, d, rnew):
+        rold = self.r[d]
+        if rnew == rold:
+            return 0
+        lose = int((self.cov[rold::d] == 1).sum())   # become uncovered
+        gain = int((self.cov[rnew::d] == 0).sum())   # become covered
+        return lose - gain  # change in |U|
+
+    def apply(self, d, rnew):
+        self.cov[self.r[d]::d] -= 1
+        self.r[d] = rnew
+        self.cov[rnew::d] += 1
+
+    def anneal(self, steps, T0=2.0, T1=0.05):
+        cur = self.uncovered()
+        best = cur
+        bestr = dict(self.r)
+        for t in range(steps):
+            T = T0 * (T1 / T0) ** (t / steps)
+            d = self.rng.choice(self.ds)
+            rnew = self.rng.randrange(d)
+            dl = self.delta(d, rnew)
+            if dl <= 0 or self.rng.random() < math.exp(-dl / T):
+                self.apply(d, rnew)
+                cur += dl
+                if cur < best:
+                    best = cur
+                    bestr = dict(self.r)
+        # restore best
+        self.cov[:] = 0
+        self.r = bestr
+        for d in self.ds:
+            self.cov[self.r[d]::d] += 1
+        assert self.uncovered() == best
+        return best
+
+def analyse(M, cov, p):
+    U = np.nonzero(cov == 0)[0]
+    u = len(U)
+    ds = [d for d in divisors(M) if d > 1]
+    sig = sigma(M)
+    prof = {}
+    for d in ds:
+        counts = np.bincount(U % d, minlength=d)
+        mx = int(counts.max())
+        prof[d] = {"max_class": mx, "eta_d": d * mx / u, "min_bound": min(M // d, u)}
+    eta = max(v["eta_d"] for v in prof.values())
+    sum_max = sum(v["max_class"] for v in prof.values())
+    sum_min = sum(v["min_bound"] for v in prof.values())
+    return {
+        "M": M, "p": p, "u": u, "u_frac": u / M, "sigma_over_M": sig / M,
+        "eta_global": eta, "eta_trivial_lower_bound_M_over_u": M / u,
+        "eta_excluding_d_ge_u": max((v["eta_d"] for d, v in prof.items() if d < u), default=None),
+        "crude": (p - 1) * u - (sig - M),
+        "qlb_f": (p - 1) * u - sum_min,
+        "profile": (p - 1) * u - sum_max,
+        "C10": (p - 1) * u - eta * u * (sig / M - 1),
+        "C10_threshold_eta": (p - 1) / (sig / M - 1),
+        "profile_by_d": {str(d): prof[d] for d in ds},
+    }
+
+if __name__ == "__main__":
+    M = int(sys.argv[1]); p = int(sys.argv[2]); steps = int(sys.argv[3]); seed = int(sys.argv[4]) if len(sys.argv) > 4 else 0
+    S = System(M, seed)
+    t0 = time.time()
+    S.greedy("inc"); g_inc = S.uncovered()
+    A_g = analyse(M, S.cov, p)
+    S.greedy("dec"); g_dec = S.uncovered()
+    if g_dec < g_inc:
+        A_g = analyse(M, S.cov, p)
+    else:
+        S.greedy("inc")
+    best = S.anneal(steps)
+    A_sa = analyse(M, S.cov, p)
+    out = {"greedy_inc": g_inc, "greedy_dec": g_dec, "sa_best": best, "sa_steps": steps, "seed": seed,
+           "time_s": time.time() - t0, "greedy": A_g, "sa": A_sa,
+           "sa_classes": {str(d): S.r[d] for d in S.ds}}
+    json.dump(out, open(f"/home/ubuntu/eta_{M}_s{seed}.json", "w"), indent=1)
+    for tag, A in (("greedy", A_g), ("sa", A_sa)):
+        print(f"M={M} {tag}: u={A['u']} ({A['u_frac']:.4f}) eta={A['eta_global']:.2f} M/u={A['eta_trivial_lower_bound_M_over_u']:.2f} "
+              f"eta(d<u)={A['eta_excluding_d_ge_u']:.2f} thr={A['C10_threshold_eta']:.2f} | crude={A['crude']} qlb_f={A['qlb_f']} profile={A['profile']} C10={A['C10']:.0f}")
+
+
+##### eta_sat_probe.py #####
+#!/usr/bin/env python3
+"""
+SAT probe: does a distinct system on M (one class per divisor d>1) exist with
+|U| <= K and |U cap (0 mod q)| >= K2 ?   (q | M; by translation WLOG the heavy class is 0 mod q)
+Reports SAT/UNSAT/timeout.  Solver: CaDiCaL 1.5.3 via python-sat, cardinality via sequential counters.
+usage: eta_sat_probe.py M K q K2 timeout_s
+"""
+import sys, math, time, json
+from pysat.formula import CNF, IDPool
+from pysat.card import CardEnc, EncType
+from pysat.solvers import Solver
+import threading
+
+def divisors(n):
+    ds = [d for d in range(1, int(math.isqrt(n)) + 1) if n % d == 0]
+    return sorted(set(ds + [n // d for d in ds]))
+
+def build(M, K, q, K2):
+    pool = IDPool()
+    cnf = CNF()
+    ds = [d for d in divisors(M) if d > 1]
+    x = {(d, r): pool.id(("x", d, r)) for d in ds for r in range(d)}
+    y = {n: pool.id(("y", n)) for n in range(M)}
+    for d in ds:  # exactly one class per modulus
+        lits = [x[(d, r)] for r in range(d)]
+        cnf.extend(CardEnc.equals(lits, 1, vpool=pool, encoding=EncType.seqcounter).clauses)
+    for n in range(M):  # y_n <-> not covered
+        covs = [x[(d, n % d)] for d in ds]
+        cnf.append([y[n]] + covs)          # all uncovered-of-n false -> y_n
+        for c in covs:
+            cnf.append([-y[n], -c])         # y_n -> none covers n
+    cnf.extend(CardEnc.atmost([y[n] for n in range(M)], K, vpool=pool, encoding=EncType.seqcounter).clauses)
+    heavy = [y[n] for n in range(0, M, q)]
+    cnf.extend(CardEnc.atleast(heavy, K2, vpool=pool, encoding=EncType.seqcounter).clauses)
+    return cnf, x, y, ds
+
+if __name__ == "__main__":
+    M, K, q, K2, TO = map(int, sys.argv[1:6])
+    cnf, x, y, ds = build(M, K, q, K2)
+    t0 = time.time()
+    s = Solver(name="cadical153", bootstrap_with=cnf.clauses)
+    timer = threading.Timer(TO, lambda: s.interrupt())
+    timer.start()
+    res = s.solve_limited(expect_interrupt=True)
+    timer.cancel()
+    dt = time.time() - t0
+    out = {"M": M, "K": K, "q": q, "K2": K2, "timeout_s": TO, "time_s": dt, "vars": cnf.nv, "clauses": len(cnf.clauses)}
+    if res is None:
+        out["result"] = "TIMEOUT"
+    elif res:
+        model = set(l for l in s.get_model() if l > 0)
+        classes = {d: [r for r in range(d) if x[(d, r)] in model][0] for d in ds}
+        U = [n for n in range(M) if all(n % d != classes[d] for d in ds)]
+        heavy = sum(1 for n in U if n % q == 0)
+        out.update({"result": "SAT", "classes": classes, "u": len(U), "heavy": heavy, "eta_q": q * heavy / len(U),
+                    "check": len(U) <= K and heavy >= K2})
+    else:
+        out["result"] = "UNSAT"
+    print(json.dumps(out))

@@ -1,0 +1,239 @@
+import Mathlib
+
+open scoped ComplexConjugate
+open ZMod Finset
+
+section Erdos376Barrier
+
+variable {N : ℕ} [NeZero N]
+
+lemma sum_stdAddChar_mul (t : ZMod N) :
+    ∑ j : ZMod N, stdAddChar (j * t) = if t = 0 then (N : ℂ) else 0 := by
+  rw [AddChar.sum_mulShift t (isPrimitive_stdAddChar N), ZMod.card]
+  split_ifs <;> simp
+
+theorem zmod_dft_polarised_parseval (Φ Ψ : ZMod N → ℂ) :
+    ∑ k, 𝓕 Φ k * conj (𝓕 Ψ k) = N * ∑ j, Φ j * conj (Ψ j) := by
+  have key : ∀ j j' k : ZMod N,
+      stdAddChar (-(j * k)) * Φ j * (conj (stdAddChar (-(j' * k))) * conj (Ψ j'))
+        = stdAddChar (k * (j' - j)) * (Φ j * conj (Ψ j')) := by
+    intro j j' k
+    rw [← AddChar.map_neg_eq_conj, neg_neg]
+    have : stdAddChar (-(j * k)) * stdAddChar (j' * k) = stdAddChar (k * (j' - j)) := by
+      rw [← AddChar.map_add_eq_mul]; congr 1; ring
+    rw [← this]; ring
+  calc ∑ k, 𝓕 Φ k * conj (𝓕 Ψ k)
+      = ∑ k, ∑ j, ∑ j', stdAddChar (-(j * k)) * Φ j *
+          (conj (stdAddChar (-(j' * k))) * conj (Ψ j')) := by
+        simp only [dft_apply, smul_eq_mul, map_sum, map_mul, Finset.sum_mul_sum]
+    _ = ∑ j, ∑ j', (∑ k, stdAddChar (k * (j' - j))) * (Φ j * conj (Ψ j')) := by
+        simp_rw [key]
+        rw [Finset.sum_comm]
+        refine Finset.sum_congr rfl fun j _ => ?_
+        rw [Finset.sum_comm]
+        simp_rw [Finset.sum_mul]
+    _ = N * ∑ j, Φ j * conj (Ψ j) := by
+        simp_rw [sum_stdAddChar_mul, sub_eq_zero, ite_mul, zero_mul]
+        rw [Finset.mul_sum]
+        refine Finset.sum_congr rfl fun j _ => ?_
+        rw [Finset.sum_ite_eq']
+        simp
+
+/-- Parseval for `ZMod.dft` (the diagonal case of the polarised identity). -/
+theorem zmod_dft_parseval (Φ : ZMod N → ℂ) :
+    ∑ k, ‖𝓕 Φ k‖ ^ 2 = N * ∑ j, ‖Φ j‖ ^ 2 := by
+  have h := zmod_dft_polarised_parseval Φ Φ
+  simp_rw [RCLike.mul_conj] at h
+  apply Complex.ofReal_injective
+  push_cast at h ⊢
+  exact h
+
+/-- Indicator of a finset as a complex-valued function. -/
+noncomputable def ind (S : Finset (ZMod N)) : ZMod N → ℂ := fun j ↦ if j ∈ S then 1 else 0
+
+lemma dft_ind_zero (S : Finset (ZMod N)) : 𝓕 (ind S) 0 = S.card := by
+  rw [dft_apply_zero]; simp [ind]
+
+lemma sum_norm_sq_ind (S : Finset (ZMod N)) : ∑ j, ‖ind S j‖ ^ 2 = S.card := by
+  simp [ind, apply_ite (fun z : ℂ ↦ ‖z‖ ^ 2), Finset.sum_ite_mem]
+
+lemma norm_dft_ind_le (S : Finset (ZMod N)) (k : ZMod N) : ‖𝓕 (ind S) k‖ ≤ S.card := by
+  rw [dft_apply]
+  refine (norm_sum_le _ _).trans ?_
+  simp only [smul_eq_mul, ind, apply_ite norm, norm_zero, mul_ite, mul_one,
+    mul_zero, Finset.sum_ite_mem, Finset.univ_inter]
+  refine le_of_eq ?_
+  calc ∑ i ∈ S, ‖stdAddChar (-(i * k))‖ = ∑ i ∈ S, (1 : ℝ) := by
+        refine Finset.sum_congr rfl fun i _ => ?_
+        exact AddChar.norm_apply _ _
+    _ = S.card := by simp
+
+/-- Polarised count: `|S ∩ C| = N⁻¹ ∑_k 𝓕1_S(k) conj(𝓕1_C(k))`. -/
+theorem card_inter_eq_dft (S C : Finset (ZMod N)) :
+    ((S ∩ C).card : ℂ) = (N : ℂ)⁻¹ * ∑ k, 𝓕 (ind S) k * conj (𝓕 (ind C) k) := by
+  rw [zmod_dft_polarised_parseval, ← mul_assoc, inv_mul_cancel₀ (by exact_mod_cast NeZero.ne N),
+    one_mul]
+  rw [Finset.card_eq_sum_ones, Nat.cast_sum, ← Finset.sum_ite_mem]
+  conv_lhs => rw [← Finset.univ_inter S]
+  rw [← Finset.sum_ite_mem]
+  refine Finset.sum_congr rfl fun j _ => ?_
+  simp only [ind]
+  by_cases hS : j ∈ S <;> by_cases hC : j ∈ C <;> simp [hS, hC]
+
+/-- The error term is exactly the nonzero-frequency sum. -/
+theorem card_inter_sub_main_eq (S C : Finset (ZMod N)) :
+    ((S ∩ C).card : ℂ) - (S.card * C.card : ℂ) / N
+      = (N : ℂ)⁻¹ * ∑ k ∈ Finset.univ.erase (0 : ZMod N), 𝓕 (ind S) k * conj (𝓕 (ind C) k) := by
+  have hN : (N : ℂ) ≠ 0 := by exact_mod_cast NeZero.ne N
+  rw [card_inter_eq_dft, ← Finset.add_sum_erase _ _ (Finset.mem_univ (0 : ZMod N)),
+    dft_ind_zero, dft_ind_zero, mul_add]
+  simp only [Complex.conj_natCast]
+  field_simp
+  ring
+
+/-- Nonzero-frequency energy of an indicator. -/
+theorem sum_erase_norm_sq_dft_ind (C : Finset (ZMod N)) :
+    ∑ k ∈ Finset.univ.erase (0 : ZMod N), ‖𝓕 (ind C) k‖ ^ 2 = C.card * (N - C.card) := by
+  have h := zmod_dft_parseval (ind C)
+  rw [← Finset.add_sum_erase _ _ (Finset.mem_univ (0 : ZMod N)), dft_ind_zero,
+    sum_norm_sq_ind] at h
+  simp only [Complex.norm_natCast] at h
+  linarith
+
+/-- Claim 4af305b7 (with the necessary hypothesis `C.Nonempty`; for `C = ∅` the statement
+is false since the left side is `N > 0` and the right side is `0`). -/
+theorem sum_ne_zero_norm_dft_indicator_ge (C : Finset (ZMod N)) (hC : C.Nonempty) :
+    (N : ℝ) - C.card ≤ ∑ k ∈ Finset.univ.erase (0 : ZMod N),
+      ‖𝓕 (fun j ↦ if j ∈ C then (1 : ℂ) else 0) k‖ := by
+  change (N : ℝ) - C.card ≤ ∑ k ∈ Finset.univ.erase (0 : ZMod N), ‖𝓕 (ind C) k‖
+  have hpos : (0 : ℝ) < C.card := by exact_mod_cast hC.card_pos
+  have h1 : ∑ k ∈ Finset.univ.erase (0 : ZMod N), ‖𝓕 (ind C) k‖ ^ 2
+      ≤ C.card * ∑ k ∈ Finset.univ.erase (0 : ZMod N), ‖𝓕 (ind C) k‖ := by
+    rw [Finset.mul_sum]
+    refine Finset.sum_le_sum fun k _ => ?_
+    rw [sq]
+    exact mul_le_mul_of_nonneg_right (norm_dft_ind_le C k) (norm_nonneg _)
+  rw [sum_erase_norm_sq_dft_ind] at h1
+  exact le_of_mul_le_mul_left h1 hpos
+
+/-- The claim fails for the empty set: this is why `hC` is needed above. -/
+theorem sum_ne_zero_norm_dft_indicator_empty :
+    ∑ k ∈ Finset.univ.erase (0 : ZMod N),
+      ‖𝓕 (fun j ↦ if j ∈ (∅ : Finset (ZMod N)) then (1 : ℂ) else 0) k‖ = 0 := by
+  simp [dft_apply]
+
+/-- Claim 6bda1835: multiplicity version of the pigeonhole energy bound. -/
+theorem sum_ne_zero_norm_sq_dft_nat_ge (f : ZMod N → ℕ) (m : ℕ) (hf : ∑ j, f j = m) :
+    (m : ℝ) * (N - m) ≤ ∑ k ∈ Finset.univ.erase (0 : ZMod N), ‖𝓕 (fun j ↦ (f j : ℂ)) k‖ ^ 2 := by
+  have h := zmod_dft_parseval (fun j ↦ (f j : ℂ))
+  rw [← Finset.add_sum_erase _ _ (Finset.mem_univ (0 : ZMod N)), dft_apply_zero] at h
+  simp only [Complex.norm_natCast] at h
+  have h0 : (∑ j, (f j : ℂ)) = (m : ℂ) := by exact_mod_cast hf
+  rw [h0, Complex.norm_natCast] at h
+  have h2 : (m : ℝ) ≤ ∑ j, ((f j : ℝ)) ^ 2 := by
+    have : ∀ j, (f j : ℝ) ≤ (f j : ℝ) ^ 2 := fun j => by
+      have : (1 : ℝ) ≤ f j ∨ (f j : ℝ) = 0 := by
+        rcases Nat.eq_zero_or_pos (f j) with h | h
+        · right; simp [h]
+        · left; exact_mod_cast h
+      rcases this with h | h
+      · nlinarith
+      · simp [h]
+    calc (m : ℝ) = ∑ j, (f j : ℝ) := by exact_mod_cast hf.symm
+      _ ≤ _ := Finset.sum_le_sum fun j _ => this j
+  have hN : (0 : ℝ) ≤ N := by positivity
+  nlinarith [h, h2]
+
+/-- Pigeonhole (multiplicity version): some `k ≠ 0` has `‖𝓕f(k)‖² ≥ m(N−m)/(N−1)`. -/
+theorem exists_ne_zero_sq_norm_dft_nat_ge (hN : 2 ≤ N) (f : ZMod N → ℕ) (m : ℕ)
+    (hf : ∑ j, f j = m) :
+    ∃ k : ZMod N, k ≠ 0 ∧ (m : ℝ) * (N - m) / (N - 1) ≤ ‖𝓕 (fun j ↦ (f j : ℂ)) k‖ ^ 2 := by
+  have hne : (Finset.univ.erase (0 : ZMod N)).Nonempty := by
+    refine ⟨1, Finset.mem_erase.mpr ⟨?_, Finset.mem_univ _⟩⟩
+    intro h
+    have := (ZMod.one_eq_zero_iff (n := N)).mp h
+    omega
+  have hcard : ((Finset.univ.erase (0 : ZMod N)).card : ℝ) = N - 1 := by
+    rw [Finset.card_erase_of_mem (Finset.mem_univ _), Finset.card_univ, ZMod.card]
+    have : 1 ≤ N := by omega
+    push_cast [Nat.cast_sub this]; ring
+  have hsum : ∑ _k ∈ Finset.univ.erase (0 : ZMod N), (m : ℝ) * (N - m) / (N - 1)
+      ≤ ∑ k ∈ Finset.univ.erase (0 : ZMod N), ‖𝓕 (fun j ↦ (f j : ℂ)) k‖ ^ 2 := by
+    rw [Finset.sum_const, nsmul_eq_mul, hcard]
+    have hN1 : (0 : ℝ) < (N : ℝ) - 1 := by
+      have : (2 : ℝ) ≤ N := by exact_mod_cast hN
+      linarith
+    rw [mul_div_cancel₀ _ hN1.ne']
+    exact sum_ne_zero_norm_sq_dft_nat_ge f m hf
+  obtain ⟨k, hk, hle⟩ := Finset.exists_le_of_sum_le hne hsum
+  exact ⟨k, (Finset.mem_erase.mp hk).1, hle⟩
+
+/-! ### Purely real barrier inequalities (no logarithms, no Riesz-product asymptotics). -/
+
+/-- `L^∞`/Hölder barrier: the lower bound `√(x/2)·(n−c)/n` for the Hölder error bound
+dominates the main term `x·c/n` as soon as `2·x·c² ≤ (n−c)²`. -/
+theorem holder_barrier (x c n : ℝ) (hx : 0 ≤ x) (hc : 0 ≤ c) (hcn : c ≤ n) (hn : 0 < n)
+    (h : 2 * x * c ^ 2 ≤ (n - c) ^ 2) :
+    x * c / n ≤ Real.sqrt (x / 2) * (n - c) / n := by
+  apply div_le_div_of_nonneg_right _ hn.le
+  have hnc : 0 ≤ n - c := by linarith
+  rw [← Real.sqrt_sq hnc, ← Real.sqrt_mul (by positivity)]
+  rw [Real.le_sqrt (by positivity) (by positivity)]
+  nlinarith [mul_le_mul_of_nonneg_left h hx]
+
+/-- `L²`/Cauchy–Schwarz barrier: `√(x(n−x)c(n−c))/n ≥ x·c/n` iff `x·c ≤ (n−x)(n−c)`. -/
+theorem cauchy_schwarz_barrier (x c n : ℝ) (hx : 0 ≤ x) (hc : 0 ≤ c) (hxn : x ≤ n) (hcn : c ≤ n)
+    (hn : 0 < n) (h : x * c ≤ (n - x) * (n - c)) :
+    x * c / n ≤ Real.sqrt (x * (n - x) * c * (n - c)) / n := by
+  apply div_le_div_of_nonneg_right _ hn.le
+  have h1 : 0 ≤ n - x := by linarith
+  have h2 : 0 ≤ n - c := by linarith
+  rw [Real.le_sqrt (by positivity) (by positivity)]
+  have hxc : 0 ≤ x * c := by positivity
+  nlinarith [mul_le_mul_of_nonneg_left h hxc]
+
+/-! ### The Hölder barrier at the level of `ZMod N` -/
+
+/-- Square-root lower bound for the indicator (C3 of idea 18ef46e0), rederived from the
+multiplicity version. -/
+theorem exists_ne_zero_sqrt_half_card_le_norm_dft_ind (hN : 2 ≤ N) (S : Finset (ZMod N))
+    (hS : 2 * S.card ≤ N) :
+    ∃ k : ZMod N, k ≠ 0 ∧ Real.sqrt (S.card / 2) ≤ ‖𝓕 (ind S) k‖ := by
+  have hf : ∑ j, (fun j ↦ if j ∈ S then 1 else 0 : ZMod N → ℕ) j = S.card := by
+    rw [Finset.card_eq_sum_ones, ← Finset.univ_inter S, ← Finset.sum_ite_mem]
+    simp
+  obtain ⟨k, hk, hle⟩ := exists_ne_zero_sq_norm_dft_nat_ge hN _ _ hf
+  refine ⟨k, hk, ?_⟩
+  have heq : (fun j ↦ ((if j ∈ S then 1 else 0 : ℕ) : ℂ)) = ind S := by
+    funext j; simp [ind]
+  rw [heq] at hle
+  have hN1 : (0 : ℝ) < (N : ℝ) - 1 := by
+    have : (2 : ℝ) ≤ N := by exact_mod_cast hN
+    linarith
+  have hS' : (2 : ℝ) * S.card ≤ N := by exact_mod_cast hS
+  have h1 : (S.card : ℝ) / 2 ≤ (S.card : ℝ) * (N - S.card) / (N - 1) := by
+    rw [div_le_div_iff₀ (by norm_num) hN1]
+    nlinarith [Nat.cast_nonneg (α := ℝ) S.card]
+  rw [Real.sqrt_le_left (norm_nonneg _)]
+  exact h1.trans hle
+
+/-- The Hölder bound `max_{k≠0}‖𝓕1_S‖ · ‖𝓕1_C‖_{L¹(k≠0)} / N` is at least the main term
+`|S||C|/N` whenever `2|S| ≤ N` and `2·|S|·|C|² ≤ (N−|C|)²`: absolute-value Fourier
+bookkeeping cannot certify `|S ∩ C| ≈ |S||C|/N` in that range. -/
+theorem holder_bound_ge_main (hN : 2 ≤ N) (S C : Finset (ZMod N)) (hC : C.Nonempty)
+    (hS : 2 * S.card ≤ N) (h : 2 * (S.card : ℝ) * (C.card : ℝ) ^ 2 ≤ ((N : ℝ) - C.card) ^ 2) :
+    ∃ k : ZMod N, k ≠ 0 ∧ (S.card : ℝ) * C.card / N ≤
+      ‖𝓕 (ind S) k‖ * (∑ k ∈ Finset.univ.erase (0 : ZMod N), ‖𝓕 (ind C) k‖) / N := by
+  obtain ⟨k, hk, hle⟩ := exists_ne_zero_sqrt_half_card_le_norm_dft_ind hN S hS
+  refine ⟨k, hk, ?_⟩
+  have hL1 := sum_ne_zero_norm_dft_indicator_ge C hC
+  have hCN : (C.card : ℝ) ≤ N := by
+    exact_mod_cast (Finset.card_le_univ C).trans_eq (ZMod.card N)
+  have hNpos : (0 : ℝ) < N := by
+    have : (2 : ℝ) ≤ N := by exact_mod_cast hN
+    linarith
+  refine (holder_barrier S.card C.card N (by positivity) (by positivity) hCN hNpos h).trans ?_
+  apply div_le_div_of_nonneg_right _ hNpos.le
+  exact mul_le_mul hle hL1 (by linarith) (norm_nonneg _)
+
+end Erdos376Barrier

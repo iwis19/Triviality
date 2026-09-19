@@ -1,0 +1,329 @@
+"""
+Erdős #274 / Herzog–Schönheim: exhaustive search for exact coset coverings with
+pairwise distinct indices in a battery of small finite groups, plus a test of the
+representation-theoretic necessary condition (claim C1):
+
+  For an exact covering G = ⊔ a_i G_i (finite G), every nontrivial irreducible ρ and
+  every i with m_ρ(G_i) := dim Fix_ρ(G_i) > 0 satisfy
+      |G_i| <= sum_{j != i, m_ρ(G_j) > 0} |G_j|          (operator-norm form)
+      m_ρ(G_i) <= sum_{j != i} m_ρ(G_j)                  (rank form)
+
+Groups are given as permutation groups; everything is computed from the Cayley table.
+Character tables are computed numerically (Burnside class-sum algorithm) and rounded.
+Requires numpy only.
+"""
+import itertools, sys, math
+from fractions import Fraction
+import numpy as np
+
+# ---------------- permutation-group utilities ----------------
+def pmul(p, q):  # (p*q)(i) = p(q(i))
+    return tuple(p[i] for i in q)
+
+def closure(gens):
+    n = len(gens[0]); e = tuple(range(n))
+    elems = {e}; frontier = [e]
+    while frontier:
+        new = []
+        for x in frontier:
+            for g in gens:
+                y = pmul(g, x)
+                if y not in elems:
+                    elems.add(y); new.append(y)
+        frontier = new
+    return sorted(elems)
+
+class Group:
+    def __init__(self, name, gens):
+        self.name = name
+        self.elems = closure(gens)
+        self.N = len(self.elems)
+        idx = {g: i for i, g in enumerate(self.elems)}
+        self.e = idx[tuple(range(len(gens[0])))]
+        self.mul = np.zeros((self.N, self.N), dtype=np.int32)
+        for i, p in enumerate(self.elems):
+            for j, q in enumerate(self.elems):
+                self.mul[i, j] = idx[pmul(p, q)]
+        self.inv = np.zeros(self.N, dtype=np.int32)
+        for i in range(self.N):
+            self.inv[i] = int(np.where(self.mul[i] == self.e)[0][0])
+
+    def sub_closure(self, S):
+        S = set(S) | {self.e}
+        frontier = list(S)
+        gens = list(S)
+        while frontier:
+            new = []
+            for x in frontier:
+                for g in gens:
+                    y = int(self.mul[g, x])
+                    if y not in S:
+                        S.add(y); new.append(y)
+            frontier = new
+        return frozenset(S)
+
+    def subgroups(self):
+        subs = set()
+        for x in range(self.N):
+            subs.add(self.sub_closure([x]))
+        subs = set(subs)
+        changed = True
+        while changed:
+            changed = False
+            lst = sorted(subs, key=len)
+            for a, b in itertools.combinations(lst, 2):
+                if a <= b or b <= a: continue
+                c = self.sub_closure(a | b)
+                if c not in subs:
+                    subs.add(c); changed = True
+        return sorted(subs, key=len)
+
+    def left_coset(self, a, H):
+        return frozenset(int(self.mul[a, h]) for h in H)
+
+    # ------------- character table (numerical Burnside) -------------
+    def conj_classes(self):
+        seen = set(); classes = []
+        for g in range(self.N):
+            if g in seen: continue
+            cl = {int(self.mul[self.mul[x, g], self.inv[x]]) for x in range(self.N)}
+            seen |= cl; classes.append(sorted(cl))
+        return classes
+
+    def character_table(self):
+        classes = self.conj_classes()
+        r = len(classes)
+        cls_of = np.zeros(self.N, dtype=int)
+        for k, cl in enumerate(classes):
+            for g in cl: cls_of[g] = k
+        # structure constants a[j][i][k] = #{(x,y) in C_j x C_i : xy = z} for fixed z in C_k
+        M = np.zeros((r, r, r))
+        reps = [cl[0] for cl in classes]
+        for j in range(r):
+            for i in range(r):
+                for x in classes[j]:
+                    for y in classes[i]:
+                        k = cls_of[self.mul[x, y]]
+                        M[j, i, k] += 1
+        for k in range(r):
+            M[:, :, k] /= len(classes[k])
+        rng = np.random.default_rng(1)
+        A = sum(rng.standard_normal() * M[j] for j in range(r))
+        # rows of eigenvector basis: simultaneous eigenvectors are common to all M_j
+        w, V = np.linalg.eig(A)  # right eigenvectors: M_j omega = omega_j omega
+        chars = []
+        for c in range(r):
+            v = V[:, c]
+            v = v / v[cls_of[self.e]]  # omega(1)=1
+            # omega_k = |C_k| chi(g_k)/chi(1)  =>  chi(g_k) = chi(1) omega_k/|C_k|
+            om = np.array([v[k] / len(classes[k]) for k in range(r)])
+            norm = sum(len(classes[k]) * abs(om[k]) ** 2 for k in range(r))
+            d = math.sqrt(self.N / norm.real)
+            chars.append(np.array([d * om[k] for k in range(r)]))
+        chars = np.array(chars)
+        # sanity: degrees integral, orthogonality
+        degs = chars[:, cls_of[self.e]].real
+        assert np.allclose(degs, np.round(degs), atol=1e-6), degs
+        assert abs(sum(np.round(degs) ** 2) - self.N) < 1e-6
+        return classes, cls_of, chars
+
+# ---------------- constructors ----------------
+def cyc(n):
+    return [tuple((i + 1) % n for i in range(n))]
+
+def dihedral(n):
+    r = tuple((i + 1) % n for i in range(n)); s = tuple((-i) % n for i in range(n))
+    return [r, s]
+
+def sym(n):
+    return [tuple([1, 0] + list(range(2, n))), tuple(list(range(1, n)) + [0])]
+
+def direct_product(gA, gB):
+    nA = len(gA[0]); nB = len(gB[0])
+    gens = []
+    for g in gA: gens.append(tuple(list(g) + list(range(nA, nA + nB))))
+    for g in gB: gens.append(tuple(list(range(nA)) + [nA + x for x in g]))
+    return gens
+
+def affine(p, mult):  # AGL(1,p) or subgroup: x -> x+1, x -> mult*x
+    return [tuple((x + 1) % p for x in range(p)), tuple((mult * x) % p for x in range(p))]
+
+def from_matrices_mod(mats, q, dim):
+    # action on vectors of F_q^dim (q prime)
+    vecs = list(itertools.product(range(q), repeat=dim)); vidx = {v: i for i, v in enumerate(vecs)}
+    gens = []
+    for m in mats:
+        perm = []
+        for v in vecs:
+            w = tuple(sum(m[i][j] * v[j] for j in range(dim)) % q for i in range(dim))
+            perm.append(vidx[w])
+        gens.append(tuple(perm))
+    return gens
+
+def quaternion():  # Q8 as regular rep via matrices over F_3: SL(2,3) contains Q8
+    return from_matrices_mod([[[0, 1], [2, 0]], [[1, 1], [1, 2]]], 3, 2)
+
+def sl23():
+    return from_matrices_mod([[[1, 1], [0, 1]], [[0, 1], [2, 0]]], 3, 2)
+
+def gl23():
+    return from_matrices_mod([[[1, 1], [0, 1]], [[0, 1], [1, 0]], [[2, 0], [0, 1]]], 3, 2)
+
+def dicyclic(n):  # order 4n: <a,x | a^{2n}=1, x^2=a^n, xax^-1=a^-1>, as perm on 4n points (regular-ish)
+    # realise inside C_{2n} ⋊ via explicit permutations on Z_{2n} x {0,1}
+    pts = [(i, s) for s in range(2) for i in range(2 * n)]; pidx = {p: k for k, p in enumerate(pts)}
+    a = tuple(pidx[((i + 1) % (2 * n), s)] if s == 0 else pidx[((i - 1) % (2 * n), s)] for (i, s) in pts)
+    x = tuple(pidx[(i, 1)] if s == 0 else pidx[((i + n) % (2 * n), 0)] for (i, s) in pts)
+    return [a, x]
+
+def c3c3_semidirect_c4():  # (C3xC3) ⋊ C4, order 36, C4 acting by (x,y)->(-y,x)
+    return [tuple(( (v[0]+1)%3)*3 + v[1] for v in itertools.product(range(3), repeat=2)),
+                                                            tuple(( v[0])*3 + (v[1]+1)%3 for v in itertools.product(range(3), repeat=2)),
+                                                            tuple(((-v[1])%3)*3 + v[0] for v in itertools.product(range(3), repeat=2))]
+
+def gen_c3c3_semidirect_c2():  # generalised dihedral of C3xC3, order 18
+    return [tuple(((v[0]+1)%3)*3 + v[1] for v in itertools.product(range(3), repeat=2)),
+            tuple((v[0])*3 + (v[1]+1)%3 for v in itertools.product(range(3), repeat=2)),
+            tuple(((-v[0])%3)*3 + (-v[1])%3 for v in itertools.product(range(3), repeat=2))]
+
+def psl27_gens():
+    # standard: (0 1 2 3 4 5 6), (1 2 4)(3 6 5)  -> generates PSL(2,7) of order 168 acting on P^1(F_7)? use projective line
+    q = 7
+    pts = list(range(q)) + ['inf']; pidx = {p: i for i, p in enumerate(pts)}
+    def mob(a, b, c, d):
+        perm = []
+        for p in pts:
+            if p == 'inf':
+                w = 'inf' if c == 0 else (a * pow(c, -1, q)) % q
+            else:
+                den = (c * p + d) % q
+                w = 'inf' if den == 0 else ((a * p + b) * pow(den, -1, q)) % q
+            perm.append(pidx[w])
+        return tuple(perm)
+    return [mob(1, 1, 0, 1), mob(0, 6, 1, 0), mob(2, 0, 0, 4)]  # x+1, -1/x, 4x  (det = 1 each: 2*4=8=1)
+
+GROUPS = {}
+def add(name, gens): GROUPS[name] = gens
+for n in range(2, 31): add(f"C{n}", cyc(n))
+for n in range(3, 16): add(f"D{n}", dihedral(n))
+add("C2xC2", direct_product(cyc(2), cyc(2))); add("C2^3", direct_product(direct_product(cyc(2), cyc(2)), cyc(2)))
+add("C2^4", direct_product(direct_product(cyc(2), cyc(2)), direct_product(cyc(2), cyc(2))))
+add("C2xC4", direct_product(cyc(2), cyc(4))); add("C2xC6", direct_product(cyc(2), cyc(6))); add("C2xC8", direct_product(cyc(2), cyc(8)))
+add("C4xC4", direct_product(cyc(4), cyc(4))); add("C3xC3", direct_product(cyc(3), cyc(3))); add("C2xC2xC4", direct_product(direct_product(cyc(2), cyc(2)), cyc(4)))
+add("C2xC10", direct_product(cyc(2), cyc(10))); add("C2xC12", direct_product(cyc(2), cyc(12))); add("C3xC6", direct_product(cyc(3), cyc(6)))
+add("C5xC5", direct_product(cyc(5), cyc(5))); add("C2^2xC6", direct_product(direct_product(cyc(2), cyc(2)), cyc(6)))
+add("Q8", quaternion()); add("SL(2,3)", sl23()); add("GL(2,3)", gl23())
+add("Dic3", dicyclic(3)); add("Dic5", dicyclic(5)); add("Dic4=Q16", dicyclic(4)); add("Dic6", dicyclic(6)); add("Dic7", dicyclic(7))
+add("A4", [(1, 2, 0, 3), (0, 2, 3, 1)]); add("S4", sym(4)); add("S3", sym(3)); add("A5", [(1, 2, 0, 3, 4), (0, 1, 3, 4, 2)]); add("S5", sym(5))
+add("C2xA4", direct_product(cyc(2), [(1, 2, 0, 3), (0, 2, 3, 1)])); add("C2xS4", direct_product(cyc(2), sym(4))); add("C3xA4", direct_product(cyc(3), [(1, 2, 0, 3), (0, 2, 3, 1)]))
+add("C2xS3", direct_product(cyc(2), sym(3))); add("C3xS3", direct_product(cyc(3), sym(3))); add("C4xS3", direct_product(cyc(4), sym(3))); add("S3xS3", direct_product(sym(3), sym(3)))
+add("C2xC2xS3", direct_product(direct_product(cyc(2), cyc(2)), sym(3))); add("C2xD5", direct_product(cyc(2), dihedral(5))); add("C2xQ8", direct_product(cyc(2), quaternion()))
+add("C2xD4", direct_product(cyc(2), dihedral(4))); add("C3xD4", direct_product(cyc(3), dihedral(4))); add("C3xQ8", direct_product(cyc(3), quaternion())); add("C5xS3", direct_product(cyc(5), sym(3)))
+add("C2xA5", direct_product(cyc(2), [(1, 2, 0, 3, 4), (0, 1, 3, 4, 2)]))
+add("F20=AGL(1,5)", affine(5, 2)); add("F21=C7:C3", affine(7, 2)); add("AGL(1,7)", affine(7, 3)); add("D7=C7:C2", affine(7, 6)); add("AGL(1,11)", affine(11, 2)); add("C11:C5", affine(11, 4)); add("AGL(1,13)", affine(13, 2)); add("C13:C4", affine(13, 5)); add("C13:C3", affine(13, 3))
+add("C5:C4=F20b", affine(5, 4)); add("(C3xC3):C2", gen_c3c3_semidirect_c2()); add("(C3xC3):C4", c3c3_semidirect_c4())
+add("PSL(2,7)", psl27_gens())
+add("G16a(Z4xZ4 perms)", [tuple(((i + 1) % 4) * 4 + j for i in range(4) for j in range(4)) , tuple(( (-i) % 4 if j % 2 == 1 else i) * 4 + (j + 1) % 4 for i in range(4) for j in range(4))])
+add("M16=C8:C2", [tuple(((i + 1) % 8) * 2 + j for i in range(8) for j in range(2)), tuple(((5 * i) % 8) * 2 + (j + 1) % 2 for i in range(8) for j in range(2))])
+add("SD16", [tuple(((i + 1) % 8) * 2 + j for i in range(8) for j in range(2)), tuple(((3 * i) % 8) * 2 + (j + 1) % 2 for i in range(8) for j in range(2))])
+add("G?(Z3xZ8 perms)", [tuple(((i + 1) % 3) * 8 + j for i in range(3) for j in range(8)), tuple(((-i) % 3 if j % 2 == 1 else i) * 8 + (j + 1) % 8 for i in range(3) for j in range(8))])
+add("C2x(C3xC3):C2", direct_product(cyc(2), gen_c3c3_semidirect_c2()))
+add("C2xF21", direct_product(cyc(2), affine(7, 2))); add("C3xF20", direct_product(cyc(3), affine(5, 2))); add("C2xF20", direct_product(cyc(2), affine(5, 2)))
+add("A4xS3", direct_product([(1, 2, 0, 3), (0, 2, 3, 1)], sym(3))); add("C2xC2xA4", direct_product(direct_product(cyc(2), cyc(2)), [(1, 2, 0, 3), (0, 2, 3, 1)]))
+add("S4xC3", direct_product(sym(4), cyc(3))); add("C2xC2xD4", direct_product(direct_product(cyc(2), cyc(2)), dihedral(4)))
+
+# ---------------- main analysis ----------------
+def egyptian_tuples(indices_available, target=Fraction(1), start=2, maxk=12):
+    """all sets of pairwise-distinct indices from indices_available (sorted), reciprocals summing to 1"""
+    out = []
+    avail = sorted(i for i in indices_available if i >= start)
+    def rec(rem, lo, chosen):
+        if rem == 0:
+            if len(chosen) >= 2: out.append(tuple(chosen))
+            return
+        if len(chosen) >= maxk: return
+        for n in avail:
+            if n < lo: continue
+            if Fraction(1, n) > rem: continue
+            # bound: remaining terms are >= n, count <= maxk-len
+            if Fraction(maxk - len(chosen), n) < rem: break
+            rec(rem - Fraction(1, n), n + 1, chosen + [n])
+    rec(target, start, [])
+    return out
+
+def find_partition(G, subs):
+    """subs: list of subgroups (frozensets). Search a_i with a_1 = e, cosets pairwise disjoint."""
+    k = len(subs)
+    # coset lists
+    cosets = []
+    for H in subs:
+        seen = set(); cl = []
+        for a in range(G.N):
+            if a in seen: continue
+            c = G.left_coset(a, H); seen |= c; cl.append(c)
+        cosets.append(cl)
+    chosen = [None] * k
+    def rec(j, covered):
+        if j == k:
+            return len(covered) == G.N
+        for c in (cosets[j] if j > 0 else [cosets[0][[G.e in c for c in cosets[0]].index(True)]]):
+            if covered.isdisjoint(c):
+                chosen[j] = c
+                if rec(j + 1, covered | c): return True
+        return False
+    ok = rec(0, frozenset())
+    return chosen if ok else None
+
+def analyse(name, gens, do_chars=True, verbose=False, c1_prune=False):
+    G = Group(name, gens)
+    subs = G.subgroups()
+    by_index = {}
+    for H in subs:
+        by_index.setdefault(G.N // len(H), []).append(H)
+    tuples = egyptian_tuples(by_index.keys())
+    n_cand = 0; n_found = 0; n_excl_C1 = 0; n_excl_rank = 0; n_private = 0
+    if do_chars:
+        classes, cls_of, chars = G.character_table()
+        def mult(H):  # multiplicities m_rho(H) for all rho
+            v = np.zeros(len(chars))
+            for h in H: v += chars[:, cls_of[h]].real
+            v /= len(H)
+            return np.round(v).astype(int)
+        mcache = {H: mult(H) for H in subs}
+        triv = int(np.argmin([abs(chars[r] - 1).sum() for r in range(len(chars))]))
+    counterexamples = []
+    for idx_tuple in tuples:
+        for choice in itertools.product(*[by_index[n] for n in idx_tuple]):
+            n_cand += 1
+            if do_chars:
+                ms = [mcache[H] for H in choice]
+                excl = False; exclr = False; priv = False
+                for r in range(len(chars)):
+                    if r == triv: continue
+                    for i, H in enumerate(choice):
+                        if ms[i][r] > 0:
+                            others = sum(len(K) for j, K in enumerate(choice) if j != i and ms[j][r] > 0)
+                            if len(H) > others: excl = True
+                            if others == 0: priv = True
+                            if ms[i][r] > sum(ms[j][r] for j in range(len(choice)) if j != i): exclr = True
+                n_excl_C1 += excl; n_excl_rank += exclr; n_private += priv
+            if c1_prune and do_chars and excl:
+                continue  # C1 is a proven necessary condition; exact search only on survivors
+            part = find_partition(G, list(choice))
+            if part is not None:
+                n_found += 1; counterexamples.append((idx_tuple, part))
+    print(f"{name:28s} |G|={G.N:4d} #subs={len(subs):4d} candidate tuples={n_cand:6d} "
+          f"partitions found={n_found}{' (exact search only on C1 survivors)' if c1_prune else ''} " + (f"excluded by C1(norm)={n_excl_C1} by rank={n_excl_rank} with private constituent={n_private}" if do_chars else ""), flush=True)
+    return counterexamples
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    c1_prune = "--c1-prune" in args
+    names = [a for a in args if not a.startswith("--")] or list(GROUPS)
+    allce = []
+    for nm in names:
+        try:
+            allce += analyse(nm, GROUPS[nm], c1_prune=c1_prune)
+        except Exception as ex:
+            print(nm, "ERROR", repr(ex), flush=True)
+    print("TOTAL distinct-index exact coverings found:", len(allce))

@@ -1,0 +1,23 @@
+import Mathlib
+
+/-- `251, 257, 263, 269` are four consecutive primes in arithmetic progression
+(common difference 6): the smallest CPAP-4. -/
+theorem cpap4_251 :
+    Nat.Prime 251 ∧ Nat.Prime 257 ∧ Nat.Prime 263 ∧ Nat.Prime 269 ∧
+      ∀ n, 251 < n → n < 269 → n ≠ 257 → n ≠ 263 → ¬ Nat.Prime n := by
+  refine ⟨by norm_num, by norm_num, by norm_num, by norm_num, ?_⟩
+  intro n h1 h2 h3 h4
+  interval_cases n <;> norm_num at *
+
+
+
+/-- `121174811 + 30 j`, `j = 0..5`, are six consecutive primes in arithmetic progression
+(common difference 30): the smallest CPAP-6 (Lander–Parkin 1967 record). -/
+theorem cpap6_121174811 :
+    (∀ j, j ≤ 5 → Nat.Prime (121174811 + 30 * j)) ∧
+      ∀ n, 121174811 < n → n < 121174961 → ¬ (30 ∣ n - 121174811) → ¬ Nat.Prime n := by
+  refine ⟨?_, ?_⟩
+  · intro j hj
+    interval_cases j <;> norm_num
+  · intro n h1 h2 h3
+    interval_cases n <;> (try norm_num at h3) <;> norm_num

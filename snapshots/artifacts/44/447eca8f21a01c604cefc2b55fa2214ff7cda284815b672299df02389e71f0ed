@@ -1,0 +1,246 @@
+# ==== heule510_checks.py ====
+"""Checks on Heule's 510-vertex 5-chromatic unit-distance graph (CNP-SAT repo: edge/510.edge, vtx/510.vtx).
+Exact arithmetic in Q(sqrt3, sqrt5, sqrt11) (basis indexed by subsets of {3,5,11}).
+(1) verify the edge list equals the set of exact unit-distance pairs;
+(2) radius classes about vertex 1 (origin); premise 'N(origin) avoids colours 1,2' (idea 7fc0 / claim 50c3);
+    single-vertex forcing and radius-class forcing, plus minimum forced count t per radius (pysat.card);
+(3) forced-pair test for unconstrained 5-colourings (spindling target in ideas d41c/953b).
+"""
+import re, itertools, time, sys
+from fractions import Fraction as Fr
+import sympy as sp
+from pysat.solvers import Cadical153
+from pysat.formula import CNF
+from pysat.card import CardEnc, EncType
+
+PR = (3, 5, 11)
+SUBS = [frozenset(s) for k in range(4) for s in itertools.combinations(PR, k)]
+IDX = {s: i for i, s in enumerate(SUBS)}
+
+def parse(expr):
+    e = sp.expand(sp.sympify(expr.replace('Sqrt[', 'sqrt(').replace(']', ')')))
+    vec = [Fr(0)]*8
+    for term in sp.Add.make_args(e):
+        coeff, rad = term.as_coeff_Mul()
+        s = frozenset()
+        if rad != 1:
+            r = sp.simplify(rad**2)
+            assert r.is_Integer, (expr, term)
+            r = int(r)
+            for p in PR:
+                if r % p == 0: s |= {p}; r //= p
+            assert r == 1, (expr, term)
+        vec[IDX[s]] += Fr(int(coeff.p), int(coeff.q))
+    return tuple(vec)
+
+def mul(u, v):
+    out = [Fr(0)]*8
+    for i, a in enumerate(u):
+        if a == 0: continue
+        for j, b in enumerate(v):
+            if b == 0: continue
+            S, T = SUBS[i], SUBS[j]
+            c = 1
+            for p in S & T: c *= p
+            out[IDX[S ^ T]] += a*b*c
+    return out
+
+def sub(u, v): return tuple(a-b for a, b in zip(u, v))
+def d2(p, q):
+    dx, dy = sub(p[0], q[0]), sub(p[1], q[1])
+    s = [a+b for a, b in zip(mul(dx, dx), mul(dy, dy))]
+    return tuple(s)
+ONE = tuple([Fr(1)] + [Fr(0)]*7)
+
+verts = []
+for line in open('/home/ubuntu/510.vtx'):
+    line = line.strip()
+    if not line: continue
+    xs, ys = line.strip('{}').split(',', 1)
+    verts.append((parse(xs), parse(ys)))
+n = len(verts)
+edges = []
+for line in open('/home/ubuntu/510.edge'):
+    if line.startswith('e'):
+        _, a, b = line.split(); edges.append((int(a)-1, int(b)-1))
+print("n =", n, "m =", len(edges), flush=True)
+
+t = time.time()
+unit_pairs = set(); D2 = {}
+for i in range(n):
+    for j in range(i+1, n):
+        v = d2(verts[i], verts[j]); D2[(i, j)] = v
+        if v == ONE: unit_pairs.add((i, j))
+E = set(tuple(sorted(e)) for e in edges)
+print("edge list == exact unit pairs:", E == unit_pairs, "| #unit pairs", len(unit_pairs), "| time", round(time.time()-t, 1), flush=True)
+
+origin = 0
+assert all(c == 0 for c in verts[origin][0]) and all(c == 0 for c in verts[origin][1])
+nbrs = sorted([j for (i, j) in E if i == origin] + [i for (i, j) in E if j == origin])
+print("deg(origin) =", len(nbrs))
+def tofloat(v): 
+    return sum(float(a)*(1 if not SUBS[i] else (sp.sqrt(sp.prod(list(SUBS[i])))).evalf(30)) for i, a in enumerate(v))
+rad = {}
+for v in range(1, n):
+    rad.setdefault(D2[(0, v)], []).append(v)
+radlist = sorted([(float(sp.sqrt(tofloat(r2))), r2, vs) for r2, vs in rad.items()], key=lambda x: x[0])
+print("number of radius classes:", len(radlist))
+print("radius classes (r, count):", [(round(r, 6), len(vs)) for r, r2, vs in radlist], flush=True)
+
+K = 5
+def var(v, c): return v*K + c + 1
+TOP = n*K
+base = CNF()
+for v in range(n):
+    base.append([var(v, c) for c in range(K)])
+    for c1 in range(K):
+        for c2 in range(c1+1, K):
+            base.append([-var(v, c1), -var(v, c2)])
+for (i, j) in E:
+    for c in range(K):
+        base.append([-var(i, c), -var(j, c)])
+
+def solve(extra):
+    s = Cadical153(bootstrap_with=base.clauses)
+    for cl in extra: s.add_clause(cl)
+    ok = s.solve(); model = s.get_model() if ok else None; s.delete()
+    if model is None: return None
+    col = [None]*n
+    for v in range(n):
+        for c in range(K):
+            if model[var(v, c)-1] > 0: col[v] = c
+    return col
+
+premise = [[-var(v, c)] for v in nbrs for c in (0, 1)]  # colours 1,2 -> indices 0,1
+col = solve(premise)
+print("premise (N(origin) avoids {1,2}) satisfiable:", col is not None, flush=True)
+forced_in, forced_out = [], []
+for v in range(n):
+    if v == origin or v in nbrs: continue
+    if solve(premise + [[-var(v, 0)], [-var(v, 1)]]) is None: forced_in.append(v)
+    if solve(premise + [[var(v, 0), var(v, 1)]]) is None: forced_out.append(v)
+print("single vertices forced into S:", forced_in, "forced out of S:", forced_out, flush=True)
+
+# radius-class forcing and minimum forced count t (S-indicator y_v <-> x_{v,0} or x_{v,1})
+for r, r2, vs in radlist:
+    if r2 == ONE: continue
+    res = solve(premise + [[-var(v, 0)] for v in vs] + [[-var(v, 1)] for v in vs])
+    if res is None:
+        # find min t: for t=1,2,... test whether 'at most t-1 of vs in S' is UNSAT
+        ys = {}; top = TOP; extra = []
+        for v in vs:
+            top += 1; ys[v] = top
+            extra += [[-top, var(v, 0), var(v, 1)], [top, -var(v, 0)], [top, -var(v, 1)]]
+        tmin = None
+        for t in range(1, len(vs)+1):
+            card = CardEnc.atmost(lits=[ys[v] for v in vs], bound=t-1, top_id=top, encoding=EncType.seqcounter)
+            if solve(premise + extra + card.clauses) is None:
+                tmin = t; continue
+            else:
+                break
+        print(f"radius {r:.6f} ({len(vs)} vertices): forced to meet S; every premise-consistent 5-colouring puts >= {tmin} of them in S", flush=True)
+print("radius scan done", flush=True)
+
+# (3) forced pairs in unconstrained 5-colourings
+t = time.time()
+col = solve([])
+cands = set((u, v) for u in range(n) for v in range(u+1, n) if (u, v) not in E and col[u] == col[v])
+print("initial monochromatic non-adjacent pairs:", len(cands), flush=True)
+forced_pairs = []; rounds = 0
+while cands:
+    u, v = next(iter(cands)); rounds += 1
+    col = solve([[-var(u, c), -var(v, c)] for c in range(K)])
+    if col is None:
+        forced_pairs.append((u, v)); cands.discard((u, v))
+    else:
+        cands = set(p for p in cands if col[p[0]] == col[p[1]])
+print("forced pairs (5 colours, no premise):", forced_pairs, "| SAT calls", rounds, "| time", round(time.time()-t, 1), flush=True)
+for (u, v) in forced_pairs:
+    print("  pair", u, v, "squared distance", D2[(u, v)])
+r53 = tuple([Fr(25, 9)] + [Fr(0)]*7)
+print("vertices at distance 5/3 from origin:", rad.get(r53, []))
+
+
+# ==== heule510_variants.py ====
+import itertools, time
+from fractions import Fraction as Fr
+exec(open('/home/ubuntu/heule510_checks.py').read().split("premise = ")[0]); premise = [[-var(v, c)] for v in nbrs for c in (0, 1)]  # reuse parsing, graph, SAT setup, radlist
+def check_model(col, extra_avoid):
+    assert all(col[i] != col[j] for (i, j) in E)
+    assert all(col[v] not in (0, 1) for v in nbrs)
+    assert all(col[v] not in (0, 1) for v in extra_avoid)
+variants = {
+ 'A: N(0) avoids {1,2}, origin free': [],
+ 'B: + origin in {1,2}': [[var(0, 0), var(0, 1)]],
+ 'C: + origin = 1': [[var(0, 0)]],
+}
+for name, extra in variants.items():
+    prem = premise + extra
+    print(name, '| satisfiable:', solve(prem) is not None)
+    fi = [v for v in range(1, n) if v not in nbrs and solve(prem + [[-var(v, 0)], [-var(v, 1)]]) is None]
+    print('   single vertices forced into S:', fi)
+    forced = []
+    for r, r2, vs in radlist:
+        if r2 == ONE: continue
+        res = solve(prem + [[-var(v, 0)] for v in vs] + [[-var(v, 1)] for v in vs])
+        if res is None: forced.append((round(r, 6), len(vs)))
+        else: check_model(res, vs)
+    print('   radius classes forced to meet S:', forced)
+
+
+# ==== heule510_witness.py ====
+import json
+exec(open('/home/ubuntu/heule510_checks.py').read().split("premise = ")[0]); premise = [[-var(v, c)] for v in nbrs for c in (0, 1)]
+out = {}
+for target in (0.736595, 1.567618, 2.0):
+    r, r2, vs = [x for x in radlist if abs(x[0]-target) < 1e-5][0]
+    # one colouring where the whole class AND N(origin) avoid S={1,2}; try also to keep all three classes out simultaneously
+    col = solve(premise + [[-var(v, c)] for v in vs for c in (0, 1)])
+    out[f"{r:.6f}"] = {"class_vertices_1based": [v+1 for v in vs], "colouring_1based_vertex_order": [c+1 for c in col]}
+big = [v for x in radlist if len(x[2]) in (26, 25, 24) and x[1] != ONE for v in x[2]]
+col = solve(premise + [[-var(v, c)] for v in big for c in (0, 1)])
+out["all_three_radii_simultaneously"] = None if col is None else [c+1 for c in col]
+json.dump(out, open('/home/ubuntu/heule510_witness.json', 'w'))
+# independent re-verification from the files only
+W = json.load(open('/home/ubuntu/heule510_witness.json'))
+Eraw = [tuple(int(x) for x in l.split()[1:]) for l in open('/home/ubuntu/510.edge') if l.startswith('e')]
+nb = sorted(set([b for a, b in Eraw if a == 1] + [a for a, b in Eraw if b == 1]))
+for k, d in W.items():
+    if k == "all_three_radii_simultaneously":
+        c = d; cls = big
+        cls = [v+1 for v in big]
+    else:
+        c = d["colouring_1based_vertex_order"]; cls = d["class_vertices_1based"]
+    proper = all(c[a-1] != c[b-1] for a, b in Eraw)
+    prem = all(c[v-1] in (3, 4, 5) for v in nb)
+    avoid = all(c[v-1] in (3, 4, 5) for v in cls)
+    print(k, "| proper:", proper, "| N(origin) in {3,4,5}:", prem, "| class avoids {1,2}:", avoid, "| colours used:", sorted(set(c)), "| origin colour:", c[0])
+
+
+# ==== recorded output of heule510_checks.py ====
+# n = 510 m = 2504
+# edge list == exact unit pairs: True | #unit pairs 2504 | time 11.6
+# deg(origin) = 36
+# number of radius classes: 44
+# radius classes (r, count): [(0.168469, 12), (0.264096, 3), (0.291798, 8), (0.333333, 4), (0.425274, 12), (0.457427, 18), (0.57735, 24), (0.624578, 6), (0.717071, 12), (0.736595, 26), (0.745356, 12), (0.833696, 10), (0.841446, 3), (0.850547, 6), (0.905065, 12), (0.950941, 4), (1.0, 36), (1.073534, 12), (1.142345, 12), (1.154701, 21), (1.166926, 4), (1.190999, 4), (1.242004, 2), (1.290994, 30), (1.369637, 9), (1.404143, 12), (1.424213, 6), (1.444003, 12), (1.457427, 18), (1.527525, 12), (1.567618, 25), (1.62428, 4), (1.715586, 6), (1.732051, 30), (1.81013, 6), (1.817953, 6), (1.859416, 4), (1.914854, 5), (1.946988, 9), (1.978599, 11), (2.0, 24), (2.023787, 2), (2.290892, 3), (2.432047, 12)]
+# premise (N(origin) avoids {1,2}) satisfiable: True
+# single vertices forced into S: [] forced out of S: []
+# radius scan done
+# initial monochromatic non-adjacent pairs: 26160
+# forced pairs (5 colours, no premise): [] | SAT calls 40 | time 0.4
+# vertices at distance 5/3 from origin: []
+
+# ==== recorded output of heule510_variants.py (tail) ====
+# A: N(0) avoids {1,2}, origin free | satisfiable: True
+#    single vertices forced into S: []
+#    radius classes forced to meet S: []
+# B: + origin in {1,2} | satisfiable: True
+#    single vertices forced into S: []
+#    radius classes forced to meet S: []
+# C: + origin = 1 | satisfiable: True
+#    single vertices forced into S: []
+#    radius classes forced to meet S: []
+
+# ==== witness colouring (1-based vertex order of 510.vtx; all listed classes and N(origin) avoid colours 1,2) ====
+# {"all_three_radii_simultaneously_colouring_1based_vertex_order": [2, 5, 3, 4, 5, 3, 4, 5, 3, 5, 3, 4, 4, 4, 5, 3, 4, 3, 4, 5, 1, 3, 5, 2, 3, 3, 4, 5, 3, 4, 5, 4, 3, 5, 4, 3, 5, 3, 1, 4, 1, 1, 3, 5, 3, 4, 4, 5, 1, 5, 1, 3, 1, 2, 2, 2, 2, 1, 1, 2, 1, 1, 1, 5, 3, 1, 1, 1, 1, 1, 1, 3, 3, 3, 1, 1, 2, 5, 2, 2, 4, 2, 1, 1, 3, 5, 3, 3, 3, 5, 5, 4, 5, 5, 5, 4, 4, 3, 4, 4, 4, 3, 5, 5, 2, 2, 3, 2, 4, 5, 5, 4, 3, 4, 5, 4, 4, 3, 3, 3, 3, 3, 3, 4, 4, 4, 5, 5, 5, 3, 3, 3, 4, 4, 4, 5, 5, 5, 4, 5, 5, 1, 1, 3, 2, 4, 1, 3, 2, 3, 5, 5, 2, 4, 2, 2, 3, 3, 5, 2, 2, 2, 3, 1, 1, 2, 1, 4, 2, 3, 2, 2, 4, 5, 2, 2, 2, 4, 4, 2, 2, 4, 3, 3, 5, 5, 4, 3, 5, 2, 4, 1, 5, 3, 1, 4, 4, 2, 3, 4, 1, 2, 3, 2, 2, 2, 2, 2, 2, 5, 2, 2, 5, 4, 2, 3, 2, 4, 1, 2, 1, 5, 1, 1, 3, 5, 1, 2, 1, 2, 2, 4, 4, 5, 4, 3, 1, 4, 3, 1, 3, 5, 3, 3, 5, 3, 5, 4, 5, 5, 4, 2, 3, 4, 3, 3, 3, 3, 5, 2, 3, 3, 4, 5, 4, 2, 1, 2, 4, 2, 1, 1, 3, 1, 1, 1, 2, 2, 1, 1, 2, 4, 3, 1, 2, 3, 2, 3, 1, 4, 4, 4, 5, 5, 3, 3, 3, 3, 4, 4, 5, 5, 5, 5, 3, 3, 4, 4, 1, 2, 3, 3, 2, 5, 5, 4, 2, 4, 1, 2, 2, 2, 2, 1, 2, 2, 1, 1, 2, 2, 1, 2, 2, 2, 1, 5, 1, 1, 1, 1, 4, 4, 5, 4, 2, 3, 1, 1, 1, 1, 2, 2, 2, 2, 5, 1, 5, 5, 1, 5, 5, 2, 1, 1, 1, 5, 5, 1, 1, 5, 5, 1, 5, 1, 5, 4, 4, 4, 4, 5, 5, 5, 4, 4, 3, 5, 5, 2, 5, 4, 3, 4, 2, 3, 5, 4, 3, 5, 4, 3, 4, 5, 3, 4, 5, 4, 3, 1, 5, 2, 2, 1, 5, 3, 3, 5, 5, 1, 2, 1, 2, 2, 3, 3, 1, 1, 3, 1, 2, 3, 2, 3, 1, 2, 5, 2, 3, 2, 4, 4, 1, 4, 4, 1, 1, 2, 2, 1, 5, 2, 4, 4, 4, 1, 3, 5, 1, 5, 5, 5, 2, 3, 4, 4, 3, 3, 1, 2, 5, 5, 4, 5, 5, 1, 4, 5, 3, 4, 3, 2, 1, 2, 5, 3, 1, 1, 5, 2, 1, 1, 2, 3, 3, 1, 3, 2, 1, 3, 5, 1, 1, 4, 4, 1, 2, 4, 2, 3, 3, 1], "classes_1based": {"0.736595": [121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 470, 471, 472, 473, 487, 493, 503, 508], "1.567618": [291, 292, 293, 294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308, 452, 459, 460, 466, 492, 502, 506], "2.000000": [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 376, 377, 378, 379, 380, 381, 382, 383, 384, 385, 386, 387]}}
+

@@ -1,0 +1,45 @@
+import Mathlib
+
+/-!
+Erdős #699 scratch statements.  Only `gcd_28_5_14` and `erdos699_good_28_5_14`
+were accepted by the lab checker (axioms: propext, Classical.choice, Quot.sound).
+`middle_lemma` and `parity_lemma` are CONJECTURAL research targets and carry `sorry`.
+-/
+
+/-- `(n,i,j)` is good if some prime `p ≥ i` divides `gcd (C(n,i), C(n,j))`. -/
+def Erdos699Good (n i j : ℕ) : Prop :=
+  ∃ p : ℕ, p.Prime ∧ i ≤ p ∧
+    p ∣ Nat.gcd (Nat.choose n i) (Nat.choose n j)
+
+/-- C1 (middle exclusion, conjectural). If a prime `p ≥ i` divides `C(n,i)` to
+exact order `e ≥ 1` but does not divide `C(n,j)` (with `i < j ≤ n/2`), then
+`j % p ≤ n % p < i` and `p^e ∣ (n - 2j) - ((n % p) - 2 (j % p))` (in ℤ). -/
+theorem middle_lemma (n i j p e : ℕ) (hp : p.Prime) (hip : i ≤ p)
+    (hi : 1 ≤ i) (hij : i < j) (hj : j ≤ n / 2)
+    (he : 1 ≤ e) (hdiv : p ^ e ∣ Nat.choose n i)
+    (hnot : ¬ p ^ (e + 1) ∣ Nat.choose n i)
+    (hnj : ¬ p ∣ Nat.choose n j) :
+    j % p ≤ n % p ∧ n % p < i ∧
+      ((p : ℤ) ^ e ∣ ((n : ℤ) - 2 * j) - ((n % p : ℕ) - 2 * ((j % p : ℕ) : ℤ))) := by
+  sorry
+
+/-- C3 (near-middle parity lemma, conjectural). If `n = 2j + d` with `d < i`,
+`p > i` prime divides `n - k` for some `k < i` with `n - k` odd, `n / p` odd and
+`p > n % p + d`, then `p` divides both `C(n,i)` and `C(n,j)`. -/
+theorem parity_lemma (n i j d k p : ℕ) (hp : p.Prime) (hip : i < p)
+    (hn : n = 2 * j + d) (hd : d < i) (hk : k < i) (hkn : k ≤ n)
+    (hpk : p ∣ n - k) (hodd : Odd (n - k)) (hq : Odd (n / p))
+    (hbig : n % p + d < p) :
+    p ∣ Nat.choose n i ∧ p ∣ Nat.choose n j := by
+  sorry
+
+theorem gcd_28_5_14 :
+    Nat.gcd (Nat.choose 28 5) (Nat.choose 28 14)
+      = 2 ^ 3 * 3 ^ 3 * 5 := by
+  decide
+
+theorem erdos699_good_28_5_14 :
+    Erdos699Good 28 5 14 :=
+  ⟨5, by norm_num, le_refl 5, by
+    rw [gcd_28_5_14]
+    norm_num⟩

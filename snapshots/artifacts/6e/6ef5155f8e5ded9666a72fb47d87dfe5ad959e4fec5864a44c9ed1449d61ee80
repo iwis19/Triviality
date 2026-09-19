@@ -1,0 +1,53 @@
+"""Local search for near-coverings of Z/L using every divisor d>1 of L once.
+Coordinate-descent: repeatedly re-optimise a single residue a_d given the others
+(exact best response), with random restarts and random kicks.  Reports the minimum
+number of uncovered residues found.  Heuristic only: a positive minimum proves nothing,
+a zero minimum would be an odd distinct covering system (lcm | L)."""
+import sys, random
+import numpy as np
+from sympy import divisors, factorint
+
+
+def run(L, restarts=20, sweeps=60, seed=0):
+    rng = random.Random(seed)
+    ds = [d for d in divisors(L) if d > 1]
+    n = np.arange(L)
+    best = L
+    best_state = None
+    for _ in range(restarts):
+        a = {d: rng.randrange(d) for d in ds}
+        cnt = np.zeros(L, dtype=np.int32)
+        for d in ds:
+            cnt[n % d == a[d]] += 1
+        for s in range(sweeps):
+            improved = False
+            for d in rng.sample(ds, len(ds)):
+                cnt[n % d == a[d]] -= 1
+                # for each residue r mod d, gain = # of n = r (mod d) with cnt==0
+                zero = (cnt == 0)
+                gains = np.bincount((n % d)[zero], minlength=d)
+                r = int(np.argmax(gains))
+                if gains[r] < gains[a[d]] or (gains[r] == gains[a[d]]):
+                    r = a[d] if gains[r] == gains[a[d]] else r
+                if r != a[d]:
+                    improved = True
+                a[d] = r
+                cnt[n % d == a[d]] += 1
+            unc = int((cnt == 0).sum())
+            if unc < best:
+                best, best_state = unc, dict(a)
+            if not improved:
+                # kick: randomise two moduli
+                for d in rng.sample(ds, 2):
+                    cnt[n % d == a[d]] -= 1
+                    a[d] = rng.randrange(d)
+                    cnt[n % d == a[d]] += 1
+    return best, best_state
+
+
+if __name__ == '__main__':
+    for L in [int(x) for x in sys.argv[1:]] or [945, 10395]:
+        b, st = run(L)
+        ds = [d for d in divisors(L) if d > 1]
+        print(f"L={L} {dict(factorint(L))} #moduli={len(ds)} excess E={sum(L//d for d in ds)-L} "
+              f"min uncovered found={b} ({b/L:.4f})", flush=True)

@@ -1,0 +1,10 @@
+Setting (own reasoning). G simple loopless finite graph, x a vertex, N = N(x), e = V \ (N ∪ {x}), F = all nonempty unions of edges.
+By the derived-subgraph description (El-Zahar 1997 definition; proof: a union of edges covers each of its vertices by an edge inside it, and conversely S = ∪_{v∈S} {v, w(v)} for a chosen neighbour w(v) ∈ S) every A ∈ F with e ⊆ A is e ∪ T, T ⊆ N ∪ {x}, uniquely.
+For T ⊆ N put P(T) := 'every vertex of e has a neighbour in e ∪ T' and Q(T) := 'every vertex of T has a neighbour in e ∪ T'.
+  c1 := |{A ∈ F : e ⊆ A, x ∉ A}| = #{T ⊆ N : e ∪ T ≠ ∅, P(T), Q(T)}   (vertices of e are not adjacent to x, so x plays no role)
+  c2 := |{A ∈ F : e ⊆ A, x ∈ A}| = #{T ⊆ N : T ≠ ∅, P(T)}   (x needs a neighbour in A ∩ N = T, so T ≠ ∅; vertices of T are covered by x; vertices of e are not adjacent to x)
+This is exactly claim c6b0fc94, which is therefore correct under the stated conventions (simple graph, ∅ ∉ F).
+Step 1 (c1 ≤ c2 + 1): every T counted in c1 satisfies P(T); the T ≠ ∅ ones are counted in c2; only T = ∅ can be extra, and only if e ≠ ∅ and P(∅).
+Step 2 (characterisation of c1 > c2): c1 > c2 forces c1 = c2 + 1, i.e. (i) e ≠ ∅ and P(∅) (G[e] has no isolated vertex), and (ii) every T ≠ ∅ with P(T) also satisfies Q(T). Since P is monotone in T, (i) gives P(T) for all T, so (ii) says Q(T) for all T ⊆ N; taking T = {v} (no loops) this says every v ∈ N has a neighbour in e, and that in turn implies Q(T) for all T. Conversely under (i) and 'every v ∈ N has a neighbour in e' both predicates are automatic, c1 = 2^{|N|}, c2 = 2^{|N|} − 1.
+Hence: c1 > c2  ⟺  [e ≠ ∅, G[e] has no isolated vertex, every neighbour of x has a neighbour in e], the sufficient criterion of claim 39e94af9, and then the Hall deficiency of the interval is exactly 1. No global 'no isolated vertex' hypothesis on G is needed (an isolated z ≠ x lies in e and kills both sides; an isolated x has N = ∅ and both sides reduce to 'e ≠ ∅ and G[e] derived').
+Checked by program on all 201,992 (G,x) pairs, labelled graphs on ≤ 6 vertices, isolated vertices allowed: c1 − c2 ∈ {≤ −1, 0, +1} only, and (c1 > c2) coincides with the criterion in every case.

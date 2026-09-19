@@ -1,0 +1,15 @@
+import Mathlib
+
+/-- If two positive rationals multiply to 1 and are not both 1, their sum exceeds 2.
+Applied to `a = ∑_{p∈P} 1/p`, `b = ∑_{q∈Q} 1/q` this gives `∑_{P∪Q} 1/p > 2` for any
+solution of Erdős #307 (since `a ≠ 1`: a finite sum of prime reciprocals is never 1). -/
+theorem erdos307_sum_gt_two (a b : ℚ) (ha : 0 < a) (hab : a * b = 1) (hne : a ≠ 1) :
+    2 < a + b := by
+  have hb : 0 < b := by
+    by_contra h
+    push_neg at h
+    nlinarith
+  have h1 : 0 < (a - 1) ^ 2 := by
+    have : a - 1 ≠ 0 := sub_ne_zero.mpr hne
+    positivity
+  nlinarith [h1, ha, hb, hab]

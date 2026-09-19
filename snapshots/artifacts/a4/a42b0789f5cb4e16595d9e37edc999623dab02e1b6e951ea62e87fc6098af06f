@@ -1,0 +1,108 @@
+// Exhaustive enumeration of strictly convex lattice polygons (up to translation)
+// whose bounding box fits in [0,K]x[0,K] in lattice coordinates (a,b).
+// Each polygon is generated once as the angle-sorted sequence of primitive edge
+// directions with multiplicities m>=1 (edges with m>1 have interior lattice points,
+// which are not vertices; strict convexity = distinct directions).
+// For each polygon and each of two norm forms
+//   N1(x,y) = x^2 + y^2          (square lattice Z[i])
+//   N2(x,y) = x^2 - x*y + y^2    (Eisenstein lattice Z[omega], coordinates a+b*omega)
+// we compute, for every vertex v, maxmult_v = max multiplicity of a squared distance
+// to the other vertices, and report per n:
+//   M(n)  = max over polygons of min_v maxmult_v   (k achievable for ALL vertices)
+//   D(n)  = min over polygons of sum_v (4 - min(4, maxmult_v))   (k=4 deficit)
+//   S(n)  = max over polygons of sum_v maxmult_v   (incidence sum)
+// Convexity is affine invariant, so the same enumeration covers both lattices
+// (the K x K box in (a,b) coordinates is a rhombus in the hex lattice).
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include <string.h>
+
+#define MAXV 64
+#define MAXDIR 4096
+static int K;
+static int dx[MAXDIR], dy[MAXDIR], ndir;
+static int mult[MAXDIR];
+static long long npoly = 0;
+static int Mn[2][MAXV], Dn[2][MAXV], Sn[2][MAXV];
+static long long cnt_n[MAXV];
+static int bestpoly[2][MAXV][MAXV][2]; // example polygon attaining M(n)
+
+static int gcd(int a, int b){ if(a<0)a=-a; if(b<0)b=-b; while(b){int t=a%b;a=b;b=t;} return a; }
+
+static int cmpang(const void*A,const void*B){
+  const int*a=A,*b=B; double x=atan2((double)a[1],(double)a[0]), y=atan2((double)b[1],(double)b[0]);
+  return (x<y)?-1:(x>y);
+}
+
+static void eval(int nv, int vx[], int vy[]){
+  int form;
+  for(form=0;form<2;form++){
+    int minmm=1000, deficit=0, ssum=0;
+    for(int i=0;i<nv;i++){
+      long long d[MAXV]; int c=0;
+      for(int j=0;j<nv;j++) if(j!=i){
+        long long x=vx[j]-vx[i], y=vy[j]-vy[i];
+        d[c++] = form==0 ? x*x+y*y : x*x-x*y+y*y;
+      }
+      // max multiplicity
+      int mm=0;
+      for(int a=0;a<c;a++){ int m=0; for(int b=0;b<c;b++) if(d[b]==d[a]) m++; if(m>mm) mm=m; }
+      if(mm<minmm) minmm=mm;
+      deficit += 4 - (mm<4?mm:4);
+      ssum += mm;
+    }
+    if(minmm>Mn[form][nv]){ Mn[form][nv]=minmm; for(int i=0;i<nv;i++){bestpoly[form][nv][i][0]=vx[i];bestpoly[form][nv][i][1]=vy[i];} }
+    if(deficit<Dn[form][nv]) Dn[form][nv]=deficit;
+    if(ssum>Sn[form][nv]) Sn[form][nv]=ssum;
+  }
+}
+
+static int seq[MAXDIR], nseq;
+// px = sum of positive x-components, nx = sum of |negative x-components|, same for y
+static void dfs(int idx, int px, int nx, int py, int ny){
+  if(idx==ndir){
+    if(px!=nx || py!=ny || nseq<3) return;
+    int vx[MAXV], vy[MAXV]; int x=0,y=0;
+    for(int i=0;i<nseq;i++){ vx[i]=x; vy[i]=y; x+=mult[seq[i]]*dx[seq[i]]; y+=mult[seq[i]]*dy[seq[i]]; }
+    npoly++; cnt_n[nseq]++;
+    eval(nseq,vx,vy);
+    return;
+  }
+  // skip this direction
+  dfs(idx+1,px,nx,py,ny);
+  // use it with multiplicity m>=1
+  int X=dx[idx], Y=dy[idx];
+  for(int m=1;;m++){
+    int npx=px, nnx=nx, npy=py, nny=ny;
+    if(X>0) npx+=m*X; else nnx-=m*X;
+    if(Y>0) npy+=m*Y; else nny-=m*Y;
+    if(npx>K||nnx>K||npy>K||nny>K) break;
+    if(nseq>=MAXV-1) break;
+    mult[idx]=m; seq[nseq++]=idx;
+    dfs(idx+1,npx,nnx,npy,nny);
+    nseq--;
+  }
+}
+
+int main(int argc,char**argv){
+  K = argc>1?atoi(argv[1]):5;
+  ndir=0;
+  for(int x=-K;x<=K;x++) for(int y=-K;y<=K;y++){ if(x==0&&y==0) continue; if(gcd(x,y)!=1) continue; dx[ndir]=x; dy[ndir]=y; ndir++; }
+  int tmp[MAXDIR][2]; for(int i=0;i<ndir;i++){tmp[i][0]=dx[i];tmp[i][1]=dy[i];}
+  qsort(tmp,ndir,sizeof(tmp[0]),cmpang);
+  for(int i=0;i<ndir;i++){dx[i]=tmp[i][0];dy[i]=tmp[i][1];}
+  for(int f=0;f<2;f++) for(int n=0;n<MAXV;n++){Mn[f][n]=0;Dn[f][n]=1<<30;Sn[f][n]=0;}
+  dfs(0,0,0,0,0);
+  printf("K=%d ndir=%d total strictly convex lattice polygons (up to translation) = %lld\n",K,ndir,npoly);
+  printf(" n   count        Z[i]: M  D  S     Z[w]: M  D  S\n");
+  for(int n=3;n<MAXV;n++) if(cnt_n[n]){
+    printf("%2d %10lld        %2d %3d %3d           %2d %3d %3d\n",n,cnt_n[n],Mn[0][n],Dn[0][n],Sn[0][n],Mn[1][n],Dn[1][n],Sn[1][n]);
+  }
+  for(int f=0;f<2;f++) for(int n=3;n<MAXV;n++) if(cnt_n[n] && Mn[f][n]>=3){
+    printf("example form=%s n=%d M=%d:",f==0?"Z[i]":"Z[w]",n,Mn[f][n]);
+    for(int i=0;i<n;i++) printf(" (%d,%d)",bestpoly[f][n][i][0],bestpoly[f][n][i][1]);
+    printf("\n");
+  }
+  return 0;
+}

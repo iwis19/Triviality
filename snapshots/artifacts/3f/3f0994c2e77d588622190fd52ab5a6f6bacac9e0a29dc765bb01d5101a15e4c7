@@ -1,0 +1,80 @@
+"""k=2 analysis of Erdos #686.
+F_2(m)/F_2(n) = N  <=>  (m+1)(m+2) = N (n+1)(n+2).
+Put x = 2m+3, y = 2n+3 (odd, >=3):  x^2 - N y^2 = 1 - N.
+Trivial solution (x,y)=(1,1) (m=n=-1). Multiply by the Pell unit (u,v)
+(u^2 - N v^2 = 1, with v even so that parity is preserved):
+  x = u + N v, y = u + v  are both odd, and x^2 - N y^2 = (1-N)(u^2-Nv^2) = 1-N.
+Admissibility m >= n+2  <=>  x >= y + 4.
+Squares N=a^2: (a y - x)(a y + x) = a^2 - 1, finitely many divisor pairs.
+"""
+import sys
+from math import isqrt
+
+def fund_pell(D):
+    """fundamental solution of u^2 - D v^2 = 1 by continued fractions (D nonsquare)."""
+    a0 = isqrt(D)
+    m, d, a = 0, 1, a0
+    p_prev, p = 1, a0
+    q_prev, q = 0, 1
+    while p*p - D*q*q != 1:
+        m = d*a - m
+        d = (D - m*m)//d
+        a = (a0 + m)//d
+        p_prev, p = p, a*p + p_prev
+        q_prev, q = q, a*q + q_prev
+    return p, q
+
+def k2_nonsquare(N):
+    u, v = fund_pell(N)
+    if v % 2:  # square the unit to make v even
+        u, v = u*u + N*v*v, 2*u*v
+    # iterate powers until x >= y+4
+    U, V = u, v
+    for _ in range(50):
+        x, y = U + N*V, U + V
+        assert x % 2 == 1 and y % 2 == 1 and x*x - N*y*y == 1 - N
+        if x >= y + 4:
+            m, n = (x-3)//2, (y-3)//2
+            assert (m+1)*(m+2) == N*(n+1)*(n+2) and m >= n+2 and n >= 0
+            return m, n
+        U, V = U*u + N*V*v, U*v + V*u
+    raise RuntimeError(N)
+
+def k2_square(a):
+    """all (m,n) with m>=n+2, n>=0, (m+1)(m+2) = a^2 (n+1)(n+2)."""
+    N = a*a
+    sols = []
+    D = N - 1
+    for A in range(1, isqrt(D)+1):
+        if D % A: continue
+        B = D // A          # A = a y - x, B = a y + x, A < B
+        if (A + B) % 2: continue
+        ay, x = (A+B)//2, (B-A)//2
+        if ay % a: continue
+        y = ay // a
+        if x % 2 == 0 or y % 2 == 0: continue
+        if x >= y + 4 and y >= 3:
+            m, n = (x-3)//2, (y-3)//2
+            assert (m+1)*(m+2) == N*(n+1)*(n+2)
+            sols.append((m, n))
+    return sols
+
+if __name__ == "__main__":
+    LIM = int(sys.argv[1]) if len(sys.argv) > 1 else 3000
+    bad = []
+    maxm = 0
+    for N in range(2, LIM+1):
+        a = isqrt(N)
+        if a*a == N: continue
+        m, n = k2_nonsquare(N)
+        maxm = max(maxm, m)
+    print(f"all nonsquare N in [2,{LIM}] have a k=2 representation via Pell units; largest m used has {len(str(maxm))} digits")
+    print("k=2 representable squares a^2, a<=2000 (a, N, (m,n)):")
+    cnt = 0
+    for a in range(2, 2001):
+        s = k2_square(a)
+        if s:
+            cnt += 1
+            if cnt <= 25 or a > 1990:
+                print(a, a*a, s)
+    print("count of k=2-representable squares with 2<=a<=2000:", cnt)

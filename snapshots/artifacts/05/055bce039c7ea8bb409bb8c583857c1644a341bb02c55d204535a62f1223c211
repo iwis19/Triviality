@@ -1,0 +1,41 @@
+#!/usr/bin/env python3
+"""Check (1) the reformulation  389(n,k) <=> C(2N, n-1) | C(2N, N), N = n+k-1,
+and (2) whether the #396 condition  prod_{i<=j}(N-i) | C(2N,N)  implies the #389
+condition for m = n-1 in {2j+1, 2j+2}  (i.e. n in {2j+2, 2j+3}).
+"""
+import sys
+from math import comb, prod
+
+def orig(n, k):
+    a = prod(range(n, n + k))
+    b = prod(range(n + k, n + 2 * k))
+    return b % a == 0
+
+def bin_form(n, N):  # C(2N, n-1) | C(2N, N)
+    return comb(2 * N, N) % comb(2 * N, n - 1) == 0
+
+def cond396(N, j):
+    return comb(2 * N, N) % prod(N - i for i in range(j + 1)) == 0
+
+if __name__ == "__main__":
+    NMAX = int(sys.argv[1]) if len(sys.argv) > 1 else 400
+    # (1) equivalence check
+    bad = 0
+    for n in range(1, 40):
+        for k in range(1, NMAX):
+            if orig(n, k) != bin_form(n, n + k - 1):
+                bad += 1
+                print("MISMATCH", n, k)
+    print("reformulation mismatches:", bad)
+    # (2) 396 => 389 ?
+    JMAX = int(sys.argv[2]) if len(sys.argv) > 2 else 4
+    for j in range(0, JMAX + 1):
+        tot = 0; fails = {2*j+1: [], 2*j+2: []}
+        for N in range(2*j + 3, NMAX):
+            if cond396(N, j):
+                tot += 1
+                for m in (2*j+1, 2*j+2):
+                    n = m + 1
+                    if N >= n and not bin_form(n, N):
+                        fails[m].append(N)
+        print(f"j={j}: #396-witnesses N<{NMAX}: {tot}; 389 failures m=2j+1 (n={2*j+2}): {len(fails[2*j+1])} {fails[2*j+1][:10]}; m=2j+2 (n={2*j+3}): {len(fails[2*j+2])} {fails[2*j+2][:10]}")

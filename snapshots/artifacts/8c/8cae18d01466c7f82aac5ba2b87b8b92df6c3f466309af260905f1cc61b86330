@@ -1,0 +1,82 @@
+C2 |G|= 2 #subs= 2 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C3 |G|= 3 #subs= 2 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C4 |G|= 4 #subs= 3 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C5 |G|= 5 #subs= 2 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C6 |G|= 6 #subs= 4 candidate tuples= 1 partitions found=0 excluded by C1(norm)=1 by rank=1 with private constituent=1
+C7 |G|= 7 #subs= 2 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C8 |G|= 8 #subs= 4 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C9 |G|= 9 #subs= 3 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C10 |G|= 10 #subs= 4 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C11 |G|= 11 #subs= 2 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C12 |G|= 12 #subs= 6 candidate tuples= 2 partitions found=0 excluded by C1(norm)=2 by rank=2 with private constituent=2
+C13 |G|= 13 #subs= 2 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C14 |G|= 14 #subs= 4 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C15 |G|= 15 #subs= 4 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C16 |G|= 16 #subs= 5 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C17 |G|= 17 #subs= 2 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C18 |G|= 18 #subs= 6 candidate tuples= 2 partitions found=0 excluded by C1(norm)=2 by rank=2 with private constituent=2
+C19 |G|= 19 #subs= 2 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C20 |G|= 20 #subs= 6 candidate tuples= 1 partitions found=0 excluded by C1(norm)=1 by rank=1 with private constituent=1
+C21 |G|= 21 #subs= 4 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C22 |G|= 22 #subs= 4 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C23 |G|= 23 #subs= 2 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C24 |G|= 24 #subs= 8 candidate tuples= 5 partitions found=0 excluded by C1(norm)=5 by rank=5 with private constituent=5
+C25 |G|= 25 #subs= 3 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C26 |G|= 26 #subs= 4 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C27 |G|= 27 #subs= 4 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C28 |G|= 28 #subs= 6 candidate tuples= 1 partitions found=0 excluded by C1(norm)=1 by rank=1 with private constituent=1
+C29 |G|= 29 #subs= 2 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C30 |G|= 30 #subs= 8 candidate tuples= 3 partitions found=0 excluded by C1(norm)=3 by rank=3 with private constituent=3
+D3 |G|= 6 #subs= 6 candidate tuples= 3 partitions found=0 excluded by C1(norm)=3 by rank=3 with private constituent=0
+D4 |G|= 8 #subs= 10 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+D5 |G|= 10 #subs= 8 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+D6 |G|= 12 #subs= 16 candidate tuples= 84 partitions found=0 excluded by C1(norm)=84 by rank=84 with private constituent=63
+D7 |G|= 14 #subs= 10 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+D8 |G|= 16 #subs= 19 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+D9 |G|= 18 #subs= 16 candidate tuples= 30 partitions found=0 excluded by C1(norm)=30 by rank=30 with private constituent=0
+D10 |G|= 20 #subs= 22 candidate tuples= 15 partitions found=0 excluded by C1(norm)=15 by rank=15 with private constituent=15
+D11 |G|= 22 #subs= 14 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+D12 |G|= 24 #subs= 34 candidate tuples= 2997 partitions found=0 excluded by C1(norm)=2997 by rank=2997 with private constituent=1536
+D13 |G|= 26 #subs= 16 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+D14 |G|= 28 #subs= 28 candidate tuples= 315 partitions found=0 excluded by C1(norm)=315 by rank=315 with private constituent=21
+D15 |G|= 30 #subs= 28 candidate tuples= 53 partitions found=0 excluded by C1(norm)=53 by rank=53 with private constituent=50
+C2xC2 |G|= 4 #subs= 5 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C2^3 |G|= 8 #subs= 16 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C2^4 |G|= 16 #subs= 67 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C2xC4 |G|= 8 #subs= 8 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C2xC6 |G|= 12 #subs= 10 candidate tuples= 18 partitions found=0 excluded by C1(norm)=18 by rank=18 with private constituent=18
+C2xC8 |G|= 16 #subs= 11 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C4xC4 |G|= 16 #subs= 15 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C3xC3 |G|= 9 #subs= 6 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C2xC2xC4 |G|= 16 #subs= 27 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C2xC10 |G|= 20 #subs= 10 candidate tuples= 3 partitions found=0 excluded by C1(norm)=3 by rank=3 with private constituent=3
+C2xC12 |G|= 24 #subs= 16 candidate tuples= 147 partitions found=0 excluded by C1(norm)=147 by rank=147 with private constituent=147
+C3xC6 |G|= 18 #subs= 12 candidate tuples= 20 partitions found=0 excluded by C1(norm)=20 by rank=20 with private constituent=20
+C5xC5 |G|= 25 #subs= 8 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C2^2xC6 |G|= 24 #subs= 32 candidate tuples= 3143 partitions found=0 excluded by C1(norm)=3143 by rank=3143 with private constituent=3143
+Q8 |G|= 8 #subs= 6 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+SL(2,3) |G|= 24 #subs= 15 candidate tuples= 48 partitions found=0 excluded by C1(norm)=48 by rank=48 with private constituent=48
+GL(2,3) |G|= 48 #subs= 55 candidate tuples=218737 partitions found=0 excluded by C1(norm)=218737 by rank=217441 with private constituent=128542
+Dic3 |G|= 12 #subs= 8 candidate tuples= 4 partitions found=0 excluded by C1(norm)=4 by rank=4 with private constituent=1
+Dic5 |G|= 20 #subs= 10 candidate tuples= 5 partitions found=0 excluded by C1(norm)=5 by rank=5 with private constituent=5
+Dic4=Q16 |G|= 16 #subs= 11 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+Dic6 |G|= 24 #subs= 18 candidate tuples= 117 partitions found=0 excluded by C1(norm)=117 by rank=117 with private constituent=96
+Dic7 |G|= 28 #subs= 12 candidate tuples= 7 partitions found=0 excluded by C1(norm)=7 by rank=7 with private constituent=7
+A4 |G|= 12 #subs= 10 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+S4 |G|= 24 #subs= 30 candidate tuples= 3453 partitions found=0 excluded by C1(norm)=3453 by rank=2157 with private constituent=234
+S3 |G|= 6 #subs= 6 candidate tuples= 3 partitions found=0 excluded by C1(norm)=3 by rank=3 with private constituent=0
+A5 |G|= 60 #subs= 59 candidate tuples= 0 partitions found=0 excluded by C1(norm)=0 by rank=0 with private constituent=0
+C2xA4 |G|= 24 #subs= 26 candidate tuples= 1103 partitions found=0 (exact search only on C1 survivors) excluded by C1(norm)=1103 by rank=911 with private constituent=655
+C2xS4 |G|= 48 #subs= 98 candidate tuples=4018818 partitions found=0 (exact search only on C1 survivors) excluded by C1(norm)=4018818 by rank=3658818 with private constituent=2232969
+C3xA4 |G|= 36 #subs= 30 candidate tuples= 1872 partitions found=0 (exact search only on C1 survivors) excluded by C1(norm)=1872 by rank=144 with private constituent=144
+C2xS3 |G|= 12 #subs= 16 candidate tuples= 84 partitions found=0 (exact search only on C1 survivors) excluded by C1(norm)=84 by rank=84 with private constituent=63
+C3xS3 |G|= 18 #subs= 14 candidate tuples= 28 partitions found=0 (exact search only on C1 survivors) excluded by C1(norm)=28 by rank=28 with private constituent=25
+C4xS3 |G|= 24 #subs= 26 candidate tuples= 1017 partitions found=0 (exact search only on C1 survivors) excluded by C1(norm)=1017 by rank=1017 with private constituent=564
+S3xS3 |G|= 36 #subs= 60 candidate tuples= 71430 partitions found=0 (exact search only on C1 survivors) excluded by C1(norm)=71430 by rank=69486 with private constituent=55530
+C2xC2xS3 |G|= 24 #subs= 54 candidate tuples= 21105 partitions found=0 (exact search only on C1 survivors) excluded by C1(norm)=21105 by rank=21105 with private constituent=15672
+C2xD5 |G|= 20 #subs= 22 candidate tuples= 15 partitions found=0 (exact search only on C1 survivors) excluded by C1(norm)=15 by rank=15 with private constituent=15
+C2xQ8 |G|= 16 #subs= 19 candidate tuples= 0 partitions found=0 (exact search only on C1 survivors) excluded by C1(norm)=0 by rank=0 with private constituent=0
+C2xD4 |G|= 16 #subs= 35 candidate tuples= 0 partitions found=0 (exact search only on C1 survivors) excluded by C1(norm)=0 by rank=0 with private constituent=0
+C3xD4 |G|= 24 #subs= 20 candidate tuples= 387 partitions found=0 (exact search only on C1 survivors) excluded by C1(norm)=387 by rank=387 with private constituent=387
+C3xQ8 |G|= 24 #subs= 12 candidate tuples= 27 partitions found=0 (exact search only on C1 survivors) excluded by C1(norm)=27 by rank=27 with private constituent=27
+C5xS3 |G|= 30 #subs= 12 candidate tuples= 13 partitions found=0 (exact search only on C1 survivors) excluded by C1(norm)=13 by rank=13 with private constituent=10

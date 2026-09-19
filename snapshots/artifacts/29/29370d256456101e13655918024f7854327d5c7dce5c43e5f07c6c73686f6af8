@@ -1,0 +1,31 @@
+import Mathlib
+
+/-- The "CRT comb" step of the reduction Dickson ⟹ CPAP-k: if every intermediate offset
+`r` (with `0 < r < (k-1)d`, `d ∤ r`) is killed by a proper divisor `q r` of `n + r`, then
+every prime strictly between `n` and `n + (k-1)d` is a term of the progression, so if the
+`n + j d` are prime they are consecutive primes. -/
+theorem cpap_comb_consecutive (k d n : ℕ) (q : ℕ → ℕ)
+    (hq : ∀ r, 0 < r → r < (k - 1) * d → ¬ d ∣ r → 1 < q r ∧ q r < n + r ∧ q r ∣ n + r) :
+    ∀ m, n < m → m < n + (k - 1) * d → m.Prime → ∃ j, j < k ∧ m = n + j * d := by
+  intro m hm1 hm2 hp
+  obtain ⟨r, rfl⟩ : ∃ r, m = n + r := ⟨m - n, by omega⟩
+  have hr0 : 0 < r := by omega
+  have hr1 : r < (k - 1) * d := by omega
+  by_cases hdr : d ∣ r
+  · obtain ⟨j, rfl⟩ := hdr
+    refine ⟨j, ?_, by ring⟩
+    have hd : 0 < d := by
+      rcases Nat.eq_zero_or_pos d with h | h
+      · subst h; simp at hr1
+      · exact h
+    have : j < k - 1 := by
+      by_contra hcon
+      push_neg at hcon
+      have : (k - 1) * d ≤ d * j := Nat.mul_le_mul_right d hcon |>.trans_eq (Nat.mul_comm _ _)
+      omega
+    omega
+  · exfalso
+    obtain ⟨h1, h2, h3⟩ := hq r hr0 hr1 hdr
+    rcases (Nat.dvd_prime hp).1 h3 with h | h
+    · omega
+    · omega

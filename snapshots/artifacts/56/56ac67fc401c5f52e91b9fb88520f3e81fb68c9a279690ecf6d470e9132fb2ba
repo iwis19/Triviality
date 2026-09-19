@@ -1,0 +1,52 @@
+"""Is the 2-fold Minkowski sum V2 = S+S of S = {w1^p w3^q w4^r : 0<=p<6, |q|<=1, |r|<=1} (54 unit vectors of R_3)
+4-colourable?  If so, no pair is 'forced monochromatic' in 5-colourings (recolour one endpoint with the 5th colour),
+so a negative forced-pair result on such V2 (claim ccc75e4e...) carries no information.
+Arithmetic: mpmath with 60 digits; unit edges = |u-v|^2 within 1e-40 of 1 (heuristic but effectively exact for these heights).
+"""
+import mpmath as mp, itertools, time
+from pysat.solvers import Cadical153
+mp.mp.dps = 60
+w1 = mp.mpc(mp.mpf(1)/2, mp.sqrt(3)/2)
+w3 = mp.mpc(mp.mpf(5)/6, mp.sqrt(11)/6)
+w4 = mp.mpc(mp.mpf(7)/8, mp.sqrt(15)/8)
+S = []
+for p in range(6):
+    for q in (-1, 0, 1):
+        for r in (-1, 0, 1):
+            S.append(w1**p * w3**q * w4**r)
+def key(z): return (mp.nstr(z.real, 40), mp.nstr(z.imag, 40))
+Sd = {key(z): z for z in S}
+print("|S| =", len(Sd))
+V = {}
+for a in Sd.values():
+    for b in Sd.values():
+        V.setdefault(key(a+b), a+b)
+V[key(mp.mpc(0, 0))] = mp.mpc(0, 0)
+pts = list(V.values()); n = len(pts)
+print("|V2| =", n)
+t = time.time()
+E = []
+for i in range(n):
+    for j in range(i+1, n):
+        d = pts[i]-pts[j]
+        if abs(d.real*d.real + d.imag*d.imag - 1) < mp.mpf('1e-40'):
+            E.append((i, j))
+print("unit edges:", len(E), "time", round(time.time()-t, 1))
+def chromatic_at_most(k):
+    var = lambda v, c: v*k + c + 1
+    s = Cadical153()
+    for v in range(n):
+        s.add_clause([var(v, c) for c in range(k)])
+    for (i, j) in E:
+        for c in range(k): s.add_clause([-var(i, c), -var(j, c)])
+    ok = s.solve(); s.delete(); return ok
+for k in (3, 4):
+    print(f"{k}-colourable:", chromatic_at_most(k))
+
+
+# ==== recorded output ====
+# |S| = 54
+# |V2| = 1481
+# unit edges: 7056 time 16.8
+# 3-colourable: False
+# 4-colourable: True

@@ -1,0 +1,22 @@
+"""Group the measure of the good set {t: all ||t v_i|| >= 1/(n+1)} by the l1-length
+of the shortest nonzero integer relation m.v = 0 (search |m_i| <= 6)."""
+from fractions import Fraction as F
+from itertools import product
+from lrc_exact import MEAS, speed_sets
+import sys, statistics
+n, B = int(sys.argv[1]), int(sys.argv[2])
+def shortest_rel(v):
+    best = None
+    for m in product(range(-6, 7), repeat=n):
+        if any(m) and sum(a*b for a, b in zip(m, v)) == 0:
+            l = sum(abs(a) for a in m)
+            if best is None or l < best: best = l
+    return best if best is not None else 99
+groups = {}
+for v in speed_sets(n, B):
+    mu = float(MEAS(v, F(1, n+1)))
+    groups.setdefault(shortest_rel(v), []).append((mu, v))
+print(f"n={n} B={B} main term {((n-1)/(n+1))**n:.4f}")
+for L in sorted(groups):
+    g = sorted(groups[L])
+    print(f"  shortest relation l1={L:>2}: count={len(g):4d} min={g[0][0]:.4f} at {g[0][1]}  median={statistics.median(x for x,_ in g):.4f} max={g[-1][0]:.4f}")

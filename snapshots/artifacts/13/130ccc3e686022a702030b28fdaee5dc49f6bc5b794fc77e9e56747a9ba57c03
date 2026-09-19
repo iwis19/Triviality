@@ -1,0 +1,92 @@
+// Erdős #287 forced-exclusion / forced-adjacent-pair computation.
+// Lemma used (elementary, standard): if sum_{n in S} 1/n = 1 and p is prime with
+// p^2 > max S, then T = {m : m p in S} satisfies  sum_{m in T} 1/m ≡ 0 (mod p),
+// i.e. p divides the numerator of sum_{m in T} 1/m.  If no nonempty subset of
+// {1..j} (j = floor(N/p)) has that property ("p is j-safe"), every multiple of p in
+// [n_1, N] is excluded from S.  Since gaps <= 2 forbid two consecutive excluded
+// integers, a forced pair (m, m+1) inside [n1max(N), N] rules out n_k = N.
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <math.h>
+
+static uint64_t gcd(uint64_t a, uint64_t b){ while(b){ uint64_t t=a%b; a=b; b=t;} return a; }
+
+int main(int argc, char **argv){
+    long NMAX = argc>1 ? atol(argv[1]) : 1000000;
+    int J = argc>2 ? atoi(argv[2]) : 20;
+    // --- primes up to 40000 for trial division
+    int TD = 40000;
+    char *comp = calloc(TD+1,1);
+    int *tdp = malloc(sizeof(int)*5000); int ntd=0;
+    for(int i=2;i<=TD;i++){ if(!comp[i]){ tdp[ntd++]=i; for(long k=(long)i*i;k<=TD;k+=i) comp[k]=1; } }
+    // --- minbad[p] = smallest j such that p divides numerator of a nonempty subset sum of {1/1..1/j}; 255 if none for j<=J
+    uint8_t *minbad = malloc(NMAX+1); memset(minbad,255,NMAX+1);
+    uint64_t L=1;
+    for(int j=1;j<=J;j++){
+        L = L/gcd(L,j)*j;
+        uint64_t *w = malloc(sizeof(uint64_t)*(j+1));
+        for(int m=1;m<=j;m++) w[m]=L/m;
+        // subsets containing j: gray code over {1..j-1}
+        uint64_t sum = w[j];
+        uint64_t nsub = 1ULL<<(j-1);
+        uint64_t gray=0;
+        for(uint64_t idx=0; idx<nsub; idx++){
+            if(idx>0){
+                int bit = __builtin_ctzll(idx); // flip bit 'bit' -> element bit+1
+                uint64_t nb = gray ^ (1ULL<<bit);
+                if(nb & (1ULL<<bit)) sum += w[bit+1]; else sum -= w[bit+1];
+                gray = nb;
+            }
+            uint64_t n = sum; // factor n, record primes > j (and <= NMAX)
+            for(int t=0;t<ntd;t++){
+                uint64_t p=tdp[t];
+                if(p*p>n) break;
+                if(n%p==0){ while(n%p==0) n/=p; if((long)p>j && (long)p<=NMAX && minbad[p]>j) minbad[p]=j; }
+            }
+            if(n>1 && (long)n>j && (long)n<=NMAX && minbad[n]>j) minbad[n]=j;
+        }
+        free(w);
+        // report B_j (primes > j) for small j
+        if(j<=8){ printf("B_%d (primes>j): ",j); for(long p=2;p<=NMAX && p<100000;p++) if(minbad[p]<=j) printf("%ld ",p); printf("\n"); }
+    }
+    fprintf(stderr,"bad sets done\n");
+    // --- largest prime factor sieve
+    uint32_t *lpf = calloc(NMAX+1,sizeof(uint32_t));
+    for(long i=2;i<=NMAX;i++){ if(lpf[i]==0){ for(long k=i;k<=NMAX;k+=i) lpf[k]=(uint32_t)i; } }
+    fprintf(stderr,"lpf done\n");
+    // --- main loop
+    long double H=1, Hlo=0; // H = H(N), Hlo = H(n1-1)
+    long n1=1; // current candidate n1max: largest n1 with H(N)-H(n1-1) >= 1-eps
+    long fails=0, unsettled_max=0, settled_by_N=0, settled_by_pair=0, maxscan=0, maxscanN=0;
+    FILE *fu = fopen("unsettled.txt","w");
+    for(long N=2;N<=NMAX;N++){
+        H += 1.0L/N;
+        // advance n1 while H(N)-H(n1) >= 1-eps (i.e. n1+1 still admissible)
+        while(n1 < N && H - (Hlo + 1.0L/n1) >= 1.0L - 1e-12L){ Hlo += 1.0L/n1; n1++; }
+        // now n1 is admissible (H-Hlo>=1-eps) [for N>=2 at least n1=1 works? H(2)=1.5>=1 ok]
+        long n1max = n1;
+        #define FORCED(m) ({ uint64_t p_=lpf[(m)]; int r_=0; if(p_*p_>(uint64_t)N){ long j_=N/p_; if(j_<=J && minbad[p_]>j_) r_=1; } r_; })
+        int settled=0;
+        if(FORCED(N)){ settled=1; settled_by_N++; }
+        else {
+            long scan=0;
+            int prev = FORCED(N);
+            for(long m=N-1;m>=n1max;m--){
+                int cur = FORCED(m); scan++;
+                if(cur && prev){ settled=1; settled_by_pair++; break; }
+                prev=cur;
+            }
+            if(settled && scan>maxscan){ maxscan=scan; maxscanN=N; }
+        }
+        if(N==1000||N==10000||N==100000||N==1000000||N==10000000||N==37||N==100){ long cnt=0; int prev=FORCED(N); for(long m=N-1;m>=n1max;m--){int cur=FORCED(m); if(cur&&prev)cnt++; prev=cur;} printf("N=%ld n1max=%ld forced pairs in [n1max,N]: %ld (interval length %ld)\n",N,n1max,cnt,N-n1max+1); }
+        if(!settled){ fails++; unsettled_max=N; fprintf(fu,"%ld %ld\n",N,n1max); }
+    }
+    fclose(fu);
+    printf("NMAX=%ld J=%d\n", NMAX, J);
+    printf("unsettled N count=%ld, largest unsettled N=%ld\n", fails, unsettled_max);
+    printf("settled by N forced: %ld, by pair: %ld\n", settled_by_N, settled_by_pair);
+    printf("max scan length to find pair: %ld at N=%ld\n", maxscan, maxscanN);
+    return 0;
+}

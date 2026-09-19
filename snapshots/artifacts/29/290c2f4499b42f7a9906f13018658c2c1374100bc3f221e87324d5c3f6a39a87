@@ -1,0 +1,39 @@
+"""Which position i witnesses the C1(norm) exclusion? (i=0: smallest index / largest subgroup;
+i=k-1: largest index / smallest subgroup).  Also records the minimum over ρ of the
+'slack' max_i (|G_i| - sum_{j≠i, m_ρ(G_j)>0} |G_j|) to see how robust the exclusion is."""
+import sys, itertools
+import numpy as np
+from hs_search import Group, GROUPS, egyptian_tuples
+
+def run(name):
+    G = Group(name, GROUPS[name]); subs = G.subgroups()
+    by_index = {}
+    for H in subs: by_index.setdefault(G.N // len(H), []).append(H)
+    classes, cls_of, chars = G.character_table()
+    triv = int(np.argmin([abs(chars[r] - 1).sum() for r in range(len(chars))]))
+    def mult(H):
+        v = np.zeros(len(chars))
+        for h in H: v += chars[:, cls_of[h]].real
+        return np.round(v / len(H)).astype(int)
+    mc = {H: mult(H) for H in subs}
+    stats = {"total": 0, "first": 0, "last": 0, "neither": 0, "none": 0}
+    examples_neither = []
+    for idx in egyptian_tuples(by_index.keys()):
+        for choice in itertools.product(*[by_index[n] for n in idx]):
+            stats["total"] += 1
+            W = set()
+            for r in range(len(chars)):
+                if r == triv: continue
+                for i, H in enumerate(choice):
+                    if mc[H][r] > 0 and len(H) > sum(len(K) for j, K in enumerate(choice) if j != i and mc[K][r] > 0):
+                        W.add(i)
+            if not W: stats["none"] += 1
+            else:
+                if 0 in W: stats["first"] += 1
+                if len(choice) - 1 in W: stats["last"] += 1
+                if 0 not in W and len(choice) - 1 not in W:
+                    stats["neither"] += 1
+                    if len(examples_neither) < 2: examples_neither.append((idx, sorted(W)))
+    print(name, G.N, stats, "examples where neither extreme index witnesses:", examples_neither, flush=True)
+
+for nm in sys.argv[1:]: run(nm)

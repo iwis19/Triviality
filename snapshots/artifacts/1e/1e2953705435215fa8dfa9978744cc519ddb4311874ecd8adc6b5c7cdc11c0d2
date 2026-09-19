@@ -1,0 +1,72 @@
+/* Exhaustive check of the lonely runner conjecture for n = N nonzero integer speeds
+ * (k = N+1 runners) with 1 <= v_1 < ... < v_N <= B and gcd(v) = 1.
+ *
+ * ML(v) = max_t min_i ||t v_i|| is attained at a breakpoint t = a/q with
+ * q in {v_i + v_j, 2 v_i}  (max of min of piecewise-linear maps; local maxima
+ * occur where two distance functions cross with opposite slopes, or at the
+ * kink ||t v_i|| = 1/2).  For each set we search for a witness a/q with
+ * min_i ||a v_i / q|| >= 1/(N+1), exactly in integers:  (N+1)*r >= q where
+ * r = min(a v_i mod q, q - a v_i mod q).  We also record whether the witness is
+ * strict (> 1/(N+1)), i.e. whether the instance is tight.
+ *
+ * Build: gcc -O2 -o lrc7 lrc7.c ; run: ./lrc7 N B
+ */
+#include <stdio.h>
+#include <stdlib.h>
+
+static int N, B, TN = 1, TD = 0, RATIO = 0; /* threshold TN/TD (default 1/(N+1)); RATIO=1 restricts to v_N >= 2 v_{N-1} */
+static long long total = 0, tight = 0, fails = 0;
+static int v[16];
+
+static int gcd(int a, int b) { while (b) { int t = a % b; a = b; b = t; } return a; }
+
+/* returns 2 if strict witness found, 1 if only tight witness, 0 if none */
+static int check(void) {
+    int best = 0; /* 0 none, 1 tight, 2 strict */
+    int qs[200], nq = 0;
+    for (int i = 0; i < N; i++) {
+        qs[nq++] = 2 * v[i];
+        for (int j = i + 1; j < N; j++) qs[nq++] = v[i] + v[j];
+    }
+    for (int qi = 0; qi < nq; qi++) {
+        int q = qs[qi];
+        for (int a = 1; a < q; a++) {
+            int ok = 2;
+            for (int i = 0; i < N; i++) {
+                int r = (int)(((long long)a * v[i]) % q);
+                if (q - r < r) r = q - r;
+                long long lhs = (long long)TD * r, rhs = (long long)TN * q;
+                if (lhs < rhs) { ok = 0; break; }
+                if (lhs == rhs) ok = 1;
+            }
+            if (ok == 2) return 2;
+            if (ok > best) best = ok;
+        }
+    }
+    return best;
+}
+
+static void rec(int idx, int start, int g) {
+    if (idx == N) {
+        if (g != 1) return;
+        if (RATIO && v[N-1] < 2 * v[N-2]) return;
+        total++;
+        int r = check();
+        if (r == 0) { fails++; printf("FAIL:"); for (int i = 0; i < N; i++) printf(" %d", v[i]); printf("\n"); }
+        else if (r == 1) { tight++; printf("TIGHT:"); for (int i = 0; i < N; i++) printf(" %d", v[i]); printf("\n"); }
+        return;
+    }
+    for (int x = start; x <= B - (N - 1 - idx); x++) {
+        v[idx] = x;
+        rec(idx + 1, x + 1, gcd(g, x));
+    }
+}
+
+int main(int argc, char **argv) {
+    N = atoi(argv[1]); B = atoi(argv[2]); TD = N + 1;
+    if (argc >= 5) { TN = atoi(argv[3]); TD = atoi(argv[4]); }
+    if (argc >= 6) RATIO = atoi(argv[5]);
+    rec(0, 1, 0);
+    printf("N=%d B=%d threshold=%d/%d ratio-restricted=%d: sets=%lld, tight(ML=thr)=%lld, failures(ML<thr)=%lld\n", N, B, TN, TD, RATIO, total, tight, fails);
+    return 0;
+}

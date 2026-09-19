@@ -1,0 +1,66 @@
+"""Exhaustive search for Erdős #287 counterexamples with n_k = N <= NMAX.
+Enumerates every set S = {n_1 < ... < n_k} with 1 < n_1, n_k = N, all gaps in {1,2},
+and sum 1/n = 1, by DFS with exact integer arithmetic (common denominator lcm(1..N))
+and two-sided pruning.  No p-adic reasoning is used, so this is independent of forced.c.
+Also reports, for each N, the number of gap<=2 sets with sum exactly 1 (expected 0)
+and the near-misses |sum-1| minimal (for information)."""
+import sys
+from math import lcm, gcd
+from fractions import Fraction
+
+NMAX = int(sys.argv[1]) if len(sys.argv) > 1 else 60
+
+def search(N):
+    L = 1
+    for m in range(2, N + 1):
+        L = lcm(L, m)
+    w = [0] * (N + 2)
+    for m in range(2, N + 1):
+        w[m] = L // m
+    target = L
+    # lb[i] = minimal possible contribution of a gap<=2 continuation after position i up to N (must contain N)
+    # any continuation from i contains >= one of {i+1,i+2}, {i+3,i+4}, ... and contains N
+    lb = [0] * (N + 2)
+    for i in range(N - 1, 0, -1):
+        s = 0
+        t = i + 2
+        while t <= N:
+            s += w[t]
+            t += 2
+        if (N - i) % 2 == 1:
+            s += w[N]
+        lb[i] = s
+    ub = [0] * (N + 2)  # sum of all w[t], i<t<=N
+    for i in range(N - 1, 0, -1):
+        ub[i] = ub[i + 1] + w[i + 1]
+    sols = []
+    count = 0
+    def dfs(i, s, path):
+        nonlocal count
+        # i = last chosen element, s = current sum; need to reach N
+        if i == N:
+            if s == target:
+                sols.append(list(path))
+            return
+        rem = target - s
+        if rem < lb[i] or rem > ub[i]:
+            return
+        for nxt in (i + 1, i + 2):
+            if nxt <= N:
+                path.append(nxt)
+                dfs(nxt, s + w[nxt], path)
+                path.pop()
+    # admissible n_1: sum_{n1..N} 1/n >= 1
+    for n1 in range(2, N):
+        if ub[n1 - 1] < target:
+            break
+        dfs(n1, w[n1], [n1])
+    return sols
+
+total = 0
+for N in range(3, NMAX + 1):
+    sols = search(N)
+    if sols:
+        print("COUNTEREXAMPLE?", N, sols)
+    total += len(sols); print(N, len(sols), flush=True)
+print(f"N<= {NMAX}: gap<=2 representations of 1 found: {total}")

@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""
+Enumerate all n < 3^A whose base-3 digits lie in {0,1}, base-5 digits in {0,1,2},
+base-7 digits in {0,1,2,3}  (equivalently, by Kummer's theorem, gcd(C(2n,n),105)=1).
+
+Method: DFS over the base-3 prefix (most significant digit first).  A node is the
+interval I = [P*3^L, (P+1)*3^L).  For p in {5,7} pick b with p^b >= 3^L; then
+floor(n/p^b) takes at most two values on I, so the base-p digits of n at positions
+>= b are known up to two candidates.  If neither candidate has all digits < p/2,
+the node contains no solution and is pruned.
+
+Heuristic node count at depth d: 2^d * (3/5)^{d log3/log5} * (4/7)^{d log3/log7}
+= 3^{0.0259 d}, so the whole tree up to 3^A has ~ A * 3^{0.026 A} nodes.
+"""
+import sys, time
+
+def good(q, p, half):
+    while q:
+        if q % p > half:
+            return False
+        q //= p
+    return True
+
+def enumerate_solutions(A, verbose=False):
+    pow3 = [3**i for i in range(A + 1)]
+    # for each L, smallest b with p^b >= 3^L, store p^b
+    Pb = {}
+    for p in (5, 7):
+        arr = []
+        for L in range(A + 1):
+            b = 0
+            while p**b < pow3[L]:
+                b += 1
+            arr.append(p**b)
+        Pb[p] = arr
+    half = {5: 2, 7: 3}
+    sols = []
+    nodes_per_depth = [0] * (A + 1)
+    stack = [(0, A)]  # (prefix P, remaining digits L)
+    while stack:
+        P, L = stack.pop()
+        nodes_per_depth[A - L] += 1
+        lo = P * pow3[L]
+        hi = lo + pow3[L] - 1
+        ok = True
+        for p in (5, 7):
+            pb = Pb[p][L]
+            qlo, qhi = lo // pb, hi // pb
+            if not (good(qlo, p, half[p]) or (qhi != qlo and good(qhi, p, half[p]))):
+                ok = False
+                break
+        if not ok:
+            continue
+        if L == 0:
+            sols.append(lo)  # lo == hi == P, both bases fully checked (pb = 1)
+        else:
+            stack.append((3 * P + 1, L - 1))
+            stack.append((3 * P, L - 1))
+    return sorted(sols), nodes_per_depth
+
+if __name__ == "__main__":
+    A = int(sys.argv[1]) if len(sys.argv) > 1 else 60
+    t = time.time()
+    sols, npd = enumerate_solutions(A)
+    dt = time.time() - t
+    print(f"A={A}  3^A ~ 10^{A*0.4771:.1f}  solutions={len(sols)}  nodes={sum(npd)}  time={dt:.1f}s", file=sys.stderr)
+    for s in sols:
+        print(s)

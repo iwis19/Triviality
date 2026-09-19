@@ -1,0 +1,41 @@
+### python3 search.py 30 60000
+k= 1 N=60000 disjoint collisions=0 [] overlapping equalities=0 C1 failures=0 C4 tests=0 failures=0 min M(n+k)/M(n)=1
+k= 2 N=60000 disjoint collisions=0 [] overlapping equalities=0 C1 failures=0 C4 tests=0 failures=0 min M(n+k)/M(n)=1
+k= 3 N=60000 disjoint collisions=0 [] overlapping equalities=1 C1 failures=0 C4 tests=1 failures=0 min M(n+k)/M(n)=0.5001
+k= 4 N=60000 disjoint collisions=0 [] overlapping equalities=1 C1 failures=0 C4 tests=1 failures=0 min M(n+k)/M(n)=0.3334
+k= 5 N=60000 disjoint collisions=0 [] overlapping equalities=4 C1 failures=0 C4 tests=4 failures=0 min M(n+k)/M(n)=0.08337
+k= 6 N=60000 disjoint collisions=0 [] overlapping equalities=3 C1 failures=0 C4 tests=4 failures=0 min M(n+k)/M(n)=0.1001
+k= 7 N=60000 disjoint collisions=0 [] overlapping equalities=7 C1 failures=0 C4 tests=7 failures=0 min M(n+k)/M(n)=0.01668
+k= 8 N=60000 disjoint collisions=0 [] overlapping equalities=7 C1 failures=0 C4 tests=8 failures=0 min M(n+k)/M(n)=0.009534
+k= 9 N=60000 disjoint collisions=0 [] overlapping equalities=11 C1 failures=0 C4 tests=12 failures=0 min M(n+k)/M(n)=0.003576
+k=10 N=60000 disjoint collisions=0 [] overlapping equalities=14 C1 failures=0 C4 tests=18 failures=0 min M(n+k)/M(n)=0.003975
+k=11 N=60000 disjoint collisions=0 [] overlapping equalities=25 C1 failures=0 C4 tests=31 failures=0 min M(n+k)/M(n)=0.0003976
+k=12 N=60000 disjoint collisions=0 [] overlapping equalities=25 C1 failures=0 C4 tests=31 failures=0 min M(n+k)/M(n)=0.000434
+k=13 N=60000 disjoint collisions=0 [] overlapping equalities=34 C1 failures=0 C4 tests=40 failures=0 min M(n+k)/M(n)=3.618e-05
+k=14 N=60000 disjoint collisions=0 [] overlapping equalities=33 C1 failures=0 C4 tests=39 failures=0 min M(n+k)/M(n)=3.898e-05
+k=15 N=60000 disjoint collisions=0 [] overlapping equalities=31 C1 failures=0 C4 tests=36 failures=0 min M(n+k)/M(n)=4.178e-05
+k=16 N=60000 disjoint collisions=0 [] overlapping equalities=30 C1 failures=0 C4 tests=36 failures=0 min M(n+k)/M(n)=2.23e-05
+k=17 N=60000 disjoint collisions=0 [] overlapping equalities=55 C1 failures=0 C4 tests=66 failures=0 min M(n+k)/M(n)=1.394e-06
+k=18 N=60000 disjoint collisions=0 [] overlapping equalities=57 C1 failures=0 C4 tests=75 failures=0 min M(n+k)/M(n)=1.477e-06
+k=19 N=60000 disjoint collisions=0 [] overlapping equalities=82 C1 failures=0 C4 tests=101 failures=0 min M(n+k)/M(n)=1.644e-07
+k=20 N=60000 disjoint collisions=0 [] overlapping equalities=79 C1 failures=0 C4 tests=98 failures=0 min M(n+k)/M(n)=2.601e-07
+k=21 N=60000 disjoint collisions=0 [] overlapping equalities=82 C1 failures=0 C4 tests=106 failures=0 min M(n+k)/M(n)=4.579e-07
+k=22 N=60000 disjoint collisions=0 [] overlapping equalities=92 C1 failures=0 C4 tests=118 failures=0 min M(n+k)/M(n)=9.644e-08
+k=23 N=60000 disjoint collisions=0 [] overlapping equalities=112 C1 failures=0 C4 tests=135 failures=0 min M(n+k)/M(n)=5.641e-08
+k=24 N=60000 disjoint collisions=0 [] overlapping equalities=115 C1 failures=0 C4 tests=141 failures=0 min M(n+k)/M(n)=4.098e-08
+k=25 N=60000 disjoint collisions=0 [] overlapping equalities=124 C1 failures=0 C4 tests=149 failures=0 min M(n+k)/M(n)=1.721e-08
+k=26 N=60000 disjoint collisions=0 [] overlapping equalities=141 C1 failures=0 C4 tests=169 failures=0 min M(n+k)/M(n)=1.483e-08
+k=27 N=60000 disjoint collisions=0 [] overlapping equalities=141 C1 failures=0 C4 tests=169 failures=0 min M(n+k)/M(n)=6.814e-10
+k=28 N=60000 disjoint collisions=0 [] overlapping equalities=163 C1 failures=0 C4 tests=209 failures=0 min M(n+k)/M(n)=1.77e-09
+k=29 N=60000 disjoint collisions=0 [] overlapping equalities=205 C1 failures=0 C4 tests=258 failures=0 min M(n+k)/M(n)=4.49e-10
+k=30 N=60000 disjoint collisions=0 [] overlapping equalities=270 C1 failures=0 C4 tests=329 failures=0 min M(n+k)/M(n)=4.589e-10
+
+### python3 search.py 8 600000
+k= 1 N=600000 disjoint collisions=0 [] overlapping equalities=0 C1 failures=0 C4 tests=0 failures=0 min M(n+k)/M(n)=1
+k= 2 N=600000 disjoint collisions=0 [] overlapping equalities=0 C1 failures=0 C4 tests=0 failures=0 min M(n+k)/M(n)=1
+k= 3 N=600000 disjoint collisions=0 [] overlapping equalities=1 C1 failures=0 C4 tests=1 failures=0 min M(n+k)/M(n)=0.5
+k= 4 N=600000 disjoint collisions=0 [] overlapping equalities=1 C1 failures=0 C4 tests=1 failures=0 min M(n+k)/M(n)=0.3333
+k= 5 N=600000 disjoint collisions=0 [] overlapping equalities=4 C1 failures=0 C4 tests=4 failures=0 min M(n+k)/M(n)=0.08334
+k= 6 N=600000 disjoint collisions=0 [] overlapping equalities=3 C1 failures=0 C4 tests=4 failures=0 min M(n+k)/M(n)=0.1
+k= 7 N=600000 disjoint collisions=0 [] overlapping equalities=7 C1 failures=0 C4 tests=7 failures=0 min M(n+k)/M(n)=0.01667
+k= 8 N=600000 disjoint collisions=0 [] overlapping equalities=7 C1 failures=0 C4 tests=8 failures=0 min M(n+k)/M(n)=0.009525

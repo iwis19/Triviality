@@ -1,0 +1,123 @@
+"""
+Search for quartic polynomials P(t) in Z[t] such that P, P+1, P+2, P+3 all factor over Q
+into two quadratics (a k=4 analogue of the k=3 families 4x^4+{-1,0,1} and 210t^2+391t+179+{1,2,3}).
+Also records the best "run length" (P, P+1, ..., P+r-1 all reducible into two quadratics) found.
+P = (l1 t^2 + a t + b)(l2 t^2 + c t + d), small coefficients.
+Fast pre-filter: a quartic reducible over Q is reducible mod every prime p (has a factor of degree<=2),
+so gcd(P+s mod p, t^(p^2) - t) != 1 for p = 3,5,7,11.  Survivors are factored with sympy.
+"""
+import itertools, sys
+from multiprocessing import Pool
+from sympy import symbols, Poly, factor_list, ZZ
+
+t = symbols('t')
+PRIMES = [3, 5, 7, 11, 13]
+
+def polymulmod(a, b, m, p):
+    # a*b mod m, over GF(p); polys as lists low->high
+    res = [0] * (len(a) + len(b) - 1)
+    for i, x in enumerate(a):
+        if x:
+            for j, y in enumerate(b):
+                res[i + j] = (res[i + j] + x * y) % p
+    return polyrem(res, m, p)
+
+def polyrem(a, m, p):
+    a = a[:]
+    dm = len(m) - 1
+    inv = pow(m[-1], -1, p)
+    while len(a) - 1 >= dm:
+        if a[-1] == 0:
+            a.pop(); continue
+        c = a[-1] * inv % p
+        sh = len(a) - 1 - dm
+        for i in range(dm + 1):
+            a[sh + i] = (a[sh + i] - c * m[i]) % p
+        a.pop()
+    while a and a[-1] == 0:
+        a.pop()
+    return a
+
+def polygcd_deg(a, b, p):
+    while b:
+        a, b = b, polyrem(a, b, p)
+    return len(a) - 1
+
+def has_small_factor_mod_p(coeffs, p):
+    # coeffs: low->high integer coefficients of quartic; returns True if reducible mod p (or degenerate)
+    m = [c % p for c in coeffs]
+    while m and m[-1] == 0:
+        m.pop()
+    if len(m) - 1 < 4:
+        return True  # leading coeff vanished mod p; be permissive
+    # compute t^(p^2) mod m by repeated squaring
+    x = [0, 1]
+    r = [1]
+    e = p * p
+    base = x
+    while e:
+        if e & 1:
+            r = polymulmod(r, base, m, p)
+        base = polymulmod(base, base, m, p)
+        e >>= 1
+    # r - t
+    r = r + [0] * (2 - len(r))
+    r[1] = (r[1] - 1) % p
+    while r and r[-1] == 0:
+        r.pop()
+    if not r:
+        return True
+    return polygcd_deg(m, r, p) >= 1
+
+def is_two_quadratics(coeffs):
+    P = Poly(list(reversed(coeffs)), t, domain=ZZ)
+    _, fl = factor_list(P.as_expr(), t)
+    degs = sorted(Poly(f, t).degree() for f, e in fl for _ in range(e))
+    return degs == [2, 2]
+
+def mul(p, q):
+    r = [0] * (len(p) + len(q) - 1)
+    for i, x in enumerate(p):
+        for j, y in enumerate(q):
+            r[i + j] += x * y
+    return r
+
+def work(args):
+    l1, l2, a, b = args
+    out = []
+    C = range(-CR, CR + 1)
+    D = range(-DR, DR + 1)
+    for c in C:
+        for d in D:
+            if (l1, a, b) > (l2, c, d):
+                continue
+            P = mul([b, a, l1], [d, c, l2])
+            # run forward: P+1, P+2, ... reducible?
+            run = 1
+            for s in range(1, 4):
+                Q = P[:]; Q[0] += s
+                if all(has_small_factor_mod_p(Q, p) for p in PRIMES) and is_two_quadratics(Q):
+                    run += 1
+                else:
+                    break
+            if run >= 3:
+                out.append((run, (l1, a, b, l2, c, d), P))
+    return out
+
+CR = int(sys.argv[1]) if len(sys.argv) > 1 else 8
+DR = int(sys.argv[2]) if len(sys.argv) > 2 else 40
+LMAX = int(sys.argv[3]) if len(sys.argv) > 3 else 3
+
+if __name__ == '__main__':
+    tasks = [(l1, l2, a, b) for l1 in range(1, LMAX + 1) for l2 in range(1, LMAX + 1)
+             for a in range(-CR, CR + 1) for b in range(-DR, DR + 1) if b != 0]
+    best = 0
+    with Pool(8) as pool:
+        for res in pool.imap_unordered(work, tasks, chunksize=4):
+            for run, coeffs, P in res:
+                if run > best:
+                    best = run
+                    print("new best run", run, coeffs, "P(t) coeffs low->high", P, flush=True)
+                if run >= 4:
+                    print("RUN>=4:", run, coeffs, P, flush=True)
+    print("done; best run =", best)

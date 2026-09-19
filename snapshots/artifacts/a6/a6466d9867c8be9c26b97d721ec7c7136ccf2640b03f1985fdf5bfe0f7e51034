@@ -1,0 +1,26 @@
+# Critic's numerical checks for idea 18ef46e0 (square-root barrier bookkeeping).
+import cmath, math
+def dft(f, N):  # Mathlib convention: F f (k) = sum_j e(-jk/N) f(j)
+    return [sum(f[j]*cmath.exp(-2j*math.pi*j_*k/N) for j_, j in enumerate(range(N))) for k in range(N)]
+def ind(S, N): return [1.0 if j in S else 0.0 for j in range(N)]
+
+# (1) Parseval and the exact mean square of nonzero coefficients (claims 8914caa4 / d7e596d4)
+N = 12; S = {0, 1, 3, 7}
+F = dft(ind(S, N), N)
+print("Parseval:", sum(abs(z)**2 for z in F), "=", N*len(S))
+print("sum_{k!=0}|F|^2 =", round(sum(abs(z)**2 for z in F[1:]), 9), " |S|(N-|S|) =", len(S)*(N-len(S)))
+
+# (2) Composition gap: the absolute-value sum sum_{k!=0}|S^(k)||C^(k)| can be ZERO while the main
+#     term |S||C|/N > 0, so 'absolute-value bookkeeping >= main term' is NOT a consequence of C2/C3.
+N = 6; S = {0, 3}; C = {0, 2, 4}
+FS, FC = dft(ind(S, N), N), dft(ind(C, N), N)
+abs_sum = sum(abs(FS[k])*abs(FC[k]) for k in range(1, N))/N
+print("Z/6: |S∩C| =", len(S & C), " main |S||C|/N =", len(S)*len(C)/N,
+      " abs-value error bound N^-1 sum_{k!=0}|S^||C^| =", round(abs_sum, 12))
+
+# (3) Threshold bookkeeping. sigma = 0.3135 (|S3∩S5∩[0,N)| = N^sigma), 7^j = N^theta.
+sigma = 0.3135; l74 = math.log(4)/math.log(7)
+print("sparsity 2|S| <= 7^j (hypothesis of C3) needs theta >", sigma)
+print("claimed L^inf threshold (uses numerical 0.522 exponent): theta >=", round(sigma/(2*0.522), 4))
+print("numerics-free L^inf threshold via ||C^||_1 >= N'-|C|: theta >=", round(sigma/(2*(1-l74)), 4))
+print("L^2 (Cauchy-Schwarz) threshold, numerics-free: theta >=", round(sigma/(2-l74), 4))

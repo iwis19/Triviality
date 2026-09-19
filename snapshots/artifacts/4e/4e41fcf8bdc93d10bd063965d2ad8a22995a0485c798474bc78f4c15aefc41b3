@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""Compare the enumerated solutions with the independent-digit random model.
+
+Model (Pomerance-style heuristic): for n in S_3 (base-3 digits in {0,1}), the events
+"all base-5 digits <= 2" and "all base-7 digits <= 3" are treated as independent with
+probabilities (3/5)^{d_5(n)} and (4/7)^{d_7(n)}, d_p(n) = number of base-p digits of n.
+Predicted count up to N grows like N^delta, delta = log2/log3 + log3/log5 + log4/log7 - 2.
+"""
+import sys, math
+from fractions import Fraction
+
+def count_S3_below(x):
+    """#{n in S_3 : 0 <= n < x} (S_3 = base-3 digits in {0,1})."""
+    if x <= 0:
+        return 0
+    digs = []
+    y = x
+    while y:
+        digs.append(y % 3); y //= 3
+    digs.reverse()
+    total = 0
+    k = len(digs)
+    for i, d in enumerate(digs):
+        rem = k - i - 1
+        if d == 0:
+            continue
+        if d == 1:
+            total += 2**rem          # put 0 here, anything below
+            continue
+        # d == 2: put 0 or 1 here, anything below; then no tight continuation
+        total += 2 * 2**rem
+        return total
+    return total  # x itself in S_3, counted strictly below
+
+def expected_count(N):
+    """Sum over n in S_3, 1<=n<=N of (3/5)^{d5(n)} (4/7)^{d7(n)} (exact rational arithmetic on breakpoints)."""
+    # breakpoints where d5 or d7 changes: powers of 5 and 7
+    pts = {1, N + 1}
+    p = 5
+    while p <= N:
+        pts.add(p); p *= 5
+    p = 7
+    while p <= N:
+        pts.add(p); p *= 7
+    pts = sorted(pts)
+    E = 0.0
+    for a, b in zip(pts, pts[1:]):
+        # n in [a, b)
+        cnt = count_S3_below(b) - count_S3_below(a)
+        if cnt == 0:
+            continue
+        d5 = len_digits(a, 5); d7 = len_digits(a, 7)
+        E += cnt * (0.6 ** d5) * ((4 / 7) ** d7)
+    return E
+
+def len_digits(n, p):
+    c = 0
+    while n:
+        c += 1; n //= p
+    return c
+
+def main(path):
+    sols = [int(l) for l in open(path) if l.strip()]
+    sols = [s for s in sols if s >= 1]
+    delta = math.log(2) / math.log(3) + math.log(3) / math.log(5) + math.log(4) / math.log(7) - 2
+    print(f"delta = {delta:.6f}")
+    A = int(sys.argv[2]) if len(sys.argv) > 2 else 150
+    print(" k   N=3^k~10^x   actual   model E(N)   actual/E   C=actual/N^delta")
+    rows = []
+    for k in range(10, A + 1, 10):
+        N = 3**k
+        act = sum(1 for s in sols if s <= N)
+        E = expected_count(N)
+        C = act / N**delta
+        rows.append((k, act, E, C))
+        print(f"{k:3d}  10^{k*math.log10(3):6.1f}  {act:7d}  {E:10.1f}   {act/E:6.3f}   {C:8.3f}")
+    # least squares slope of log(actual) vs log N for k >= 60
+    xs = [k * math.log(3) for k, act, E, C in rows if k >= 60 and act > 0]
+    ys = [math.log(act) for k, act, E, C in rows if k >= 60 and act > 0]
+    n = len(xs); mx = sum(xs) / n; my = sum(ys) / n
+    slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sum((x - mx) ** 2 for x in xs)
+    print(f"fitted growth exponent (k>=60): {slope:.4f}   (model delta = {delta:.4f})")
+    # clustering: split solutions into clusters when gap > sqrt(n)
+    clusters = 1
+    for a, b in zip(sols, sols[1:]):
+        if b - a > math.isqrt(b):
+            clusters += 1
+    print(f"solutions: {len(sols)}, clusters (gap > sqrt n): {clusters}")
+    # number of solutions per base-3 length
+    from collections import Counter
+    cnt = Counter(len_digits(s, 3) for s in sols)
+    print("solutions per base-3 length (len: count):", dict(sorted(cnt.items())))
+
+if __name__ == "__main__":
+    main(sys.argv[1])

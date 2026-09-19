@@ -10,17 +10,20 @@ account or the old VM.
 |---|---|---|
 | Code (backend, frontend, Lean project) | this repo, `main` | yes |
 | Plan and pilot notes | `docs/plan.md`, `docs/pilot-fusion-vs-ultra.md` | yes |
-| Research state at handoff (12 Lean-verified sub-results, 12 campaigns, ~40 attempts) | `snapshots/mathlab-2026-09-19.db` + `snapshots/artifacts/` | yes |
+| Research state at handoff (27 Lean-verified sub-results, 53 campaigns, 143 attempts, 230 ideas, 1126 atlas problems incl. all 642 open Erdős problems) | `snapshots/mathlab-2026-09-19.db` + `snapshots/artifacts/` | yes |
+| One-day sprint notes, triage list and local search scripts | `snapshots/sprint-2026-09-19/`, section 7 below | yes |
 | Secrets (`backend/.env`) | **not** in git; recreate (step 1) | no |
 | Devin API key/org of the old account | old account only; do **not** reuse | no |
 
-Old-account sessions that are still `running`/`queued` in the snapshot cannot be polled with
-the new key; the scheduler times them out when their lease expires (≤ 6 h) and re-plans.
-Their finished output, if any, is lost — acceptable.
+At the 2026-09-19 18:15 UTC handoff all 43 in-flight provider sessions were deleted via the API
+and their attempts marked `timed_out`; every campaign was set to `paused`. Nothing is running
+and nothing bills anyone until campaigns are un-paused (`POST /private/campaigns/{id}/state?state=active`).
 
 ## 1. Secrets the new Devin session must have (ask the user once, up front)
 
-Create as **permanent repo-scoped secrets** so later sessions don't ask again:
+Already stored as **org-scoped secrets** in the `mathdiscovery` Devin org (`MATHLAB_DEVIN_API_KEY`,
+`MATHLAB_DEVIN_ORG_ID`, `MATHLAB_OWNER_API_KEY`); a session in that org just uses them. For a
+different account create them again:
 
 | Secret | Where the user gets it |
 |---|---|
@@ -103,11 +106,24 @@ update `MATHLAB_PUBLIC_BASE_URL` and restart the backend.
 
 ## 5. Where the campaigns stand
 
-Portfolios in the snapshot: `autonomous-1` (4 concurrent; union-closed, Hadwiger–Nelson,
-Goldbach, kissing number d=5) and `erdos-autonomous` (3 concurrent; Erdős #376, #7, #141,
-#1142). `auto_plan` is on, so finished campaigns get successors automatically. Campaigns at
-their `session_budget` stop dispatching; start a successor with `POST /private/campaigns`
-(same `problem_id`, larger `session_budget`) rather than editing the old one. Only the 12 `lean_check`/`verified` evidence rows carry the "Lean verified" label;
+Portfolios in the snapshot (all paused at handoff, all `max_concurrent_sessions=32`):
+
+- `autonomous-1` / `erdos-autonomous`: the original famous-problem campaigns (union-closed,
+  Hadwiger–Nelson, Goldbach, kissing number d=5, Erdős #376, #7, #141, #1142), budgets raised to
+  100000.
+- `sprint`: one successor campaign per problem above; the famous-problem ones were paused
+  deliberately to concentrate on tractable targets, #376/#1142 kept.
+- `tractable`: two campaigns (seed 1 and 2) for each of 16 neglected, concrete Erdős problems
+  chosen from the full open catalog: #686, #835, #647, #677, #699, #488, #307, #396, #727,
+  #389, #289, #261, #274, #1056, #287, #97. This is where the effort should continue.
+
+Campaign policy in force: `max_acu_limit=25`, `role_acu_limits.prover_formalizer=40`,
+`ideas_per_generation=4`, `default_mode=ultra`. `auto_plan` continues generations *within* a
+campaign but does **not** create successor campaigns (contrary to the earlier note); a campaign
+at its `session_budget` stops. Also only one attempt is in flight per campaign
+(`Scheduler.plan`), so parallelism = number of active campaigns, not portfolio slots.
+
+Only `lean_check`/`verified` evidence rows carry the "Lean verified" label;
 everything else is candidate/empirical and no open problem is marked solved — keep it that way:
 the label is granted only by `backend/app/services/lean_checker.py`, never by a worker report.
 
@@ -123,3 +139,45 @@ the label is granted only by `backend/app/services/lean_checker.py`, never by a 
 - The lab runs only while the machine is awake. For always-on hosting the plan is Fly.io
   (one machine, persistent volume for SQLite + Lean cache, secrets as Fly secrets); the user
   has not yet provided a Fly token.
+- Sprint settings used on 2026-09-19: `MATHLAB_DEVIN_MAX_ACU_LIMIT=25`,
+  `MATHLAB_SCHEDULER_INTERVAL_SECONDS=45`.
+
+## 7. One-day sprint (2026-09-19): goal, triage and what was found
+
+Goal set by the user: solve at least one open problem, preferring obscure/neglected but concrete
+problems over famous ones. No open problem is solved yet. State of play:
+
+- Full open Erdős catalog imported (`POST /private/atlas/import/erdos`, 642 problems, 385 with
+  reference Lean statements). Triage export: `snapshots/sprint-2026-09-19/erdos_open.txt`.
+- Lab notes for workers were written into `problems.assumptions` for #686, #835, #647, #677,
+  #699, #488 (they appear in every worker prompt). Key ones, all **unverified sketches**:
+  - **#686** (every N≥2 as a ratio of products of k consecutive integers, m≥n+k): with k=2 and
+    x=2m+3, y=2n+3 the equation is x²−Ny²=1−N; from the trivial solution (1,1) times powers of the
+    fundamental unit of x²−Ny²=1 one gets infinitely many solutions with x,y odd and x≥y+4 for
+    every **non-square** N (checked by hand for N=2,3; parity works for odd N directly, for even N
+    use the square of the unit). So the open content is square N. Local search: 9=26·27·28/(12·13·14),
+    16=14·15·16/(5·6·7), but **no representation of N=4 or N=25 with k≤12 and n<10⁶**
+    (`search686.py`, `search686b.py`). Best next steps: Lean-formalize the non-square case;
+    decide N=4 (it is equivalent to C(a,k)=4·C(b,k) with a≥b+k); the k=3 case is the elliptic
+    curve 4(u³−u)=v³−v.
+  - **#835**: a valid colouring is a proper (k+1)-colouring of the Johnson graph J(2k,k); each
+    colour class is a constant-weight code of distance 4, so has ≤C(2k,k−1)/k elements, forcing
+    every class to be a Steiner system S(k−1,k,2k). Hence the question is equivalent to the
+    existence of a large set LS(k−1,k,2k): k=3 impossible (no S(2,3,6)), k=5 impossible
+    (divisibility), k=4 / k=6 reduce to 5 disjoint SQS(8) / 7 disjoint S(5,6,12) — check the
+    large-set literature (Kramer–Mesner, Teirlinck, Etzion); the k=3 impossibility is finite and
+    Lean-decidable.
+  - **#647**: no n in (24, 2·10⁸] (`search647.c`). **#677**: no coincidence M(n,k)=M(m,k),
+    m≥n+k, for 2≤k≤12, n<3·10⁵ (`search677.py`). **#699**: holds for all n≤3000
+    (`search699.c`). **#488**: no counterexample among small A (`search488.py`).
+- Worker output on the tractable set so far (see ideas/evidence in the DB, `monitor.py` prints
+  a digest): Lean-verified sub-lemmas for #677 (k=2 case, elementary sieve bounds), #699
+  (Kummer criterion + concrete instances), #389, #727 (carry-budget reformulation), #307
+  (arithmetic-derivative reformulation); literature checks found all 16 still open as of
+  2026-09-19 (#699: i=2 and n=2j cases known; #274: Herzog–Schönheim, Sun 2004 for subnormal
+  subgroups).
+
+To resume: restore the snapshot (step 3), start the stack (step 4), un-pause the `tractable`
+portfolio campaigns first (`POST /private/campaigns/{id}/state?state=active`) and set
+`MATHLAB_DEVIN_MAX_ACU_LIMIT=25`. Everything else in the atlas (642 open Erdős problems) is
+available for new campaigns via `POST /private/campaigns`.

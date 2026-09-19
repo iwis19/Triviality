@@ -1,0 +1,15 @@
+== (A) 396 => 389 transfer, N < 300000
+j=0: 396-witnesses=35088; 389 fails for n=3 (m=2): 0 []; for n=2 (m=1): 581 [20, 88, 104, 240, 368, 464, 624, 720]
+j=1: 396-witnesses=3415; 389 fails for n=5 (m=4): 11 [7566, 28545, 62322, 62331, 68154, 186018, 197106, 204216]; for n=4 (m=3): 70 [561, 2184, 5665, 6161, 8241, 11040, 13345, 17680]
+j=2: 396-witnesses=321; 389 fails for n=7 (m=6): 2 [110290, 116290]; for n=6 (m=5): 2 [62322, 244950]
+j=3: 396-witnesses=32; 389 fails for n=9 (m=8): 1 [116291]; for n=8 (m=7): 0 []
+j=4: 396-witnesses=3; 389 fails for n=11 (m=10): 0 []; for n=10 (m=9): 0 []
+== (B) blocking lemma N == -1 mod L_m; N < 300000
+m=1 (n=2): L_m=4; #N==-1 mod L below NMAX: 75000; small-prime violations: 0; witnesses in progression: 6736 (0.0898); overall witness density (sample of 20000): 0.10250
+m=2 (n=3): L_m=36; #N==-1 mod L below NMAX: 8333; small-prime violations: 0; witnesses in progression: 609 (0.0731); overall witness density (sample of 20000): 0.10415
+m=3 (n=4): L_m=72; #N==-1 mod L below NMAX: 4166; small-prime violations: 0; witnesses in progression: 29 (0.0070); overall witness density (sample of 20000): 0.00915
+m=4 (n=5): L_m=1800; #N==-1 mod L below NMAX: 166; small-prime violations: 0; witnesses in progression: 1 (0.0060); overall witness density (sample of 20000): 0.00965
+m=5 (n=6): L_m=1800; #N==-1 mod L below NMAX: 166; small-prime violations: 0; witnesses in progression: 0 (0.0000); overall witness density (sample of 20000): 0.00075
+m=6 (n=7): L_m=88200; #N==-1 mod L below NMAX: 3; small-prime violations: 0; witnesses in progression: 0 (0.0000); overall witness density (sample of 20000): 0.00080
+m=7 (n=8): L_m=176400; #N==-1 mod L below NMAX: 1; small-prime violations: 0; witnesses in progression: 0 (0.0000); overall witness density (sample of 20000): 0.00005
+m=8 (n=9): L_m=529200; #N==-1 mod L below NMAX: 0; small-prime violations: 0; witnesses in progression: 0 (nan); overall witness density (sample of 20000): 0.00005

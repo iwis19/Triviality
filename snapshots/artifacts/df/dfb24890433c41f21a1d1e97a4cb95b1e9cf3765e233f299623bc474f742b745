@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""Recompute E(K) = sum_{p<=K+1, ord_p(2)=p-1} log p - A*K for 16<=K<=KMAX (idea 10893db6, exp9)."""
+import sys, math, time, numpy as np
+KMAX = int(sys.argv[1]) if len(sys.argv) > 1 else 10**7
+A = 0.3739558136192022880547280543464164151116292486061
+t0 = time.time()
+N = KMAX + 2
+spf = np.zeros(N, dtype=np.int32)
+for i in range(2, int(N**.5) + 1):
+    if spf[i] == 0:
+        blk = spf[i*i::i]; m = blk == 0; blk[m] = i
+is_p = spf == 0; is_p[:2] = False
+P = np.flatnonzero(is_p).astype(np.int64)
+spf[is_p] = np.flatnonzero(is_p)
+def modpow_vec(b, e, m):
+    r = np.ones_like(m); b = b % m; e = e.copy()
+    while e.any():
+        odd = (e & 1) == 1
+        r[odd] = (r[odd] * b[odd]) % m[odd]
+        e >>= 1
+        b = (b * b) % m
+    return r
+Podd = P[P > 2]
+cur = Podd - 1
+ok = np.ones(Podd.size, dtype=bool)
+while (cur > 1).any():
+    act = cur > 1
+    q = spf[cur[act]].astype(np.int64)
+    e = (Podd[act] - 1) // q
+    r = modpow_vec(np.full(q.size, 2, dtype=np.int64), e, Podd[act])
+    ok_act = ok[act]; ok_act &= (r != 1); ok[act] = ok_act
+    c = cur[act]
+    while True:
+        d = (c % q == 0)
+        if not d.any(): break
+        c[d] //= q[d]
+    cur[act] = c
+prim = Podd[ok]
+print("primes<=%d: %d ; with 2 primitive root: %d ; ratio %.6f (A=%.6f)" % (N-1, P.size, prim.size, prim.size/P.size, A))
+w = np.zeros(N, dtype=np.float64); w[prim] = np.log(prim)
+cum = np.cumsum(w)
+K = np.arange(16, KMAX + 1, dtype=np.int64)
+E = cum[K + 1] - A * K
+ratio_sqrt = np.abs(E) / np.sqrt(K)
+print("max |E|/sqrt(K) over 16<=K<=%d: %.4f at K=%d" % (KMAX, ratio_sqrt.max(), K[ratio_sqrt.argmax()]))
+lo = 16
+while lo <= KMAX:
+    hi = min(2 * lo - 1, KMAX); m = (K >= lo) & (K <= hi)
+    print("K in [%d,%d]: max|E|=%.3f  max|E|/sqrtK=%.3f  E(hi)=%.3f" % (lo, hi, np.abs(E[m]).max(), ratio_sqrt[m].max(), E[m][-1]))
+    lo *= 2
+big = K >= 2**20
+if big.any():
+    hool = K[big] * np.log(np.log(K[big])) / np.log(K[big])
+    print("max |E|/(K loglog K/log K) for K>=2^20: %.5f" % (np.abs(E[big]) / hool).max())
+print("E(128)=%.3f, max|E| on [64,128]=%.3f" % (E[128-16], np.abs(E[64-16:128-16+1]).max()))
+print("time %.1fs" % (time.time() - t0))
+
+# --- output ---
+# primes<=10000001: 664579 ; with 2 primitive root: 248491 ; ratio 0.373907 (A=0.373956)
+# max |E|/sqrt(K) over 16<=K<=10000000: 1.7682 at K=27771
+# K in [16,31]: max|E|=3.884  max|E|/sqrtK=0.915  E(hi)=2.390
+# K in [32,63]: max|E|=7.315  max|E|/sqrtK=0.944  E(hi)=6.193
+# K in [64,127]: max|E|=9.276  max|E|/sqrtK=1.142  E(hi)=0.171
+# K in [128,255]: max|E|=15.798  max|E|/sqrtK=1.178  E(hi)=3.812
+# K in [256,511]: max|E|=12.811  max|E|/sqrtK=0.690  E(hi)=-2.478
+# K in [512,1023]: max|E|=22.461  max|E|/sqrtK=0.756  E(hi)=-2.829
+# K in [1024,2047]: max|E|=40.107  max|E|/sqrtK=0.930  E(hi)=-11.967
+# K in [2048,4095]: max|E|=51.357  max|E|/sqrtK=0.873  E(hi)=31.667
+# K in [4096,8191]: max|E|=63.058  max|E|/sqrtK=0.818  E(hi)=24.811
+# K in [8192,16383]: max|E|=153.445  max|E|/sqrtK=1.269  E(hi)=-70.848
+# K in [16384,32767]: max|E|=294.663  max|E|/sqrtK=1.768  E(hi)=-130.922
+# K in [32768,65535]: max|E|=226.992  max|E|/sqrtK=0.903  E(hi)=-196.145
+# K in [65536,131071]: max|E|=365.337  max|E|/sqrtK=1.368  E(hi)=-61.499
+# K in [131072,262143]: max|E|=627.654  max|E|/sqrtK=1.434  E(hi)=-491.396
+# K in [262144,524287]: max|E|=899.890  max|E|/sqrtK=1.523  E(hi)=-328.534
+# K in [524288,1048575]: max|E|=905.732  max|E|/sqrtK=0.885  E(hi)=-870.594
+# K in [1048576,2097151]: max|E|=1257.246  max|E|/sqrtK=1.038  E(hi)=-315.854
+# K in [2097152,4194303]: max|E|=1284.256  max|E|/sqrtK=0.635  E(hi)=736.711
+# K in [4194304,8388607]: max|E|=3301.601  max|E|/sqrtK=1.428  E(hi)=563.740
+# K in [8388608,10000000]: max|E|=2561.618  max|E|/sqrtK=0.811  E(hi)=-2520.103
+# max |E|/(K loglog K/log K) for K>=2^20: 0.00527
+# E(128)=-0.203, max|E| on [64,128]=9.276
+# time 2.0s

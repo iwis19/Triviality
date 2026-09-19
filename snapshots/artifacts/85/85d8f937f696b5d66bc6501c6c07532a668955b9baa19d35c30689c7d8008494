@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""Recompute Montgomery large-sieve quantity L for the reduced sequence m = n/M_S(K) (idea 10893db6, exp8).
+L = sum_{q<=Q} mu^2(q) prod_{p|q} w(p)/(p-w(p)),  q composed of primes p<=Q with p not dividing M,
+w(2)=1, w(p)=min(K, ord_p(2)).  Q = floor(sqrt(L')), L' = 2^K / M_S(K).
+Also reports the hybrid block bound 2L'/L + Q + K + 1 and log2(2L'/L), and the K-normalised log L.
+"""
+import sys, math, time
+import numpy as np
+
+def primes_upto(n):
+    s = np.ones(n + 1, dtype=bool); s[:2] = False
+    for i in range(2, int(n ** .5) + 1):
+        if s[i]: s[i*i::i] = False
+    return np.flatnonzero(s)
+
+def factor_small(m):
+    f, d = [], 2
+    while d * d <= m:
+        if m % d == 0:
+            f.append(d)
+            while m % d == 0: m //= d
+        d += 1
+    if m > 1: f.append(m)
+    return f
+
+def two_is_prim_root(p):
+    return p % 2 == 1 and all(pow(2, (p - 1) // q, p) != 1 for q in factor_small(p - 1))
+
+def S(K):
+    return [p for p in range(3, K + 2) if all(p % d for d in range(2, int(p**.5)+1)) and two_is_prim_root(p)]
+
+def omega_array(P, K):
+    """w(p) = min(K, ord_p(2)) for array of odd primes P (int64), vectorised: smallest d<=K with 2^d = 1 mod p."""
+    w = np.full(P.size, K, dtype=np.int64)
+    pw = np.full(P.size, 2 % 1, dtype=np.int64); pw = np.ones(P.size, dtype=np.int64)
+    found = np.zeros(P.size, dtype=bool)
+    for d in range(1, K + 1):
+        pw = (pw * 2) % P
+        hit = (~found) & (pw == 1)
+        w[hit] = d
+        found |= hit
+    return w
+
+def compute_L(K):
+    SK = S(K); M = 1
+    for p in SK: M *= p
+    Lp = (1 << K) / M
+    Q = int(math.isqrt(int((1 << K) // M)))  # floor sqrt of floor(L'); differs negligibly
+    Pall = primes_upto(Q)
+    P = Pall[np.array([M % int(p) != 0 for p in Pall])]
+    Pexcl = [int(p) for p in Pall if M % int(p) == 0]
+    Podd = P[P != 2].astype(np.int64)
+    w = omega_array(Podd, K)
+    f = np.ones(Q + 1, dtype=np.float64)
+    # p = 2: w=1, factor 1/(2-1)=1
+    if Q >= 2:
+        f[4::4] = 0.0
+    for p in Pexcl:                      # primes dividing the wheel modulus impose no condition on m
+        f[p::p] = 0.0
+    for p, wp in zip(Podd.tolist(), w.tolist()):
+        g = wp / (p - wp)
+        f[p::p] *= g
+        if p * p <= Q: f[p*p::p*p] = 0.0
+    f[0] = 0.0
+    L = float(f.sum())
+    return dict(K=K, S=SK, log2M=math.log2(M), log2Lp=math.log2(Lp), Q=Q, nprimes=int(P.size), L=L,
+                logL=math.log(L), norm=math.log(L) / (K * math.log(math.log(K)) / math.log(K)),
+                log2_bound_main=math.log2(2 * Lp / L), bound=2 * Lp / L + Q + K + 1,
+                n_w_eq_K=int((w == K).sum()))
+
+if __name__ == "__main__":
+    for K in [int(a) for a in sys.argv[1:]] or [44, 80]:
+        t = time.time(); r = compute_L(K); r['t'] = round(time.time() - t, 1)
+        print(r, flush=True)
+
+# --- output for 96 104 112 120 ---
+# {'K': 96, 'S': [3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67, 83], 'log2M': 55.364553269879636, 'log2Lp': 40.635446730120364, 'Q': 1306905, 'nprimes': 100503, 'L': 29616.329420814363, 'logL': 10.296081157820515, 'norm': 0.3224251009063928, 'log2_bound_main': 26.781341503142407, 'bound': 116648906.09049737, 'n_w_eq_K': 100401, 't': 0.2}
+# {'K': 104, 'S': [3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67, 83, 101], 'log2M': 62.02276475263143, 'log2Lp': 41.97723524736857, 'Q': 2080671, 'nprimes': 154479, 'L': 47469.09313574587, 'logL': 10.767834107418198, 'norm': 0.3131328595401466, 'log2_bound_main': 27.442534379481295, 'bound': 184481267.924767, 'n_w_eq_K': 154368, 't': 0.3}
+# {'K': 112, 'S': [3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67, 83, 101, 107], 'log2M': 68.76423173903258, 'log2Lp': 43.23576826096742, 'Q': 3218337, 'nprimes': 231454, 'L': 29910.197186807145, 'logL': 10.305954744273848, 'norm': 0.2798497243681128, 'log2_bound_main': 29.367418459777454, 'bound': 695804678.3304679, 'n_w_eq_K': 231331, 't': 0.5}
+# {'K': 120, 'S': [3, 5, 11, 13, 19, 29, 37, 53, 59, 61, 67, 83, 101, 107], 'log2M': 68.76423173903258, 'log2Lp': 51.23576826096742, 'Q': 51493397, 'nprimes': 3085215, 'L': 269994.28912261286, 'logL': 12.506156086359088, 'norm': 0.3186082669318105, 'log2_bound_main': 34.193198894593834, 'bound': 19693168257.64199, 'n_w_eq_K': 3085065, 't': 6.7}

@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+import json, os, sys, urllib.request
+src = open(sys.argv[1]).read()
+decl = sys.argv[2]
+body = json.dumps({"source": src, "declaration": decl}).encode()
+req = urllib.request.Request(
+    "https://stylus-only-exciting-apache.trycloudflare.com/worker/attempts/370709a06b564ce5a3e9e06d969af811/lean-check",
+    data=body,
+    headers={"X-Worker-Token": os.environ["LAB_WORKER_TOKEN"], "Content-Type": "application/json"})
+try:
+    r = urllib.request.urlopen(req, timeout=1500)
+    print(r.status); print(r.read().decode()[:8000])
+except urllib.error.HTTPError as e:
+    print(e.code, e.read().decode()[:8000])

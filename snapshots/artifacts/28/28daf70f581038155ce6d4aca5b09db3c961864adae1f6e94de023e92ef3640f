@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+"""Distribution of S_3 ∩ [0,3^a) (base-3 digits in {0,1}; 2^a elements) modulo m = 5^b and 7^c,
+and of the 'digit-restricted residues' R_p(b) = {r mod p^b : all base-p digits of r <= (p-1)/2}.
+
+Reports: relative discrepancy of residue counts, and the ratio
+   #{n in S_3, n<3^a : n mod p^b in R_p(b)} / (2^a * (|R_p(b)|/p^b))
+i.e. whether the base-3 Cantor set sees the low base-p digits 'randomly'.
+Heuristic threshold for equidistribution mod m from L^1 Fourier bounds: m << 2^{a·c} for some c<1.
+"""
+import sys, math
+from collections import Counter
+
+def S3(a):
+    out = []
+    for k in range(2**a):
+        n = 0; kk = k; pw = 1
+        while kk:
+            if kk & 1: n += pw
+            pw *= 3; kk >>= 1
+        out.append(n)
+    return out
+
+def restricted_residues(p, b):
+    half = (p - 1) // 2
+    R = {0}
+    for _ in range(b):
+        R = {p * r + d for r in R for d in range(half + 1)}
+    return R
+
+def main():
+    a = int(sys.argv[1]) if len(sys.argv) > 1 else 20
+    S = S3(a)
+    N = len(S)
+    print(f"a={a}, |S_3 ∩ [0,3^a)| = 2^{a} = {N}")
+    for p in (5, 7):
+        print(f"--- base p={p}")
+        b = 1
+        while p**b <= 4 * N:
+            m = p**b
+            cnt = Counter(n % m for n in S)
+            exp = N / m
+            disc = max(abs(cnt.get(r, 0) - exp) for r in range(m)) / exp
+            R = restricted_residues(p, b)
+            hit = sum(cnt.get(r, 0) for r in R)
+            ratio = hit / (N * len(R) / m)
+            print(f"  m={p}^{b}={m:>9d}  N/m={exp:10.1f}  max rel. discrepancy={disc:7.3f}   hits-in-R ratio={ratio:.4f}  (#R={len(R)})")
+            b += 1
+
+if __name__ == "__main__":
+    main()

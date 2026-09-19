@@ -1,0 +1,84 @@
+"""Numerical checks for the C_m superset-injection obstruction (idea 5adce551).
+
+1. For random graphs G on <= 8 vertices, the union-closure of E(G) (as vertex 2-sets,
+   nonempty unions) equals {S != {} : every vertex of S has a neighbour in S}.
+2. For C_m, m = 3..14, x = 0, e = V \\ N[x]: counts of F ∩ up(e) avoiding / containing x.
+3. Which sets e ∪ T (T ⊆ N[x]) lie in F for m = 4 (idea says "2 members without x": check).
+4. The graph criterion of claim 39e94af9 via the characterization: 2^deg vs 2^deg - 1.
+"""
+import itertools, random
+
+def union_closure(gens):
+    F = set(gens)
+    changed = True
+    while changed:
+        changed = False
+        for A in list(F):
+            for B in list(F):
+                C = A | B
+                if C not in F:
+                    F.add(C); changed = True
+    return F
+
+def derived(V, E):
+    adj = {v: set() for v in V}
+    for a, b in E:
+        adj[a].add(b); adj[b].add(a)
+    out = set()
+    for r in range(1, len(V) + 1):
+        for S in itertools.combinations(V, r):
+            S = frozenset(S)
+            if all(adj[v] & S for v in S):
+                out.add(S)
+    return out
+
+random.seed(1)
+for trial in range(300):
+    n = random.randint(1, 8)
+    V = list(range(n))
+    E = [(a, b) for a in V for b in V if a < b and random.random() < 0.4]
+    F = union_closure([frozenset(e) for e in E])
+    D = derived(V, E)
+    assert F == D, (n, E)
+print("1. characterization == union-closure on 300 random graphs (n<=8): OK")
+
+def cycle(m):
+    V = list(range(m)); E = [(v, (v + 1) % m) for v in V]
+    return V, E
+
+print("2. C_m counts, x=0, e=V\\N[x]:  m  |e|  avoid_x  contain_x")
+for m in range(3, 15):
+    V, E = cycle(m)
+    F = derived(V, E)
+    x = 0
+    N = {x, 1 % m, (m - 1) % m}
+    e = frozenset(v for v in V if v not in N)
+    up = [A for A in F if e <= A]
+    a = sum(1 for A in up if x not in A); c = sum(1 for A in up if x in A)
+    print(f"   {m:2d}  {len(e):2d}   {a:3d}      {c:3d}")
+
+print("3. m=4 members of F ∩ up(e):")
+V, E = cycle(4); F = derived(V, E); e = frozenset({2})
+print("   ", sorted(sorted(A) for A in F if e <= A))
+
+print("4. graph criterion check (claim 39e94af9) on all graphs on <=6 vertices without isolated vertices:")
+bad = 0; hits = 0
+for n in range(2, 7):
+    V = list(range(n)); pairs = [(a, b) for a in V for b in V if a < b]
+    for mask in range(1 << len(pairs)):
+        E = [pairs[i] for i in range(len(pairs)) if mask >> i & 1]
+        adj = {v: set() for v in V}
+        for a, b in E: adj[a].add(b); adj[b].add(a)
+        if any(not adj[v] for v in V): continue
+        F = None
+        for x in V:
+            e = frozenset(v for v in V if v != x and v not in adj[x])
+            if not e: continue
+            if not all(adj[v] & e for v in e): continue
+            if not all(adj[u] & e for u in adj[x]): continue
+            if F is None: F = derived(V, E)
+            up = [A for A in F if e <= A]
+            a = sum(1 for A in up if x not in A); c = sum(1 for A in up if x in A)
+            hits += 1
+            if not (a == 2 ** len(adj[x]) and c == 2 ** len(adj[x]) - 1): bad += 1
+print(f"   criterion instances: {hits}, mismatches with 2^deg / 2^deg-1: {bad}")

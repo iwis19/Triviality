@@ -1,0 +1,62 @@
+// Faster stage-1 sieve for blocks (2^L, 2^{L+1}], 66 <= L < 120.  Same logic as search128.c
+// but with a CRT wheel modulo W = 7*17*23*41*43*47 for the most restrictive filters and
+// only filter primes p < 2^40 (larger listed primes have negligible filtering power).
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+typedef unsigned __int128 u128; typedef uint64_t u64;
+#define MAXP 4096
+static u64 P[MAXP]; static int ORD[MAXP]; static int NP=0;
+static unsigned char *BAD[MAXP]; // for p < 2^24: table; else sorted set
+static u64 S[MAXP][128];
+static int in_set(int i,u64 r){ if(BAD[i]) return BAD[i][r]; int lo=0,hi=ORD[i]-1; while(lo<=hi){int m=(lo+hi)/2; if(S[i][m]==r)return 1; if(S[i][m]<r)lo=m+1; else hi=m-1;} return 0; }
+static int cmp(const void*a,const void*b){ u64 x=*(u64*)a,y=*(u64*)b; return x<y?-1:x>y; }
+static void print128(u128 x){ char b[50]; int i=49; b[i]=0; if(!x){puts("0");return;} while(x){ b[--i]='0'+(int)(x%10); x/=10;} puts(b+i); }
+static void fprint128(FILE*f,u128 x){ char b[50]; int i=49; b[i]=0; if(!x) b[--i]='0'; while(x){ b[--i]='0'+(int)(x%10); x/=10;} fprintf(f,"%s",b+i); }
+static u64 mulmod(u64 a,u64 b,u64 m){ return (u64)((u128)a*b%m); }
+static u64 powmod(u64 a,u64 e,u64 m){ u64 r=1;a%=m;while(e){if(e&1)r=mulmod(r,a,m);a=mulmod(a,a,m);e>>=1;}return r;}
+static const u64 WP[6]={7,17,23,41,43,47};
+int main(int argc,char**argv){
+  int LO=atoi(argv[1]), HI=atoi(argv[2]);
+  FILE*f=fopen("smallorder.txt","r"); unsigned long long p; int o;
+  while(fscanf(f,"%llu %d",&p,&o)==2){ P[NP]=p; ORD[NP]=o; u64 x=1; for(int k=0;k<o;k++){S[NP][k]=x; x=mulmod(x,2,p);} qsort(S[NP],o,sizeof(u64),cmp);
+    if(p<(1u<<24)){ BAD[NP]=calloc(p,1); for(int k=0;k<o;k++) BAD[NP][S[NP][k]]=1; } else BAD[NP]=NULL; NP++; }
+  fclose(f);
+  u64 W=1; for(int i=0;i<6;i++) W*=WP[i];
+  // allowed residues w mod W
+  unsigned char *okw=malloc(W); u64 nw=0;
+  int widx[6]; for(int i=0;i<6;i++){ widx[i]=-1; for(int j=0;j<NP;j++) if(P[j]==WP[i]) widx[i]=j; }
+  for(u64 w=0;w<W;w++){ int ok=1; for(int i=0;i<6&&ok;i++){ if(BAD[widx[i]][w%WP[i]]) ok=0; } okw[w]=ok; nw+=ok; }
+  fprintf(stderr,"wheel W=%llu allowed=%llu (rate %.5f)\n",(unsigned long long)W,(unsigned long long)nw,(double)nw/W);
+  for(int L=LO; L<HI; L++){
+    u128 lo=((u128)1<<L)+1, hi=((u128)1<<(L+1));
+    u128 M=1; int filt[MAXP], nf=0; double rate[MAXP];
+    for(int i=0;i<NP;i++){ if(ORD[i]>=120) continue; u128 thr=((u128)1<<ORD[i])+P[i]; if(thr<lo){ if((u64)ORD[i]==P[i]-1) M*=P[i]; else { int isw=0; for(int j=0;j<6;j++) if(P[i]==WP[j]) isw=1; if(isw) continue; if(P[i] >= ((u64)1<<40)) continue; filt[nf]=i; rate[nf]=(double)(P[i]-ORD[i])/P[i]; nf++; } } }
+    for(int a=0;a<nf;a++) for(int b=a+1;b<nf;b++) if(rate[b]<rate[a]){int t=filt[a];filt[a]=filt[b];filt[b]=t;double d=rate[a];rate[a]=rate[b];rate[b]=d;}
+    for(int j=0;j<6;j++) if(M%WP[j]==0){ fprintf(stderr,"wheel prime divides M!\n"); return 1; }
+    u128 step=2*M; u128 start=(lo+M-1)/M*M; if(!(start&1)) start+=M;
+    u128 ncand=(start<=hi)?(hi-start)/step+1:0;
+    // t-residues mod W allowed: n = start + t*step ; need okw[n mod W]; t ≡ (w - start)*step^{-1} mod W
+    u64 sW=(u64)(start%W), stW=(u64)(step%W); u64 inv=powmod(stW, 0, W); // placeholder
+    // compute inverse of stW mod W via extended Euclid
+    { int64_t a=(int64_t)stW, b=(int64_t)W, x0=1, x1=0; while(b){ int64_t q=a/b, t=a-q*b; a=b; b=t; t=x0-q*x1; x0=x1; x1=t; } if(a!=1){fprintf(stderr,"gcd!=1\n");return 1;} inv=(u64)((x0%(int64_t)W+(int64_t)W)%(int64_t)W); }
+    u64 *T=malloc(nw*sizeof(u64)); u64 k=0;
+    for(u64 w=0;w<W;w++) if(okw[w]){ u64 d=(w+W-sW)%W; T[k++]=mulmod(d,inv,W); }
+    qsort(T,nw,sizeof(u64),cmp);
+    // per-filter constants
+    u64 r0[MAXP], st[MAXP], dW[MAXP];
+    for(int a=0;a<nf;a++){ int i=filt[a]; r0[a]=(u64)(start%P[i]); st[a]=(u64)(step%P[i]); dW[a]=mulmod(W%P[i],st[a],P[i]); }
+    u128 U=ncand/W+1; long passed=0; u128 checked=0;
+    for(u64 j=0;j<nw;j++){
+      u64 t0=T[j]; u64 rb[MAXP]; for(int a=0;a<nf;a++){ int i=filt[a]; rb[a]=(u64)(( (u128)(t0%P[i])*st[a]+r0[a])%P[i]); }
+      for(u128 u=0;u<U;u++){
+        u128 t=t0+u*W; if(t>=ncand) break; checked++;
+        int ok=1; for(int a=0;a<nf;a++){ int i=filt[a]; u64 r=(rb[a]+(u64)u*dW[a])%P[i]; if(in_set(i,r)){ok=0;break;} }
+        if(ok){ passed++; print128(start+t*step); }
+      }
+    }
+    free(T);
+    fprintf(stderr,"block L=%d: M=",L); fprint128(stderr,M); fprintf(stderr," filters=%d candidates=",nf); fprint128(stderr,ncand); fprintf(stderr," after_wheel=");fprint128(stderr,checked); fprintf(stderr," passed=%ld\n",passed); fflush(stdout);
+  }
+  return 0;
+}

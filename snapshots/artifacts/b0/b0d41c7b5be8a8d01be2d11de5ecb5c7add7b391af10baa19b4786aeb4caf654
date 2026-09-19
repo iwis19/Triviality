@@ -1,0 +1,54 @@
+"""(1) Fixed-length obstruction: for block lengths (L1, L2) the shift n must satisfy
+    P1(n) ≡ P2(n) ≡ 1 (mod p) with P1 = (x+1)...(x+L1), P2 = (x+L1+1)...(x+L1+L2);
+    since gcd_Q[x](P1-1, P2-1) = 1 (see claim C3), p must divide R(L1,L2) = Res(P1-1, P2-1) ≠ 0.
+    We list R and its prime factors for small lengths and check Erdős' example (L1,L2)=(2,3), p=11.
+(2) Tetrad amplification experiment: for q ≡ 1 (mod 6), every prime p | q!-1 gives
+    0!,1!,q!,(p-1-q)!,(p-2)! ≡ 1 (mod p) (five indices, k=4). We test for which such p additionally
+    p ≡ 3 (mod 4) and ((p-1)/2)! ≡ 1 (mod p) [Mordell: iff h(-p) ≡ 3 mod 4], giving a sixth index (k=5).
+"""
+import sys, math
+from sympy import symbols, resultant, factorint, Poly, isprime, gcd, prod, expand
+
+x = symbols('x')
+
+def P(lo, hi):  # (x+lo)...(x+hi)
+    return prod([x + i for i in range(lo, hi + 1)])
+
+print("=== (1) resultants R(L1,L2) = Res(P1-1, P2-1) and their prime factors ===")
+for L1 in range(1, 5):
+    for L2 in range(1, 5):
+        p1 = expand(P(1, L1) - 1); p2 = expand(P(L1 + 1, L1 + L2) - 1)
+        g = gcd(Poly(p1, x), Poly(p2, x))
+        R = int(resultant(p1, p2, x))
+        print(f"L1={L1} L2={L2}: gcd={g.as_expr()}, R={R}, factors={factorint(abs(R)) if R else 'ZERO'}")
+# Erdős example: n=2 -> blocks {3,4},{5,6,7}
+print("Erdős example check: 3*4 mod 11 =", 12 % 11, ", 5*6*7 mod 11 =", 210 % 11, "; 11 | R(2,3)?", int(resultant(expand(P(1,2)-1), expand(P(3,5)-1), x)) % 11 == 0)
+
+print("\n=== (2) tetrad primes p | q!-1, q ≡ 1 mod 6 ===")
+def fact_mod(n, p):
+    f = 1
+    for i in range(2, n + 1):
+        f = f * i % p
+    return f
+
+def check_five(p, q):
+    idx = [0, 1, q, p - 1 - q, p - 2]
+    ok = len(set(idx)) == 5 and all(fact_mod(n, p) == 1 for n in idx)
+    return ok
+
+rows = []
+for q in [7, 13, 19, 25, 31]:
+    Nq = math.factorial(q) - 1
+    fac = factorint(Nq, limit=10**7) if q >= 25 else factorint(Nq)
+    for p, e in fac.items():
+        if not isprime(p) or p > 3_000_000:  # keep the factorial scan cheap; unfactored cofactors are skipped
+            if not isprime(p): print(f"  q={q}: skipping unfactored/large cofactor of size {len(str(p))} digits")
+            else: print(f"  q={q}: prime factor {p} too large for scan, skipped")
+            continue
+        five = check_five(p, q)
+        half = fact_mod((p - 1) // 2, p) if p % 4 == 3 else None
+        six = (p % 4 == 3 and half == 1)
+        rows.append((q, p, five, p % 4, half == 1 if half is not None else None, six))
+        print(f"  q={q:2d} p={p:9d}: five indices 0,1,q,p-1-q,p-2 all n!≡1: {five}; p mod 4 = {p%4}; ((p-1)/2)!≡1: {half==1 if half is not None else '-'}; sixth index available (k=5): {six}")
+print("summary: tetrad primes tested:", len(rows), "; all five-index checks passed:", all(r[2] for r in rows),
+      "; with k=5 upgrade:", sum(1 for r in rows if r[5]))

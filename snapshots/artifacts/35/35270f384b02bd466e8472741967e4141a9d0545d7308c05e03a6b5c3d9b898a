@@ -1,0 +1,43 @@
+import Mathlib
+
+/-!
+Critique of claim b0b99c4f158b44edb0afb2197f95a485 (Lemma A) for Erdős #97.
+
+The approved Lean target
+  theorem angle_middle_ge (v a b c : EuclideanSpace ℝ (Fin 2)) (r : ℝ)
+    (ha : dist v a = r) (hb : dist v b = r) (hc : dist v c = r)
+    (hbetween : ∠ a v b + ∠ b v c = ∠ a v c) : Real.pi - ∠ a v c / 2 ≤ ∠ a b c
+is FALSE as stated: it has no distinctness hypotheses, and Mathlib's unoriented
+angle convention gives `∠ a a c = π / 2`.  Taking `a = b = c ≠ v` the hypothesis
+`hbetween` reads `0 + 0 = 0` while the conclusion reads `π ≤ π / 2`.
+(The same happens for `a = b ≠ c`: `π - ∠ a v c / 2 ≤ π / 2` fails unless `∠ a v c = π`.)
+-/
+
+open EuclideanGeometry Real
+
+/-- The approved Lean target for Lemma A, packaged as a proposition. -/
+def AngleMiddleGeStatement : Prop :=
+  ∀ (v a b c : EuclideanSpace ℝ (Fin 2)) (r : ℝ),
+    dist v a = r → dist v b = r → dist v c = r →
+    ∠ a v b + ∠ b v c = ∠ a v c → Real.pi - ∠ a v c / 2 ≤ ∠ a b c
+
+theorem angle_middle_ge_statement_false : ¬ AngleMiddleGeStatement := by
+  intro h
+  set a : EuclideanSpace ℝ (Fin 2) := EuclideanSpace.single 0 1 with ha
+  have hne : a ≠ (0 : EuclideanSpace ℝ (Fin 2)) := by
+    intro h0
+    have := congrArg (fun f => f 0) h0
+    simp [ha] at this
+  have h0 : ∠ a (0 : EuclideanSpace ℝ (Fin 2)) a = 0 := angle_self_of_ne hne
+  have hmain := h 0 a a a (dist 0 a) rfl rfl rfl (by rw [h0]; ring)
+  rw [h0, angle_self_left] at hmain
+  linarith [Real.pi_pos]
+
+/-- The statement becomes an equality once `a ≠ b` and `b ≠ c` are added
+(inscribed angle theorem, Euclid III.20–22; Mathlib:
+`EuclideanGeometry.Sphere.oangle_center_eq_two_zsmul_oangle`). We only record the
+corrected target here; it is NOT proved in this file. -/
+def AngleMiddleGeCorrectedStatement : Prop :=
+  ∀ (v a b c : EuclideanSpace ℝ (Fin 2)) (r : ℝ),
+    dist v a = r → dist v b = r → dist v c = r → a ≠ b → b ≠ c →
+    ∠ a v b + ∠ b v c = ∠ a v c → Real.pi - ∠ a v c / 2 ≤ ∠ a b c

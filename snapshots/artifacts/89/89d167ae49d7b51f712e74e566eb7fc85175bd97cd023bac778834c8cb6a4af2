@@ -1,0 +1,28 @@
+"""E3 (idea I3): dispersion of the normalised Goldbach count rho(N)=r1(N)/(S(N) I(N)).
+Test whether fluctuations are at the Poisson scale, i.e. std(rho) * sqrt(mean r1) ~ const,
+and record the empirical k-th central moments of (r1 - S*I)/sqrt(S*I) in dyadic blocks.
+If the tail is Gaussian/Poisson-like, an exception (r1 = 0) at N ~ X would be a deviation
+of ~ sqrt(S(N) I(N)) ~ sqrt(N)/log N standard deviations: the *quantitative* target that a
+moment-method proof (k-th moment of the minor-arc integral) would have to certify.
+Run: python3 goldbach_moments.py [LIMIT]
+"""
+import sys, math
+import numpy as np
+sys.argv = [sys.argv[0]] + sys.argv[1:2]
+exec(open(__file__.replace("goldbach_moments.py", "goldbach_experiments.py")).read().split('print("=== E1')[0])
+
+print(f"{'block':>22} {'n':>5} {'mean r1':>8} {'mean rho':>8} {'std rho':>8} {'std*sqrt(mean r1)':>18} {'min z':>7} {'skew':>6} {'kurt':>6}")
+lo = 1024
+while lo < LIMIT:
+    hi = min(2 * lo, LIMIT)
+    stride = 2 if hi - lo <= 8000 else max(2, 2 * ((hi - lo) // 8000))
+    Ns = np.arange(lo, hi, stride); Ns = Ns[Ns % 2 == 0]
+    r = np.array([r1_rsemi(int(N))[0] for N in Ns], float)
+    M = np.array([singular(int(N)) * main_term(int(N)) for N in Ns])
+    rho = r / M
+    z = (r - M) / np.sqrt(M)
+    zc = z - z.mean()
+    skew = (zc**3).mean() / zc.std()**3
+    kurt = (zc**4).mean() / zc.std()**4
+    print(f"[{lo:>9},{hi:>9})  {len(Ns):>5} {r.mean():>8.1f} {rho.mean():>8.4f} {rho.std():>8.4f} {rho.std()*math.sqrt(r.mean()):>18.3f} {z.min():>7.2f} {skew:>6.2f} {kurt:>6.2f}")
+    lo = hi

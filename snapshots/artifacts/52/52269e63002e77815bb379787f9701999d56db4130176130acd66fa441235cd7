@@ -1,0 +1,89 @@
+"""Random ('extended birthday') model for factorial collisions mod p.
+
+Model: for c ∉ {±1}, r_p(c) = #{0<=n<p : n! ≡ c} ~ Poisson(1), independent over c.
+For c = 1:  r_p(1) = 3 + 2A + B + C,  A~Poi(1/4) (odd n in [3,(p-3)/2] with n! ≡ 1, each
+            gives the reflected solution p-1-n), B~Poi(1/2) (even n), C = 1_{((p-1)/2)! ≡ 1}
+            (only for p ≡ 3 mod 4, Mordell: iff h(-p) ≡ 3 mod 4; modelled as prob 1/2).
+For c = -1: r_p(-1) = 1 + 2A' + B' + C' similarly (Wilson gives n = p-1).
+Prediction for the least prime with a value of multiplicity >= m:
+  X_m = least X with  E[#{p <= X : max_c r_p(c) >= m}] >= 1,
+with E ≈ sum_{p<=X} [ 1 - (1-Q(m))^(p-3) (1-P1(m,p)) (1-P2(m,p)) ]  (independence).
+"""
+import math, sys
+import numpy as np
+
+def sieve(N):
+    s = np.ones(N + 1, dtype=bool); s[:2] = False
+    for i in range(2, int(N ** 0.5) + 1):
+        if s[i]: s[i*i::i] = False
+    return np.nonzero(s)[0]
+
+def pois_pmf(lam, k):
+    return math.exp(-lam) * lam ** k / math.factorial(k)
+
+def tail_poisson(lam, m):
+    return 1 - sum(pois_pmf(lam, j) for j in range(m))
+
+def p_value_one(m, pmod4):
+    # P(3 + 2A + B + C >= m)
+    tot = 0.0
+    for A in range(0, m + 1):
+        pa = pois_pmf(0.25, A)
+        for C in ((0, 1) if pmod4 == 3 else (0,)):
+            pc = 0.5 if pmod4 == 3 else 1.0
+            need = m - 3 - 2 * A - C
+            tot += pa * pc * (1.0 if need <= 0 else tail_poisson(0.5, need))
+    return tot
+
+def p_value_minus_one(m, pmod4):
+    tot = 0.0
+    for A in range(0, m + 1):
+        pa = pois_pmf(0.25, A)
+        for C in ((0, 1) if pmod4 == 3 else (0,)):
+            pc = 0.5 if pmod4 == 3 else 1.0
+            need = m - 1 - 2 * A - C
+            tot += pa * pc * (1.0 if need <= 0 else tail_poisson(0.5, need))
+    return tot
+
+def main(N=20_000_000):
+    primes = sieve(N)
+    out = []
+    for m in range(6, 18):
+        Q = tail_poisson(1.0, m)
+        Pplus = {r: p_value_one(m, r) for r in (1, 3)}
+        Pminus = {r: p_value_minus_one(m, r) for r in (1, 3)}
+        cum = 0.0; X = None; cum_generic = 0.0; cum_pm1 = 0.0
+        Xg = None; Xpm = None
+        for p in primes:
+            p = int(p)
+            if p < 7: continue
+            r = p % 4
+            g = 1 - (1 - Q) ** (p - 3)
+            s = 1 - (1 - Pplus[r]) * (1 - Pminus[r])
+            cum += 1 - (1 - g) * (1 - s)
+            cum_generic += g; cum_pm1 += s
+            if X is None and cum >= 1: X = p
+            if Xg is None and cum_generic >= 1: Xg = p
+            if Xpm is None and cum_pm1 >= 1: Xpm = p
+            if X and Xg and Xpm: break
+        out.append((m, X, Xg, Xpm))
+        print(f"m={m:2d} (k={m-1:2d}): predicted least p ~ {X}   [generic-values only: {Xg}, ±1 only: {Xpm}]")
+    return out
+
+if __name__ == "__main__":
+    main(int(sys.argv[1]) if len(sys.argv) > 1 else 20_000_000)
+
+# ---- output (python3 poisson_model.py 3000000) ----
+# m= 6 (k= 5): predicted least p ~ 23   [generic-values only: 131, ±1 only: 23]
+# m= 7 (k= 6): predicted least p ~ 59   [generic-values only: 379, ±1 only: 59]
+# m= 8 (k= 7): predicted least p ~ 181   [generic-values only: 1129, ±1 only: 191]
+# m= 9 (k= 8): predicted least p ~ 691   [generic-values only: 3719, ±1 only: 733]
+# m=10 (k= 9): predicted least p ~ 2791   [generic-values only: 12689, ±1 only: 3011]
+# m=11 (k=10): predicted least p ~ 11959   [generic-values only: 45121, ±1 only: 13147]
+# m=12 (k=11): predicted least p ~ 51991   [generic-values only: 166603, ±1 only: 59119]
+# m=13 (k=12): predicted least p ~ 234211   [generic-values only: 635729, ±1 only: 278767]
+# m=14 (k=13): predicted least p ~ 1069363   [generic-values only: 2509147, ±1 only: 1349059]
+# m=15 (k=14): predicted least p ~ None   [generic-values only: None, ±1 only: None]
+# m=16 (k=15): predicted least p ~ None   [generic-values only: None, ±1 only: None]
+# m=17 (k=16): predicted least p ~ None   [generic-values only: None, ±1 only: None]
+# 

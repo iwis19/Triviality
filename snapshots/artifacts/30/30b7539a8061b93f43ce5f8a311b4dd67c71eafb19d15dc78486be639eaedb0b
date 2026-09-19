@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""
+Barrier check for 'k-fold union' entropy arguments (own reasoning; the 2-fold version is the
+Chase-Lovett approximate-union-closed barrier).
+
+F_eps = { A ⊆ [n] : p n <= |A| <= (p+eps) n }  ∪  { A : |A| >= (1-p) n },  p = (3-sqrt5)/2 so that (1-p)^2 = p.
+
+Claims checked numerically (exact arithmetic over size classes, A,B iid uniform on F_eps):
+  * max element frequency (= E|A|/n by symmetry)  ->  p + eps  as n grows
+  * P(A ∪ B ∉ F_eps)  ->  0 exponentially
+  * since the upper part is an up-set, any k-fold union that fails to lie in F_eps has a 2-fold
+    sub-union that fails, hence P(A_1 ∪ ... ∪ A_k ∉ F_eps) <= C(k,2) P(A∪B ∉ F_eps)  (union bound over pairs is crude but suffices)
+So F_eps is 'approximately closed' under k-fold unions for every fixed k with max frequency ≈ p+eps:
+any argument using only  H(A_1∪...∪A_k) <= log|F| and the marginals cannot beat (3-sqrt5)/2.
+Exact union-closure of F_eps, however, adds all sets of size in ((p+eps)n, (1-p)n), which are
+exponentially more numerous than F_eps itself (h(1/2) > h(p+eps)), and pushes max frequency to >= ~1/2.
+"""
+from fractions import Fraction
+from math import comb, sqrt, log2
+
+def analyze(n, p, eps):
+    lo, hi, big = int(round(p * n)), int(round((p + eps) * n)), int(round((1 - p) * n))
+    allowed = [a for a in range(n + 1) if lo <= a <= hi or a >= big]
+    allowed_set = set(allowed)
+    W = {a: comb(n, a) for a in allowed}
+    tot = sum(W.values())
+    freq = Fraction(sum(a * W[a] for a in allowed), n * tot)
+    mass_upper = Fraction(sum(W[a] for a in allowed if a >= big), tot)
+    fail = Fraction(0)
+    for a in allowed:
+        for b in allowed:
+            pab = Fraction(W[a] * W[b], tot * tot)
+            # distribution of |A∩B| given sizes a,b
+            bad = Fraction(0)
+            for j in range(max(0, a + b - n), min(a, b) + 1):
+                if (a + b - j) not in allowed_set:
+                    bad += Fraction(comb(a, j) * comb(n - a, b - j), comb(n, b))
+            fail += pab * bad
+    # size of exact union closure: all sizes >= lo (unions of two lower-layer sets of sizes in [lo,hi] realise every size in [lo, 2hi]∩[0,n], and 2hi >= big)
+    closure_sizes = [a for a in range(lo, n + 1)]
+    ctot = sum(comb(n, a) for a in closure_sizes)
+    cfreq = Fraction(sum(a * comb(n, a) for a in closure_sizes), n * ctot)
+    return dict(n=n, lo=lo, hi=hi, big=big, size=tot, maxfreq=float(freq), mass_upper=float(mass_upper),
+                P_union_not_in_F=float(fail), closure_size_ratio=float(Fraction(ctot, tot)), closure_maxfreq=float(cfreq))
+
+if __name__ == "__main__":
+    p = (3 - sqrt(5)) / 2
+    print(f"p = (3-sqrt5)/2 = {p:.6f}; (1-p)^2 = {(1-p)**2:.6f}")
+    for eps in (0.02, 0.04):
+        for n in (60, 120, 240, 480):
+            r = analyze(n, p, eps)
+            print(f"eps={eps} n={n:4d} layers |A| in [{r['lo']},{r['hi']}] ∪ [{r['big']},n]  maxfreq={r['maxfreq']:.4f} "
+                  f"upper-mass={r['mass_upper']:.2e}  P(A∪B∉F)={r['P_union_not_in_F']:.2e}  "
+                  f"|closure|/|F|={r['closure_size_ratio']:.2e}  closure maxfreq={r['closure_maxfreq']:.4f}")

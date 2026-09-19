@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""Fast p-adic experiments for Erdős #389 in the form  C(2N, m) | C(2N, N)  (m = n-1, N = n+k-1).
+
+Notation: V_p(N) = v_p(C(2N,N)) = #carries of N+N in base p;
+          c_p(m,N) = v_p(C(2N,m)) = #{t>=1 : m mod p^t > 2N mod p^t}  (Kummer).
+
+Experiments:
+ (A) 396 => 389 transfer:  prod_{i<=j}(N-i) | C(2N,N)  ==>  C(2N,2j+2) | C(2N,N) ?   (and 2j+1 ?)
+ (B) small-prime blocking lemma: N == -1 (mod L_m), L_m = prod_{p<=m+1} p^{ceil(log_p(m+2))}
+     ==> c_p(m,N) <= V_p(N) for all p <= m+1; plus witness density in this progression.
+"""
+import sys
+from math import isqrt, prod
+
+def spf_sieve(N):
+    s = list(range(N + 1))
+    for i in range(2, isqrt(N) + 1):
+        if s[i] == i:
+            for k in range(i * i, N + 1, i):
+                if s[k] == k:
+                    s[k] = i
+    return s
+
+def factor(x, spf):
+    f = {}
+    while x > 1:
+        p = spf[x]
+        while x % p == 0:
+            x //= p; f[p] = f.get(p, 0) + 1
+    return f
+
+def Vp(N, p):
+    v = 0; q = p
+    while q <= 2 * N:
+        if 2 * (N % q) >= q:
+            v += 1
+        q *= p
+    return v
+
+def cp(m, N, p):
+    v = 0; q = p
+    while q <= 2 * N:
+        if m % q > (2 * N) % q:
+            v += 1
+        q *= p
+    return v
+
+def is389(N, m, spf, small_primes):
+    ps = set(p for p in small_primes if p <= m)
+    for r in range(m):
+        ps.update(factor(2 * N - r, spf).keys())
+    for p in ps:
+        if cp(m, N, p) > Vp(N, p):
+            return False
+    return True
+
+def failing_primes_389(N, m, spf, small_primes):
+    ps = set(p for p in small_primes if p <= m)
+    for r in range(m):
+        ps.update(factor(2 * N - r, spf).keys())
+    return sorted(p for p in ps if cp(m, N, p) > Vp(N, p))
+
+def is396(N, j, spf):
+    tot = {}
+    for i in range(j + 1):
+        for p, e in factor(N - i, spf).items():
+            tot[p] = tot.get(p, 0) + e
+    return all(e <= Vp(N, p) for p, e in tot.items())
+
+def L_m(m, small_primes):
+    L = 1
+    for p in small_primes:
+        if p > m + 1:
+            break
+        q = 1
+        while q < m + 2:
+            q *= p
+        L *= q
+    return L
+
+if __name__ == "__main__":
+    NMAX = int(sys.argv[1]) if len(sys.argv) > 1 else 200000
+    spf = spf_sieve(2 * NMAX + 2)
+    small_primes = [p for p in range(2, 200) if spf[p] == p]
+
+    print("== (A) 396 => 389 transfer, N <", NMAX)
+    for j in range(0, 5):
+        wit = 0; fail_even = []; fail_odd = []
+        for N in range(2 * j + 4, NMAX):
+            if is396(N, j, spf):
+                wit += 1
+                if not is389(N, 2 * j + 2, spf, small_primes):
+                    fail_even.append(N)
+                if not is389(N, 2 * j + 1, spf, small_primes):
+                    fail_odd.append(N)
+        print(f"j={j}: 396-witnesses={wit}; 389 fails for n={2*j+3} (m={2*j+2}): {len(fail_even)} {fail_even[:8]};"
+              f" for n={2*j+2} (m={2*j+1}): {len(fail_odd)} {fail_odd[:8]}", flush=True)
+
+    print("== (B) blocking lemma N == -1 mod L_m; N <", NMAX)
+    for m in range(1, 9):
+        L = L_m(m, small_primes)
+        cnt = 0; wit = 0; small_viol = 0; large_fail_primes = {}
+        N = L - 1
+        while N < NMAX:
+            if N >= m + 1:
+                cnt += 1
+                for p in small_primes:
+                    if p > m + 1: break
+                    if cp(m, N, p) > Vp(N, p):
+                        small_viol += 1
+                if is389(N, m, spf, small_primes):
+                    wit += 1
+            N += L
+        # overall density of 389-witnesses for this m (sample every N in a range)
+        lo = max(m + 1, NMAX // 2); tot = 0; ok = 0
+        for N in range(lo, min(lo + 20000, NMAX)):
+            tot += 1
+            if is389(N, m, spf, small_primes): ok += 1
+        print(f"m={m} (n={m+1}): L_m={L}; #N==-1 mod L below NMAX: {cnt}; small-prime violations: {small_viol};"
+              f" witnesses in progression: {wit} ({wit/cnt if cnt else float('nan'):.4f});"
+              f" overall witness density (sample of {tot}): {ok/tot:.5f}", flush=True)

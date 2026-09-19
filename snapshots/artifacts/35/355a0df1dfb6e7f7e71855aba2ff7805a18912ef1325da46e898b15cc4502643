@@ -1,0 +1,207 @@
+### erdos677_support.py
+#!/usr/bin/env python3
+"""
+Bounded experiment for Erdos #677, idea "reduce to same-prime-support".
+
+Part A: exhaustive search for DISJOINT blocks of k consecutive integers with the
+        same set of prime divisors, i.e. Supp(P_k(n)) = Supp(P_k(m)), m >= n+k,
+        with both blocks inside [1, N]. Hash by the sorted tuple of primes.
+Part B: for k=3..KMAX and n<=NB, count m in [n+k, 3(n+k)) with
+        Supp(P_k(m)) SUBSET Supp(P_k(n)) (the relaxation that BSW remark says
+        suffices for their Props 5.2 and 5.7; it is a necessary condition for
+        M(m,k)=M(n,k) by I1's ratio bound m+k<3(n+k) and C3).
+Part C: measure the counting inequality behind BSW Prop 5.2:
+        omega'(P_k(m)) <= omega'(P_k(n)) where omega' counts distinct primes >k,
+        and record min over n<=NB of max_{m in window} omega'(P_k(m)) - omega'(P_k(n)).
+"""
+import sys, time, math
+from collections import defaultdict
+
+N = int(sys.argv[1]) if len(sys.argv) > 1 else 10**6
+KMAX = int(sys.argv[2]) if len(sys.argv) > 2 else 8
+NB = int(sys.argv[3]) if len(sys.argv) > 3 else 2000
+
+def spf_sieve(N):
+    spf = list(range(N + 1))
+    for i in range(2, int(N**0.5) + 1):
+        if spf[i] == i:
+            for j in range(i * i, N + 1, i):
+                if spf[j] == j:
+                    spf[j] = i
+    return spf
+
+t0 = time.time()
+spf = spf_sieve(N + KMAX + 1)
+print(f"sieve up to {N+KMAX+1} done in {time.time()-t0:.1f}s", flush=True)
+
+def primes_of(x):
+    s = set()
+    while x > 1:
+        p = spf[x]; s.add(p)
+        while x % p == 0: x //= p
+    return s
+
+def block_supp(n, k):
+    s = set()
+    for i in range(1, k + 1):
+        s |= primes_of(n + i)
+    return s
+
+def lcm_block(n, k):
+    L = 1
+    for i in range(1, k + 1):
+        L = L * (n + i) // math.gcd(L, n + i)
+    return L
+
+# ---------- Part A ----------
+print("\n=== Part A: disjoint same-support blocks, blocks inside [1,%d] ===" % N)
+for k in range(2, KMAX + 1):
+    t0 = time.time()
+    table = defaultdict(list)
+    # incremental support via multiset counts would be faster; direct is fine for N=1e6, k<=8
+    cur = [primes_of(i) for i in range(1, k + 1)]  # supports of n+1..n+k for n=0
+    cnt = defaultdict(int)
+    for s in cur:
+        for p in s: cnt[p] += 1
+    sols = []
+    for n in range(0, N - k + 1):
+        key = tuple(sorted(cnt.keys()))
+        for n0 in table[key]:
+            if n - n0 >= k:
+                sols.append((n0, n))
+        table[key].append(n)
+        # slide window: remove n+1, add n+k+1
+        if n + k + 1 <= N:
+            for p in cur[0]:
+                cnt[p] -= 1
+                if cnt[p] == 0: del cnt[p]
+            cur.pop(0)
+            s = primes_of(n + k + 1); cur.append(s)
+            for p in s: cnt[p] += 1
+    print(f"k={k}: {len(sols)} disjoint same-support pairs (n,m) with n<m, m>=n+k, m+k<={N}  [{time.time()-t0:.1f}s]")
+    for (a, b) in sols[:40]:
+        eq = lcm_block(a, k) == lcm_block(b, k)
+        print(f"   n={a} m={b} supp={sorted(block_supp(a,k))} lcm_equal={eq} ratio(m+k)/(n+k)={(b+k)/(a+k):.3f}")
+    if len(sols) > 40: print("   ...")
+    # for k=2 compare with known family x=2^h-3, y=2^h(2^h-2)-1 and (74,1214)
+    if k == 2:
+        fam = set()
+        h = 2
+        while 2**h * (2**h - 2) - 1 + 2 <= N:
+            fam.add((2**h - 3, 2**h * (2**h - 2) - 1)); h += 1
+        fam.add((74, 1214))
+        S = set(sols)
+        print("   k=2 known family present:", fam <= S, " extra beyond known family:", sorted(S - fam))
+
+# ---------- Part B & C ----------
+print(f"\n=== Part B/C: n<=%d, m in [n+k, 3(n+k)), subset-support and omega' counts ===" % NB)
+for k in range(3, KMAX + 1):
+    t0 = time.time()
+    M = 3 * (NB + k) + k
+    supp = [frozenset(block_supp(m, k)) for m in range(0, M + 1)]
+    om = [sum(1 for p in s if p > k) for s in supp]
+    subset_hits = []
+    pairs = surv_omega = surv_bigprimes = 0
+    for n in range(0, NB + 1):
+        Sn = supp[n]; wn = om[n]
+        Sn_big = {p for p in Sn if p > k}
+        for m in range(n + k, 3 * (n + k)):
+            pairs += 1
+            if om[m] <= wn: surv_omega += 1
+            Sm_big = {p for p in supp[m] if p > k}
+            if Sm_big <= Sn_big: surv_bigprimes += 1
+            if supp[m] <= Sn:
+                subset_hits.append((n, m, supp[m] == Sn))
+    print(f"k={k}: pairs={pairs}; survivors of omega'(P_k(m))<=omega'(P_k(n)): {surv_omega} ({surv_omega/pairs:.3f}); "
+          f"survivors of 'all primes>k of upper block divide lower block': {surv_bigprimes}; "
+          f"full subset-support hits (n,m,equal?): {subset_hits[:20]}{' ...' if len(subset_hits)>20 else ''} total={len(subset_hits)}  [{time.time()-t0:.1f}s]", flush=True)
+
+
+### results (python3 erdos677_support.py 1000000 10 1500)
+sieve up to 1000011 done in 0.1s
+
+=== Part A: disjoint same-support blocks, blocks inside [1,1000000] ===
+k=2: 842 disjoint same-support pairs (n,m) with n<m, m>=n+k, m+k<=1000000  [4.7s]
+   n=1 m=7 supp=[2, 3] lcm_equal=False ratio(m+k)/(n+k)=3.000
+   n=2 m=7 supp=[2, 3] lcm_equal=False ratio(m+k)/(n+k)=2.250
+   n=4 m=8 supp=[2, 3, 5] lcm_equal=False ratio(m+k)/(n+k)=1.667
+   n=4 m=14 supp=[2, 3, 5] lcm_equal=False ratio(m+k)/(n+k)=2.667
+   n=8 m=14 supp=[2, 3, 5] lcm_equal=False ratio(m+k)/(n+k)=1.600
+   n=13 m=19 supp=[2, 3, 5, 7] lcm_equal=False ratio(m+k)/(n+k)=1.400
+   n=4 m=23 supp=[2, 3, 5] lcm_equal=False ratio(m+k)/(n+k)=4.167
+   n=8 m=23 supp=[2, 3, 5] lcm_equal=False ratio(m+k)/(n+k)=2.500
+   n=14 m=23 supp=[2, 3, 5] lcm_equal=False ratio(m+k)/(n+k)=1.562
+   n=11 m=25 supp=[2, 3, 13] lcm_equal=False ratio(m+k)/(n+k)=2.077
+   n=5 m=26 supp=[2, 3, 7] lcm_equal=False ratio(m+k)/(n+k)=4.000
+   n=10 m=31 supp=[2, 3, 11] lcm_equal=False ratio(m+k)/(n+k)=2.750
+   n=13 m=34 supp=[2, 3, 5, 7] lcm_equal=False ratio(m+k)/(n+k)=2.400
+   n=19 m=34 supp=[2, 3, 5, 7] lcm_equal=False ratio(m+k)/(n+k)=1.714
+   n=5 m=47 supp=[2, 3, 7] lcm_equal=False ratio(m+k)/(n+k)=7.000
+   n=26 m=47 supp=[2, 3, 7] lcm_equal=False ratio(m+k)/(n+k)=1.750
+   n=43 m=53 supp=[2, 3, 5, 11] lcm_equal=False ratio(m+k)/(n+k)=1.222
+   n=5 m=62 supp=[2, 3, 7] lcm_equal=False ratio(m+k)/(n+k)=9.143
+   n=26 m=62 supp=[2, 3, 7] lcm_equal=False ratio(m+k)/(n+k)=2.286
+   n=47 m=62 supp=[2, 3, 7] lcm_equal=False ratio(m+k)/(n+k)=1.306
+   n=24 m=63 supp=[2, 5, 13] lcm_equal=False ratio(m+k)/(n+k)=2.500
+   n=4 m=79 supp=[2, 3, 5] lcm_equal=False ratio(m+k)/(n+k)=13.500
+   n=8 m=79 supp=[2, 3, 5] lcm_equal=False ratio(m+k)/(n+k)=8.100
+   n=14 m=79 supp=[2, 3, 5] lcm_equal=False ratio(m+k)/(n+k)=5.062
+   n=23 m=79 supp=[2, 3, 5] lcm_equal=False ratio(m+k)/(n+k)=3.240
+   n=74 m=94 supp=[2, 3, 5, 19] lcm_equal=False ratio(m+k)/(n+k)=1.263
+   n=20 m=97 supp=[2, 3, 7, 11] lcm_equal=False ratio(m+k)/(n+k)=4.500
+   n=43 m=98 supp=[2, 3, 5, 11] lcm_equal=False ratio(m+k)/(n+k)=2.222
+   n=53 m=98 supp=[2, 3, 5, 11] lcm_equal=False ratio(m+k)/(n+k)=1.818
+   n=89 m=103 supp=[2, 3, 5, 7, 13] lcm_equal=False ratio(m+k)/(n+k)=1.154
+   n=83 m=118 supp=[2, 3, 5, 7, 17] lcm_equal=False ratio(m+k)/(n+k)=1.412
+   n=43 m=119 supp=[2, 3, 5, 11] lcm_equal=False ratio(m+k)/(n+k)=2.689
+   n=53 m=119 supp=[2, 3, 5, 11] lcm_equal=False ratio(m+k)/(n+k)=2.200
+   n=98 m=119 supp=[2, 3, 5, 11] lcm_equal=False ratio(m+k)/(n+k)=1.210
+   n=13 m=124 supp=[2, 3, 5, 7] lcm_equal=False ratio(m+k)/(n+k)=8.400
+   n=19 m=124 supp=[2, 3, 5, 7] lcm_equal=False ratio(m+k)/(n+k)=6.000
+   n=34 m=124 supp=[2, 3, 5, 7] lcm_equal=False ratio(m+k)/(n+k)=3.500
+   n=49 m=134 supp=[2, 3, 5, 17] lcm_equal=False ratio(m+k)/(n+k)=2.667
+   n=28 m=143 supp=[2, 3, 5, 29] lcm_equal=False ratio(m+k)/(n+k)=4.833
+   n=110 m=146 supp=[2, 3, 7, 37] lcm_equal=False ratio(m+k)/(n+k)=1.321
+   ...
+   k=2 known family present: True  extra beyond known family: 842-len(family) pairs (list omitted; k=2 same-support pairs are plentiful, e.g. (1,7),(2,7),(4,8),(13,19),(89,103),...)
+k=3: 16 disjoint same-support pairs (n,m) with n<m, m>=n+k, m+k<=1000000  [4.7s]
+   n=2 m=7 supp=[2, 3, 5] lcm_equal=False ratio(m+k)/(n+k)=2.000
+   n=3 m=7 supp=[2, 3, 5] lcm_equal=False ratio(m+k)/(n+k)=1.667
+   n=4 m=13 supp=[2, 3, 5, 7] lcm_equal=False ratio(m+k)/(n+k)=2.286
+   n=11 m=25 supp=[2, 3, 7, 13] lcm_equal=False ratio(m+k)/(n+k)=2.000
+   n=4 m=47 supp=[2, 3, 5, 7] lcm_equal=False ratio(m+k)/(n+k)=7.143
+   n=13 m=47 supp=[2, 3, 5, 7] lcm_equal=False ratio(m+k)/(n+k)=3.125
+   n=33 m=48 supp=[2, 3, 5, 7, 17] lcm_equal=False ratio(m+k)/(n+k)=1.417
+   n=19 m=53 supp=[2, 3, 5, 7, 11] lcm_equal=False ratio(m+k)/(n+k)=2.545
+   n=12 m=62 supp=[2, 3, 5, 7, 13] lcm_equal=False ratio(m+k)/(n+k)=4.333
+   n=54 m=74 supp=[2, 3, 5, 7, 11, 19] lcm_equal=False ratio(m+k)/(n+k)=1.351
+   n=19 m=97 supp=[2, 3, 5, 7, 11] lcm_equal=False ratio(m+k)/(n+k)=4.545
+   n=53 m=97 supp=[2, 3, 5, 7, 11] lcm_equal=False ratio(m+k)/(n+k)=1.786
+   n=32 m=118 supp=[2, 3, 5, 7, 11, 17] lcm_equal=False ratio(m+k)/(n+k)=3.457
+   n=168 m=322 supp=[2, 3, 5, 13, 17, 19] lcm_equal=False ratio(m+k)/(n+k)=1.901
+   n=88 m=622 supp=[2, 3, 5, 7, 13, 89] lcm_equal=False ratio(m+k)/(n+k)=6.868
+   n=2649 m=58562 supp=[2, 3, 5, 11, 13, 17, 53, 241] lcm_equal=False ratio(m+k)/(n+k)=22.083
+k=4: 5 disjoint same-support pairs (n,m) with n<m, m>=n+k, m+k<=1000000  [4.9s]
+   n=11 m=24 supp=[2, 3, 5, 7, 13] lcm_equal=False ratio(m+k)/(n+k)=1.867
+   n=12 m=24 supp=[2, 3, 5, 7, 13] lcm_equal=False ratio(m+k)/(n+k)=1.750
+   n=13 m=47 supp=[2, 3, 5, 7, 17] lcm_equal=False ratio(m+k)/(n+k)=3.000
+   n=18 m=53 supp=[2, 3, 5, 7, 11, 19] lcm_equal=False ratio(m+k)/(n+k)=2.591
+   n=151 m=339 supp=[2, 3, 5, 7, 11, 17, 19, 31] lcm_equal=False ratio(m+k)/(n+k)=2.213
+k=5: 2 disjoint same-support pairs (n,m) with n<m, m>=n+k, m+k<=1000000  [4.9s]
+   n=11 m=23 supp=[2, 3, 5, 7, 13] lcm_equal=False ratio(m+k)/(n+k)=1.750
+   n=12 m=47 supp=[2, 3, 5, 7, 13, 17] lcm_equal=False ratio(m+k)/(n+k)=3.059
+k=6: 0 disjoint same-support pairs (n,m) with n<m, m>=n+k, m+k<=1000000  [5.0s]
+k=7: 0 disjoint same-support pairs (n,m) with n<m, m>=n+k, m+k<=1000000  [5.2s]
+k=8: 0 disjoint same-support pairs (n,m) with n<m, m>=n+k, m+k<=1000000  [5.4s]
+k=9: 0 disjoint same-support pairs (n,m) with n<m, m>=n+k, m+k<=1000000  [5.3s]
+k=10: 0 disjoint same-support pairs (n,m) with n<m, m>=n+k, m+k<=1000000  [5.9s]
+
+=== Part B/C: n<=1500, m in [n+k, 3(n+k)), subset-support and omega' counts ===
+k=3: pairs=2260506; survivors of omega'(P_k(m))<=omega'(P_k(n)): 1322203 (0.585); survivors of 'all primes>k of upper block divide lower block': 57; full subset-support hits (n,m,equal?): [(2, 7, True), (3, 7, True), (4, 7, False), (4, 13, True), (11, 25, True), (12, 23, False), (12, 24, False), (12, 25, False), (13, 47, True), (18, 47, False), (19, 47, False), (19, 53, True), (27, 47, False), (32, 47, False), (32, 48, False), (32, 53, False), (32, 97, False), (33, 47, False), (33, 48, True), (34, 47, False)] ... total=57  [2.0s]
+k=4: pairs=2263508; survivors of omega'(P_k(m))<=omega'(P_k(n)): 1255059 (0.554); survivors of 'all primes>k of upper block divide lower block': 16; full subset-support hits (n,m,equal?): [(9, 23, False), (11, 23, False), (11, 24, True), (12, 23, False), (12, 24, True), (13, 47, True), (18, 53, True), (31, 47, False), (32, 47, False), (33, 47, False), (118, 241, False), (151, 339, True), (201, 286, False), (202, 286, False), (1186, 1679, False), (1187, 1679, False)] total=16  [2.3s]
+k=5: pairs=2266510; survivors of omega'(P_k(m))<=omega'(P_k(n)): 1192365 (0.526); survivors of 'all primes>k of upper block divide lower block': 6; full subset-support hits (n,m,equal?): [(9, 23, False), (10, 23, False), (11, 23, True), (12, 23, False), (12, 47, True), (118, 241, False)] total=6  [2.5s]
+k=6: pairs=2269512; survivors of omega'(P_k(m))<=omega'(P_k(n)): 1127948 (0.497); survivors of 'all primes>k of upper block divide lower block': 0; full subset-support hits (n,m,equal?): [] total=0  [2.6s]
+k=7: pairs=2272514; survivors of omega'(P_k(m))<=omega'(P_k(n)): 1072164 (0.472); survivors of 'all primes>k of upper block divide lower block': 0; full subset-support hits (n,m,equal?): [] total=0  [2.7s]
+k=8: pairs=2275516; survivors of omega'(P_k(m))<=omega'(P_k(n)): 1021714 (0.449); survivors of 'all primes>k of upper block divide lower block': 0; full subset-support hits (n,m,equal?): [] total=0  [2.8s]
+k=9: pairs=2278518; survivors of omega'(P_k(m))<=omega'(P_k(n)): 969463 (0.425); survivors of 'all primes>k of upper block divide lower block': 0; full subset-support hits (n,m,equal?): [] total=0  [3.0s]
+k=10: pairs=2281520; survivors of omega'(P_k(m))<=omega'(P_k(n)): 919198 (0.403); survivors of 'all primes>k of upper block divide lower block': 0; full subset-support hits (n,m,equal?): [] total=0  [3.1s]

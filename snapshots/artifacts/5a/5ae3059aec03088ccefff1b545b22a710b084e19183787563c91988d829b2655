@@ -1,0 +1,42 @@
+# Model prediction for the number of n in (2^L, 2^{L+1}] with exactly one / exactly two composite values
+# among n - 2^k (1<=k<=L), using shift-set-dependent singular series, compared with exact counts.
+import math, sys, itertools
+from mpmath import mp, mpf, log, quad, exp
+mp.dps = 20
+B = 200000
+sieve = bytearray([1]) * (B + 1); sieve[0] = sieve[1] = 0
+for i in range(2, int(B ** 0.5) + 1):
+    if sieve[i]: sieve[i*i::i] = bytearray(len(sieve[i*i::i]))
+primes = [i for i in range(3, B + 1) if sieve[i]]
+pw = {p: [pow(2, k, p) for k in range(0, 64)] for p in primes}
+def logS(shifts):  # singular series for the tuple {n - 2^k : k in shifts}
+    m = len(shifts); s = (m - 1) * math.log(2)
+    for p in primes:
+        nu = len(set(pw[p][k] for k in shifts))
+        s += math.log(1 - nu / p) - m * math.log(1 - 1 / p)
+    s -= (m * m - m) / 2 / (B * math.log(B))
+    return s
+def integral(L, shifts, comp):
+    two_L = mpf(2) ** L
+    def g(u):
+        y = exp(u); v = exp(u)
+        for k in shifts: v /= log(two_L + y - mpf(2) ** k)
+        for k in comp: v *= (1 - 2 / log(two_L + y - mpf(2) ** k))
+        return v
+    return quad(g, [log(3), log(two_L) / 2, log(two_L)])
+actual_d1 = {2:1,3:3,4:2,5:2,6:2,7:2,8:2,9:0,10:0,11:0,12:0,13:0,14:0,15:0,16:0}
+actual_d2 = {2:0,3:0,4:3,5:6,6:2,7:6,8:4,9:4,10:3,11:3,12:3,13:1,14:0,15:0,16:0}
+print("L  model_d1  actual_d1  model_d2  actual_d2")
+LMAX = int(sys.argv[1]) if len(sys.argv) > 1 else 16
+for L in range(2, LMAX + 1):
+    ks = list(range(1, L + 1))
+    d1 = mpf(0)
+    for j in ks:
+        sh = [k for k in ks if k != j]
+        d1 += exp(mpf(logS(sh))) * integral(L, sh, [j])
+    d2 = mpf(0)
+    if L <= 14:
+        for j1, j2 in itertools.combinations(ks, 2):
+            sh = [k for k in ks if k not in (j1, j2)]
+            d2 += exp(mpf(logS(sh))) * integral(L, sh, [j1, j2])
+    print("%2d %9.3f %6d %9.3f %6s" % (L, float(d1), actual_d1.get(L, 0), float(d2), actual_d2.get(L, '?') if L <= 14 else '-'))

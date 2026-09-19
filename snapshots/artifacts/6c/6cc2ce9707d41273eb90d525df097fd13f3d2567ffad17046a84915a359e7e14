@@ -1,0 +1,36 @@
+import experiments2 as E
+primes = E.primes_upto(2_000_000)
+NMODEL, IMAX = 40000, 70
+spf = list(range(NMODEL + 1))
+for p in primes:
+    if p * p > NMODEL: break
+    for k in range(p * p, NMODEL + 1, p):
+        if spf[k] == k: spf[k] = p
+def pf(m):
+    out = set()
+    while m > 1:
+        out.add(spf[m]); m //= spf[m]
+    return out
+cum_gt = cum_ge = 0.0; by_i = {}
+chks = {100,300,1000,3000,10000,20000,40000}
+for n in range(6, NMODEL + 1):
+    bp = [pf(n - k) for k in range(min(IMAX, n))]
+    for i in range(2, min(IMAX, n // 2) + 1):
+        P = set()
+        for k in range(i): P |= bp[k]
+        count = max(n / 2 - i, 0); fgt = fge = count
+        for p in P:
+            if p < i: continue
+            if p > n // 2: fgt = fge = 0.0; break
+            if E.vp_binom(n, i, p) > 0:
+                f = E.dominated_fraction(n, p)
+                fge *= f
+                if p > i: fgt *= f
+        cum_gt += fgt; cum_ge += fge; by_i[i] = by_i.get(i, 0.0) + fge
+    if n in (10000, 20000, 40000): print(n, {k: round(v, 4) for k, v in sorted(by_i.items()) if v > 1e-3})
+
+# OUTPUT:
+# 10000 {2: 5.2629, 3: 4.2624, 4: 1.1143, 5: 0.7301, 6: 0.0218, 7: 0.0275, 8: 0.0066, 9: 0.0014, 12: 0.0022, 13: 0.0017}
+# 20000 {2: 5.3431, 3: 4.2642, 4: 1.1143, 5: 0.7301, 6: 0.0218, 7: 0.0275, 8: 0.0066, 9: 0.0014, 12: 0.0022, 13: 0.0017}
+# 40000 {2: 5.4004, 3: 4.2648, 4: 1.1143, 5: 0.7301, 6: 0.0218, 7: 0.0275, 8: 0.0066, 9: 0.0014, 12: 0.0022, 13: 0.0017}
+# 

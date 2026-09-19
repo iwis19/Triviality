@@ -1,0 +1,200 @@
+#!/usr/bin/env python3
+"""
+check_cert.py -- independent checker for the witness log produced by gen_cert.py.
+
+Usage: python3 check_cert.py OUTDIR Kmin Kmax [--slow]
+
+What is checked (for every block K in [Kmin, Kmax]):
+  1. Recompute S(K) = {p prime, 3 <= p <= K+1, 2 is a primitive root mod p} by direct order computation,
+     M = prod S(K), i_lo = floor((2^K+K+1)/M)+1, i_hi = floor(2^{K+1}/M); compare with the block meta.
+  2. Type A: for every j in 1..K+1 exactly one line "K j k kind w" exists in typeA.txt and its witness is valid.
+  3. Type B: for every t in 0..i_hi-i_lo the entry is either a factor witness (kk[t]=k, ww[t]=q) with
+        1 <= k <= K, 1 < q < n - 2^k, q | n - 2^k,    n = M*(i_lo+t)
+     or kk[t] = 0 and there is exactly one line "K i k kind w" in mr.txt with i = i_lo+t whose witness is valid:
+        kind 'mr' : m = n-2^k odd, m > 2, 2 <= w < m, w is a strong (Miller-Rabin) witness for m
+        kind 'one': n - 2^k == 1
+        kind 'sol': n is a SOLUTION -- re-verified: n - 2^k prime for all 1 <= k <= K (reported, not an error)
+  The factor check is done vectorised (numpy int64) via  (M mod q)(i mod q) == 2^k mod q, which is
+  equivalent to q | M*i - 2^k; properness q < n-2^k is guaranteed by n-2^k > 2^{K-1} >= 2^16 > q when
+  k < K and K >= 17, and is checked with exact integers otherwise.  With --slow every entry is checked
+  with exact Python integers instead (no numpy arithmetic).
+Only Python integers, numpy and (for the primality of reported solutions only) trial division are used.
+"""
+import sys, os
+import numpy as np
+
+
+def is_prime_small(m):
+    if m < 2:
+        return False
+    d = 2
+    while d * d <= m:
+        if m % d == 0:
+            return False
+        d += 1
+    return True
+
+
+def primes_upto(n):
+    return [p for p in range(2, n + 1) if is_prime_small(p)]
+
+
+def order2(p):
+    o, x = 1, 2 % p
+    while x != 1:
+        x = x * 2 % p
+        o += 1
+    return o
+
+
+def S_of_K(K):
+    return [p for p in primes_upto(K + 1) if p >= 3 and order2(p) == p - 1]
+
+
+def is_strong_witness(a, m):
+    """True iff a is a strong witness for the compositeness of odd m > 2."""
+    if m % 2 == 0 or m <= 2 or not (2 <= a < m):
+        return False
+    d, s = m - 1, 0
+    while d % 2 == 0:
+        d //= 2
+        s += 1
+    x = pow(a, d, m)
+    if x == 1 or x == m - 1:
+        return False
+    for _ in range(s - 1):
+        x = x * x % m
+        if x == m - 1:
+            return False
+    return True
+
+
+def check_witness(n, K, k, kind, w):
+    """Exact check of one witness for candidate n in block K. Returns (ok, is_solution)."""
+    if kind == 'sol':
+        return all(is_prime_small(n - (1 << k)) for k in range(1, K + 1)), True
+    if not (1 <= k <= K):
+        return False, False
+    m = n - (1 << k)
+    if kind == 'f':
+        return (1 < w < m and m % w == 0), False
+    if kind == 'mr':
+        return is_strong_witness(w, m), False
+    if kind == 'one':
+        return m == 1, False
+    return False, False
+
+
+def read_lines(path):
+    d = {}
+    if not os.path.exists(path):
+        return d
+    with open(path) as f:
+        for line in f:
+            K, idx, k, kind, w = line.split()
+            key = (int(K), int(idx))
+            if key in d:
+                raise SystemExit("duplicate line for %s in %s" % (key, path))
+            d[key] = (int(k), kind, int(w))
+    return d
+
+
+def check_block(K, out, A, MR, slow):
+    errors = []
+    S = S_of_K(K)
+    M = 1
+    for p in S:
+        M *= p
+    lo, hi = 1 << K, 1 << (K + 1)
+    i_lo = (lo + K + 1) // M + 1
+    i_hi = hi // M
+    sols = []
+    # type A
+    for j in range(1, K + 2):
+        if (K, j) not in A:
+            errors.append("typeA missing K=%d j=%d" % (K, j)); continue
+        k, kind, w = A[(K, j)]
+        ok, is_sol = check_witness(lo + j, K, k, kind, w)
+        if not ok:
+            errors.append("typeA bad witness K=%d j=%d" % (K, j))
+        if is_sol:
+            sols.append(lo + j)
+    # type B
+    z = np.load(os.path.join(out, "block%02d.npz" % K), allow_pickle=True)
+    kk, ww, meta = z["kk"], z["ww"], list(z["meta"])
+    N = max(0, i_hi - i_lo + 1)
+    if meta != [K, i_lo, i_hi] or kk.shape != (N,) or ww.shape != (N,):
+        errors.append("block %d: meta/shape mismatch: meta=%s expected %s, N=%d shape=%s" % (K, meta, [K, i_lo, i_hi], N, kk.shape))
+        return errors, sols, 0
+    nfact = 0
+    if slow or N == 0:
+        for t in range(N):
+            n = M * (i_lo + t)
+            if kk[t] > 0:
+                ok, _ = check_witness(n, K, int(kk[t]), 'f', int(ww[t]))
+                if not ok:
+                    errors.append("block %d t=%d bad factor witness" % (K, t))
+                nfact += 1
+    else:
+        kk64 = kk.astype(np.int64); ww64 = ww.astype(np.int64)
+        idx = np.arange(i_lo, i_hi + 1, dtype=np.int64)
+        fac = kk64 > 0
+        nfact = int(fac.sum())
+        if ((kk64 > K) | (fac & (ww64 < 2))).any():
+            errors.append("block %d: k out of range or q < 2" % K)
+        key = (kk64 * 65536 + ww64)[fac]
+        ifac = idx[fac]
+        order = np.argsort(key, kind="stable")
+        key, ifac = key[order], ifac[order]
+        bounds = np.flatnonzero(np.diff(key)) + 1
+        starts = np.concatenate([[0], bounds]); ends = np.concatenate([bounds, [key.size]])
+        for a, b in zip(starts.tolist(), ends.tolist()):
+            if a >= b:
+                continue
+            k, q = divmod(int(key[a]), 65536)
+            i = ifac[a:b]
+            lhs = ((M % q) * (i % q)) % q
+            if not np.all(lhs == pow(2, k, q)):
+                errors.append("block %d: divisibility fails for (k,q)=(%d,%d)" % (K, k, q))
+            # properness q < n - 2^k
+            if k == K or K < 17:
+                for ii in i.tolist():
+                    if not (q < M * ii - (1 << k)):
+                        errors.append("block %d: improper divisor i=%d k=%d q=%d" % (K, ii, k, q))
+            # else: n - 2^k > 2^{K-1} >= 2^16 > q automatically
+    # entries with kk == 0 must be covered by mr.txt
+    zero_t = np.nonzero(kk == 0)[0].tolist()
+    mr_here = {i for (KK, i) in MR if KK == K}
+    for t in zero_t:
+        i = i_lo + t
+        if (K, i) not in MR:
+            errors.append("block %d: index i=%d has no witness" % (K, i)); continue
+        k, kind, w = MR[(K, i)]
+        ok, is_sol = check_witness(M * i, K, k, kind, w)
+        if not ok:
+            errors.append("block %d: bad mr/sol witness i=%d" % (K, i))
+        if is_sol:
+            sols.append(M * i)
+        mr_here.discard(i)
+    for i in mr_here:
+        if not (i_lo <= i <= i_hi):
+            errors.append("block %d: mr.txt index %d outside [%d,%d]" % (K, i, i_lo, i_hi))
+    return errors, sols, N
+
+
+if __name__ == "__main__":
+    out, Kmin, Kmax = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+    slow = "--slow" in sys.argv
+    A = read_lines(os.path.join(out, "typeA.txt"))
+    MR = read_lines(os.path.join(out, "mr.txt"))
+    all_ok, all_sols, total = True, [], 0
+    for K in range(Kmin, Kmax + 1):
+        errs, sols, N = check_block(K, out, A, MR, slow)
+        total += N + K + 1
+        all_sols += sols
+        status = "OK" if not errs else "FAIL"
+        print("K=%d %s candidates=%d solutions=%s %s" % (K, status, N + K + 1, sols, errs[:3]), flush=True)
+        all_ok &= not errs
+    print("RANGE (2^%d, 2^%d] checked; total candidates %d; all witnesses valid: %s; solutions: %s"
+          % (Kmin, Kmax + 1, total, all_ok, sorted(all_sols)))
+    sys.exit(0 if all_ok else 1)

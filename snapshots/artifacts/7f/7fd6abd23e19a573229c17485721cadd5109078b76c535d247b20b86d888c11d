@@ -1,0 +1,555 @@
+===== degrey_stage1.py =====
+#!/usr/bin/env python3
+"""
+Stage-1 test for the de Grey-style two-stage argument at 5 colors.
+
+For each graph H in Heule's CNP-SAT repository (https://github.com/marijnheule/CNP-SAT,
+vtx/*.vtx = Mathematica-style exact coordinates, edge/*.edge = DIMACS unit-distance edges)
+and for each 'rare property' P among
+   P1: some pair of vertices at distance sqrt(3) is monochromatic
+   P2: some pair of vertices at distance 1/sqrt(3) is monochromatic
+   P3: some regular triangle of side sqrt(3) is monochromatic
+we ask (SAT) whether there is a proper 5-coloring of H that is P-free, and if so,
+we compute (MaxSAT, RC2) the minimum number of P-occurrences over all proper 5-colorings.
+
+Distances are computed with mpmath at 60 digits; two lengths are "equal" if they
+agree to 1e-30. Edge lists are cross-checked against the coordinate-derived unit pairs.
+"""
+import sys, re, time, itertools, json
+import mpmath as mp
+from pysat.formula import CNF, WCNF
+from pysat.solvers import Cadical153
+from pysat.examples.rc2 import RC2
+
+mp.mp.dps = 60
+TOL = mp.mpf('1e-30')
+K = 5
+
+def parse_vtx(path):
+    pts = []
+    for line in open(path):
+        line = line.strip()
+        if not line:
+            continue
+        s = line.strip('{}')
+        s = s.replace('Sqrt[', 'mp.sqrt(').replace(']', ')')
+        s = re.sub(r'(?<![\w.])(\d+)(?![\w.])', r'mp.mpf(\1)', s)  # exact integers, no float division
+        a, b = s.split(',', 1) if s.count(',') == 1 else split_top(s)
+        pts.append((mp.mpf(eval(a, {'mp': mp})), mp.mpf(eval(b, {'mp': mp}))))
+    return pts
+
+def split_top(s):
+    depth = 0
+    for i, ch in enumerate(s):
+        if ch in '([': depth += 1
+        elif ch in ')]': depth -= 1
+        elif ch == ',' and depth == 0:
+            return s[:i], s[i+1:]
+    raise ValueError(s)
+
+def parse_edges(path):
+    E = []
+    for line in open(path):
+        if line.startswith('e '):
+            _, a, b = line.split()
+            E.append((int(a)-1, int(b)-1))
+    return E
+
+def pairs_at(pts, d):
+    """float prefilter (|dist-d|<1e-9) then 60-digit confirmation (|dist-d|<1e-30)."""
+    import numpy as np
+    P = np.array([[float(x), float(y)] for x, y in pts])
+    D = np.sqrt(((P[:, None, :] - P[None, :, :])**2).sum(-1))
+    I, J = np.where(np.abs(D - float(d)) < 1e-9)
+    out = []
+    for i, j in zip(I, J):
+        if i < j:
+            dx = pts[i][0] - pts[j][0]; dy = pts[i][1] - pts[j][1]
+            if abs(mp.sqrt(dx*dx+dy*dy) - d) < TOL:
+                out.append((int(i), int(j)))
+    return sorted(out)
+
+def triangles(pairs, n):
+    adj = [set() for _ in range(n)]
+    for i, j in pairs:
+        adj[i].add(j); adj[j].add(i)
+    T = set()
+    for i, j in pairs:
+        for k in adj[i] & adj[j]:
+            T.add(tuple(sorted((i, j, k))))
+    return sorted(T)
+
+def var(v, c):  # colors 0..K-1
+    return v*K + c + 1
+
+def base_cnf(n, E):
+    cnf = CNF()
+    for v in range(n):
+        cnf.append([var(v, c) for c in range(K)])
+    for u, v in E:
+        for c in range(K):
+            cnf.append([-var(u, c), -var(v, c)])
+    # symmetry breaking: vertex 0 gets color 0 (harmless: colors are interchangeable)
+    cnf.append([var(0, 0)])
+    return cnf
+
+def run(name, n, E, occurrences, label, budget_s):
+    """occurrences: list of vertex tuples (pairs or triples). P-free = no tuple monochromatic."""
+    res = {'graph': name, 'property': label, 'num_occurrences': len(occurrences)}
+    if not occurrences:
+        res['pfree_5col'] = 'vacuous (no occurrences)'
+        return res
+    cnf = base_cnf(n, E)
+    for tup in occurrences:
+        for c in range(K):
+            cnf.append([-var(v, c) for v in tup])
+    t = time.time()
+    with Cadical153(bootstrap_with=cnf.clauses) as s:
+        sat = s.solve()
+        model = s.get_model() if sat else None
+    res['pfree_5col'] = 'SAT' if sat else 'UNSAT'
+    res['pfree_time_s'] = round(time.time()-t, 2)
+    if sat:
+        col = [next(c for c in range(K) if model[var(v, c)-1] > 0) for v in range(n)]
+        # sanity: proper and P-free
+        assert all(col[u] != col[v] for u, v in E)
+        assert all(len(set(col[v] for v in tup)) > 1 for tup in occurrences)
+        res['min_occurrences'] = 0
+        res['witness_coloring'] = col
+    else:
+        # minimum number of monochromatic occurrences via MaxSAT (RC2)
+        wcnf = WCNF()
+        for cl in base_cnf(n, E).clauses:
+            wcnf.append(cl)
+        top = n*K
+        for tup in occurrences:
+            top += 1; y = top
+            for c in range(K):
+                wcnf.append([y] + [-var(v, c) for v in tup])  # all same color c -> y
+            wcnf.append([-y], weight=1)
+        t = time.time()
+        with RC2(wcnf, solver='cd15', adapt=True, exhaust=True, minz=True) as rc2:
+            m = rc2.compute()
+            res['min_occurrences'] = rc2.cost
+        res['maxsat_time_s'] = round(time.time()-t, 2)
+        col = [next(c for c in range(K) if m[var(v, c)-1] > 0) for v in range(n)]
+        assert all(col[u] != col[v] for u, v in E)
+        mono = [tup for tup in occurrences if len(set(col[v] for v in tup)) == 1]
+        assert len(mono) == rc2.cost, (len(mono), rc2.cost)
+        res['witness_coloring'] = col
+        res['mono_occurrences_in_witness'] = mono
+    return res
+
+def main(names):
+    root = sys.argv[1] if len(sys.argv) > 1 else '/home/ubuntu/CNP-SAT'
+    results = []
+    for name in names:
+        pts = parse_vtx(f'{root}/vtx/{name}.vtx')
+        n = len(pts)
+        unit = pairs_at(pts, mp.mpf(1))
+        try:
+            E = parse_edges(f'{root}/edge/{name}.edge')
+            same = set(map(tuple, map(sorted, E))) == set(unit)
+        except FileNotFoundError:
+            E, same = unit, 'edges derived from coordinates'
+        s3 = pairs_at(pts, mp.sqrt(3))
+        s13 = pairs_at(pts, 1/mp.sqrt(3))
+        tri = triangles(s3, n)
+        info = {'graph': name, 'n': n, 'unit_edges': len(unit), 'edge_file_matches_coords': same,
+                'pairs_sqrt3': len(s3), 'pairs_1_over_sqrt3': len(s13), 'triangles_sqrt3': len(tri)}
+        print(json.dumps(info), flush=True)
+        results.append(info)
+        # 4-colorability sanity (should be UNSAT for Heule's 5-chromatic graphs)
+        global K
+        K = 4
+        with Cadical153(bootstrap_with=base_cnf(n, E).clauses) as s:
+            info['4colorable'] = s.solve()
+        K = 5
+        for occ, label in [(s3, 'P1: mono pair at sqrt3'), (s13, 'P2: mono pair at 1/sqrt3'),
+                           (tri, 'P3: mono regular triangle side sqrt3'),
+                           (s3 + s13, 'P1 or P2: mono pair at sqrt3 or 1/sqrt3')]:
+            r = run(name, n, E, occ, label, 600)
+            print(json.dumps({k: v for k, v in r.items() if k != 'witness_coloring'}), flush=True)
+            results.append(r)
+        # full distance-spectrum scan: for each distance d occurring in H, is there a proper
+        # 5-coloring with NO monochromatic pair at distance d?  (i.e. is H + {d-pairs} 5-colorable)
+        import numpy as np
+        P = np.array([[float(x), float(y)] for x, y in pts])
+        D = np.sqrt(((P[:, None, :] - P[None, :, :])**2).sum(-1))
+        iu = np.triu_indices(n, 1)
+        ds, cnt = np.unique(np.round(D[iu], 9), return_counts=True)
+        MINMULT = 100  # only distances realized by >= 100 vertex pairs are scanned (bounded budget)
+        print(json.dumps({'graph': name, 'distinct_distances_total': int(len(ds)),
+                          'scanned_with_multiplicity_ge': MINMULT,
+                          'num_scanned': int((cnt >= MINMULT).sum())}), flush=True)
+        spectrum = []
+        forced = []
+        UT = np.triu(D, 1)
+        for dv, c in zip(ds, cnt):
+            if dv < 1e-6 or c < MINMULT:
+                continue
+            I, J = np.where(np.abs(UT - dv) < 1e-9)
+            occ = [(int(i), int(j)) for i, j in zip(I, J)]
+            cnf = base_cnf(n, E)
+            for u, v in occ:
+                for c in range(K):
+                    cnf.append([-var(u, c), -var(v, c)])
+            t = time.time()
+            with Cadical153(bootstrap_with=cnf.clauses) as s:
+                sat = s.solve()
+            spectrum.append((float(dv), len(occ), 'SAT' if sat else 'UNSAT', round(time.time()-t, 2)))
+            print(json.dumps({'d': float(dv), 'pairs': len(occ), 'res': spectrum[-1][2], 't': spectrum[-1][3]}), flush=True)
+            if not sat:
+                forced.append(float(dv))
+        info['num_distinct_distances'] = len(spectrum)
+        info['distances_forcing_mono_pair_in_every_5col'] = forced
+        info['spectrum'] = spectrum
+        print(json.dumps({'graph': name, 'distinct_distances': len(spectrum), 'forced_distances': forced,
+                          'never_forced_examples': [s for s in spectrum if s[1] >= 50][:10]}), flush=True)
+    json.dump(results, open('/home/ubuntu/degrey_stage1_results.json', 'w'))
+
+if __name__ == '__main__':
+    main(sys.argv[2:] if len(sys.argv) > 2 else ['510', '517', '529', '553', '610', 'L403', 'S199', 'T721', 'G2167'])
+
+===== degrey_stage1b.py =====
+#!/usr/bin/env python3
+"""
+Slack measurement: how many 'popular' distances of H can be simultaneously forbidden from being
+monochromatic while a proper 5-coloring of H still exists?
+
+Distances sorted by multiplicity (number of vertex pairs realising them, float rounding 1e-9).
+We add them one at a time (most popular first) as extra 'must differ' constraints on top of the
+unit-distance edges and report the first prefix length at which 5-colorability fails, and the
+distance that tips it.  Plus a coarse sweep by multiplicity threshold.
+"""
+import sys, json, time
+import numpy as np
+from pysat.solvers import Cadical153
+from degrey_stage1 import parse_vtx, parse_edges, base_cnf, var, K
+
+root = '/home/ubuntu/CNP-SAT'
+out = {}
+for name in sys.argv[1:]:
+    pts = parse_vtx(f'{root}/vtx/{name}.vtx'); n = len(pts)
+    E = parse_edges(f'{root}/edge/{name}.edge')
+    P = np.array([[float(x), float(y)] for x, y in pts])
+    D = np.sqrt(((P[:, None, :] - P[None, :, :])**2).sum(-1))
+    UT = np.triu(D, 1); iu = np.triu_indices(n, 1)
+    ds, cnt = np.unique(np.round(D[iu], 9), return_counts=True)
+    order = np.argsort(-cnt)
+    ds, cnt = ds[order], cnt[order]
+    # exclude distance 1 itself (already edges) and 0
+    keep = [(d, c) for d, c in zip(ds, cnt) if d > 1e-6 and abs(d-1) > 1e-9]
+    pairs_of = {}
+    def occ(d):
+        if d not in pairs_of:
+            I, J = np.where(np.abs(UT - d) < 1e-9)
+            pairs_of[d] = [(int(i), int(j)) for i, j in zip(I, J)]
+        return pairs_of[d]
+    # incremental: one solver, add distance classes in decreasing multiplicity
+    s = Cadical153(bootstrap_with=base_cnf(n, E).clauses)
+    added = []
+    t0 = time.time()
+    tip = None
+    for d, c in keep:
+        for u, v in occ(d):
+            for col in range(K):
+                s.add_clause([-var(u, col), -var(v, col)])
+        added.append((float(d), int(c)))
+        ok = s.solve()
+        print(json.dumps({'graph': name, 'num_forbidden_distances': len(added), 'last_added': [float(d), int(c)],
+                          'sat': ok, 't': round(time.time()-t0, 1)}), flush=True)
+        if not ok:
+            tip = (float(d), int(c)); break
+        if time.time() - t0 > 1500:
+            break
+    s.delete()
+    out[name] = {'n': n, 'distinct_distances': int(len(keep)), 'forbidden_prefix_len_before_unsat': len(added) - (tip is not None),
+                 'tipping_distance': tip, 'prefix': added, 'time_s': round(time.time()-t0, 1)}
+    json.dump(out, open('/home/ubuntu/degrey_stage1b_results.json', 'w'))
+
+===== degrey_stage1c.py =====
+#!/usr/bin/env python3
+"""
+Analyse the tipping set from degrey_stage1b: distances S = {1/sqrt3, sqrt(5/3), 0.736595474, 1.567618291}.
+For H in {510, 517}:
+  * which subsets of S already give UNSAT (minimal forbidden-distance sets),
+  * does the augmented graph (unit edges + S-pairs) contain a K6? (trivial reason),
+  * size of a vertex-minimal UNSAT subgraph (greedy deletion with assumptions).
+Also identify the two unknown distances algebraically (mpmath identify).
+"""
+import sys, json, itertools, time
+import numpy as np, mpmath as mp
+from pysat.solvers import Cadical153
+from degrey_stage1 import parse_vtx, parse_edges, var, K
+import networkx as nx
+
+root = '/home/ubuntu/CNP-SAT'
+S = [0.577350269, 1.290994449, 0.736595474, 1.567618291]
+mp.mp.dps = 30
+for d in S:
+    print(d, 'd^2 =', mp.identify(mp.mpf(d)**2, ['sqrt(3)', 'sqrt(11)', 'sqrt(33)']), flush=True)
+
+def build(n, E, extra, sel):
+    """clauses with a selector literal per vertex (for vertex-minimal core)."""
+    cls = []
+    for v in range(n):
+        cls.append([-sel[v]] + [var(v, c) for c in range(K)])
+    for u, v in E + extra:
+        for c in range(K):
+            cls.append([-var(u, c), -var(v, c)])
+    return cls
+
+for name in sys.argv[1:]:
+    pts = parse_vtx(f'{root}/vtx/{name}.vtx'); n = len(pts)
+    E = parse_edges(f'{root}/edge/{name}.edge')
+    P = np.array([[float(x), float(y)] for x, y in pts])
+    D = np.sqrt(((P[:, None, :] - P[None, :, :])**2).sum(-1)); UT = np.triu(D, 1)
+    occ = {}
+    for d in S:
+        I, J = np.where(np.abs(UT - d) < 1e-9); occ[d] = [(int(i), int(j)) for i, j in zip(I, J)]
+    sel = [n*K + 1 + v for v in range(n)]
+    res = {'graph': name, 'subsets': {}}
+    for r in range(1, len(S)+1):
+        for sub in itertools.combinations(S, r):
+            extra = sum((occ[d] for d in sub), [])
+            with Cadical153(bootstrap_with=build(n, E, extra, sel)) as s:
+                ok = s.solve(assumptions=sel)
+            res['subsets'][str(sub)] = 'SAT' if ok else 'UNSAT'
+    print(json.dumps(res), flush=True)
+    extra = sum((occ[d] for d in S), [])
+    G = nx.Graph(); G.add_edges_from(E + extra)
+    w = max(len(c) for c in nx.find_cliques(G))
+    print(json.dumps({'graph': name, 'clique_number_of_augmented_graph': w}), flush=True)
+    # vertex-minimal UNSAT subgraph by greedy deletion
+    with Cadical153(bootstrap_with=build(n, E, extra, sel)) as s:
+        assert not s.solve(assumptions=sel)
+        core = set(s.get_core())
+        keep = [v for v in range(n) if sel[v] in core]
+        changed = True
+        while changed:
+            changed = False
+            for v in list(keep):
+                trial = [x for x in keep if x != v]
+                if not s.solve(assumptions=[sel[x] for x in trial]):
+                    keep = trial; changed = True
+        print(json.dumps({'graph': name, 'vertex_minimal_unsat_subgraph_size': len(keep), 'vertices': keep}), flush=True)
+        sub = [(u, v) for u, v in E if u in keep and v in keep]
+        subx = [(u, v) for u, v in extra if u in keep and v in keep]
+        print(json.dumps({'graph': name, 'unit_edges_in_core': len(sub), 'extra_pairs_in_core': len(subx),
+                          'core_points': [[mp.nstr(pts[v][0], 15), mp.nstr(pts[v][1], 15)] for v in keep]}), flush=True)
+
+===== degrey_stage1d.py =====
+#!/usr/bin/env python3
+"""
+de Grey's original stage-1 property, one level up.  In de Grey (2018) the 7-vertex hexagon H
+(centre + regular unit hexagon) has, in every proper 4-colouring of a certain graph, a monochromatic
+triple on its ring (the three alternate ring vertices).  Here: for Heule's 5-chromatic graphs H,
+enumerate all embedded copies of the 7-vertex hexagon and ask by SAT whether a proper 5-colouring
+exists in which
+   Q1: no hexagon copy has a monochromatic alternate triple on its ring,
+   Q2: no hexagon copy has its ring coloured with <= 2 colours,
+   Q3: no hexagon copy has ANY monochromatic pair on its ring at distance sqrt3 (i.e. alternate
+       vertices) -- same as P1 restricted to hexagon rings.
+If SAT for all, the 7-hexagon carries no forced 'rare' 5-colour property in these graphs.
+"""
+import sys, json, itertools, time
+import numpy as np, mpmath as mp
+from pysat.solvers import Cadical153
+from pysat.card import CardEnc, EncType
+from pysat.formula import IDPool
+from degrey_stage1 import parse_vtx, parse_edges, base_cnf, var, K
+
+root = '/home/ubuntu/CNP-SAT'
+for name in sys.argv[1:]:
+    pts = parse_vtx(f'{root}/vtx/{name}.vtx'); n = len(pts)
+    E = parse_edges(f'{root}/edge/{name}.edge')
+    P = np.array([[float(x), float(y)] for x, y in pts])
+    D = np.sqrt(((P[:, None, :] - P[None, :, :])**2).sum(-1))
+    adj = [set(int(j) for j in np.where(np.abs(D[i]-1) < 1e-9)[0]) for i in range(n)]
+    hexes = []
+    for c in range(n):
+        nb = sorted(adj[c])
+        if len(nb) < 6: continue
+        # find 6-cycles of unit edges among neighbours of c (ring of the hexagon)
+        ring_adj = {u: [v for v in nb if abs(D[u, v]-1) < 1e-9] for u in nb}
+        seen = set()
+        for u in nb:
+            if len(ring_adj[u]) < 2: continue
+            for a in ring_adj[u]:
+                path = [u, a]
+                while len(path) < 6:
+                    nxt = [v for v in ring_adj[path[-1]] if v != path[-2]]
+                    if not nxt: break
+                    path.append(nxt[0])
+                if len(path) == 6 and u in ring_adj[path[-1]] and len(set(path)) == 6:
+                    key = tuple(sorted(path))
+                    if key not in seen:
+                        seen.add(key); hexes.append((c, path))
+    print(json.dumps({'graph': name, 'hexagon_copies': len(hexes)}), flush=True)
+    for label in ['Q1_no_mono_alternate_triple', 'Q2_ring_uses_ge3_colours', 'Q3_no_mono_sqrt3_pair_on_ring']:
+        cnf = base_cnf(n, E)
+        pool = IDPool(start_from=n*K + 1)
+        for c, ring in hexes:
+            trip = [ring[0::2], ring[1::2]]
+            if label == 'Q1_no_mono_alternate_triple':
+                for t in trip:
+                    for col in range(K):
+                        cnf.append([-var(v, col) for v in t])
+            elif label == 'Q3_no_mono_sqrt3_pair_on_ring':
+                for t in trip:
+                    for u, v in itertools.combinations(t, 2):
+                        for col in range(K):
+                            cnf.append([-var(u, col), -var(v, col)])
+            else:  # ring uses >= 3 colours: 'colour col used on ring' indicator, at least 3 true
+                used = []
+                for col in range(K):
+                    y = pool.id(('used', c, col)); used.append(y)
+                    for v in ring:
+                        cnf.append([-var(v, col), y])
+                    cnf.append([-y] + [var(v, col) for v in ring])
+                for cl in CardEnc.atleast(lits=used, bound=3, vpool=pool, encoding=EncType.seqcounter).clauses:
+                    cnf.append(cl)
+        t = time.time()
+        with Cadical153(bootstrap_with=cnf.clauses) as s:
+            ok = s.solve()
+        print(json.dumps({'graph': name, 'property': label, 'free_5colouring': 'SAT' if ok else 'UNSAT',
+                          't': round(time.time()-t, 2)}), flush=True)
+
+===== stage1_log.txt (spectrum lines with t>=1s or UNSAT kept; others summarized) =====
+{"graph": "510", "n": 510, "unit_edges": 2504, "edge_file_matches_coords": true, "pairs_sqrt3": 1204, "pairs_1_over_sqrt3": 1586, "triangles_sqrt3": 262}
+{"graph": "510", "property": "P1: mono pair at sqrt3", "num_occurrences": 1204, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "510", "property": "P2: mono pair at 1/sqrt3", "num_occurrences": 1586, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "510", "property": "P3: mono regular triangle side sqrt3", "num_occurrences": 262, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "510", "property": "P1 or P2: mono pair at sqrt3 or 1/sqrt3", "num_occurrences": 2790, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "510", "distinct_distances_total": 12967, "scanned_with_multiplicity_ge": 100, "num_scanned": 188}
+{"graph": "510", "distinct_distances": 188, "forced_distances": [], }
+{"graph": "517", "n": 517, "unit_edges": 2579, "edge_file_matches_coords": true, "pairs_sqrt3": 1297, "pairs_1_over_sqrt3": 1625, "triangles_sqrt3": 302}
+{"graph": "517", "property": "P1: mono pair at sqrt3", "num_occurrences": 1297, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "517", "property": "P2: mono pair at 1/sqrt3", "num_occurrences": 1625, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "517", "property": "P3: mono regular triangle side sqrt3", "num_occurrences": 302, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "517", "property": "P1 or P2: mono pair at sqrt3 or 1/sqrt3", "num_occurrences": 2922, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "517", "distinct_distances_total": 11526, "scanned_with_multiplicity_ge": 100, "num_scanned": 190}
+{"graph": "517", "distinct_distances": 190, "forced_distances": [], }
+{"graph": "529", "n": 529, "unit_edges": 2670, "edge_file_matches_coords": true, "pairs_sqrt3": 1335, "pairs_1_over_sqrt3": 1671, "triangles_sqrt3": 302}
+{"graph": "529", "property": "P1: mono pair at sqrt3", "num_occurrences": 1335, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "529", "property": "P2: mono pair at 1/sqrt3", "num_occurrences": 1671, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "529", "property": "P3: mono regular triangle side sqrt3", "num_occurrences": 302, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "529", "property": "P1 or P2: mono pair at sqrt3 or 1/sqrt3", "num_occurrences": 3006, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "529", "distinct_distances_total": 11538, "scanned_with_multiplicity_ge": 100, "num_scanned": 209}
+{"graph": "529", "distinct_distances": 209, "forced_distances": [], }
+{"graph": "553", "n": 553, "unit_edges": 2722, "edge_file_matches_coords": true, "pairs_sqrt3": 1390, "pairs_1_over_sqrt3": 1741, "triangles_sqrt3": 341}
+{"graph": "553", "property": "P1: mono pair at sqrt3", "num_occurrences": 1390, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "553", "property": "P2: mono pair at 1/sqrt3", "num_occurrences": 1741, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "553", "property": "P3: mono regular triangle side sqrt3", "num_occurrences": 341, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "553", "property": "P1 or P2: mono pair at sqrt3 or 1/sqrt3", "num_occurrences": 3131, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "553", "distinct_distances_total": 14864, "scanned_with_multiplicity_ge": 100, "num_scanned": 208}
+{"graph": "553", "distinct_distances": 208, "forced_distances": [], }
+{"graph": "610", "n": 610, "unit_edges": 3000, "edge_file_matches_coords": true, "pairs_sqrt3": 1580, "pairs_1_over_sqrt3": 1937, "triangles_sqrt3": 392}
+{"graph": "610", "property": "P1: mono pair at sqrt3", "num_occurrences": 1580, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "610", "property": "P2: mono pair at 1/sqrt3", "num_occurrences": 1937, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "610", "property": "P3: mono regular triangle side sqrt3", "num_occurrences": 392, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "610", "property": "P1 or P2: mono pair at sqrt3 or 1/sqrt3", "num_occurrences": 3517, "pfree_5col": "SAT", "pfree_time_s": 0.01, "min_occurrences": 0}
+{"graph": "610", "distinct_distances_total": 14311, "scanned_with_multiplicity_ge": 100, "num_scanned": 224}
+{"graph": "610", "distinct_distances": 224, "forced_distances": [], }
+{"graph": "G2167", "n": 2167, "unit_edges": 16512, "edge_file_matches_coords": "edges derived from coordinates", "pairs_sqrt3": 11718, "pairs_1_over_sqrt3": 13554, "triangles_sqrt3": 3700}
+{"graph": "G2167", "property": "P1: mono pair at sqrt3", "num_occurrences": 11718, "pfree_5col": "SAT", "pfree_time_s": 0.1, "min_occurrences": 0}
+{"graph": "G2167", "property": "P2: mono pair at 1/sqrt3", "num_occurrences": 13554, "pfree_5col": "SAT", "pfree_time_s": 0.1, "min_occurrences": 0}
+{"graph": "G2167", "property": "P3: mono regular triangle side sqrt3", "num_occurrences": 3700, "pfree_5col": "SAT", "pfree_time_s": 3.74, "min_occurrences": 0}
+{"graph": "G2167", "property": "P1 or P2: mono pair at sqrt3 or 1/sqrt3", "num_occurrences": 25272, "pfree_5col": "SAT", "pfree_time_s": 0.07, "min_occurrences": 0}
+{"graph": "G2167", "distinct_distances_total": 1653, "scanned_with_multiplicity_ge": 100, "num_scanned": 1308}
+-- spectrum lines: 1027 total, 0 UNSAT; slow ones (t>=1s):
+{"d": 0.500603786, "pairs": 322, "res": "SAT", "t": 1.39}
+{"d": 0.687623714, "pairs": 312, "res": "SAT", "t": 8.35}
+{"d": 1.322647288, "pairs": 308, "res": "SAT", "t": 1.61}
+{"d": 1.35923666, "pairs": 572, "res": "SAT", "t": 1.54}
+{"d": 1.576644867, "pairs": 574, "res": "SAT", "t": 3.97}
+{"d": 2.0, "pairs": 596, "res": "SAT", "t": 22.83}
+{"d": 2.081665999, "pairs": 324, "res": "SAT", "t": 2.13}
+{"d": 2.263646124, "pairs": 351, "res": "SAT", "t": 4.18}
+{"d": 0.409725478, "pairs": 258, "res": "SAT", "t": 1.29}
+{"d": 0.500603786, "pairs": 315, "res": "SAT", "t": 1.39}
+{"d": 0.666666667, "pairs": 234, "res": "SAT", "t": 6.07}
+{"d": 0.687623714, "pairs": 297, "res": "SAT", "t": 1.48}
+{"d": 1.322647288, "pairs": 300, "res": "SAT", "t": 1.55}
+{"d": 1.35923666, "pairs": 585, "res": "SAT", "t": 1.6}
+{"d": 1.576644867, "pairs": 579, "res": "SAT", "t": 1.2}
+{"d": 1.687460902, "pairs": 321, "res": "SAT", "t": 19.32}
+{"d": 1.791435056, "pairs": 386, "res": "SAT", "t": 17.93}
+{"d": 1.867032146, "pairs": 309, "res": "SAT", "t": 4.84}
+{"d": 2.0, "pairs": 636, "res": "SAT", "t": 113.44}
+{"d": 2.081665999, "pairs": 312, "res": "SAT", "t": 6.89}
+{"d": 2.263646124, "pairs": 378, "res": "SAT", "t": 1.4}
+{"d": 0.409725478, "pairs": 270, "res": "SAT", "t": 2.88}
+{"d": 0.666666667, "pairs": 237, "res": "SAT", "t": 6.06}
+{"d": 0.687623714, "pairs": 292, "res": "SAT", "t": 4.58}
+{"d": 1.235788666, "pairs": 314, "res": "SAT", "t": 4.56}
+{"d": 1.322647288, "pairs": 315, "res": "SAT", "t": 1.97}
+{"d": 1.35923666, "pairs": 629, "res": "SAT", "t": 1.62}
+{"d": 1.649549612, "pairs": 255, "res": "SAT", "t": 1.39}
+{"d": 1.687460902, "pairs": 346, "res": "SAT", "t": 3.13}
+{"d": 1.791435056, "pairs": 412, "res": "SAT", "t": 3.74}
+{"d": 1.867032146, "pairs": 305, "res": "SAT", "t": 4.18}
+{"d": 2.0, "pairs": 659, "res": "SAT", "t": 114.63}
+{"d": 2.081665999, "pairs": 325, "res": "SAT", "t": 4.11}
+{"d": 0.500603786, "pairs": 385, "res": "SAT", "t": 3.0}
+{"d": 0.745355992, "pairs": 448, "res": "SAT", "t": 21.2}
+{"d": 1.35923666, "pairs": 710, "res": "SAT", "t": 1.6}
+{"d": 1.687460902, "pairs": 371, "res": "SAT", "t": 10.04}
+{"d": 1.791435056, "pairs": 412, "res": "SAT", "t": 1.13}
+{"d": 1.867032146, "pairs": 367, "res": "SAT", "t": 6.61}
+{"d": 2.0, "pairs": 663, "res": "SAT", "t": 1.17}
+{"d": 0.500603786, "pairs": 388, "res": "SAT", "t": 1.58}
+{"d": 0.745355992, "pairs": 461, "res": "SAT", "t": 15.74}
+{"d": 1.35923666, "pairs": 817, "res": "SAT", "t": 1.35}
+{"d": 1.576644867, "pairs": 771, "res": "SAT", "t": 2.13}
+{"d": 1.687460902, "pairs": 399, "res": "SAT", "t": 2.43}
+{"d": 1.791435056, "pairs": 513, "res": "SAT", "t": 1.37}
+{"d": 1.867032146, "pairs": 395, "res": "SAT", "t": 6.94}
+{"d": 2.0, "pairs": 739, "res": "SAT", "t": 207.65}
+{"d": 0.049158942, "pairs": 2634, "res": "SAT", "t": 111.61}
+{"d": 0.085145784, "pairs": 1536, "res": "SAT", "t": 70.81}
+{"d": 0.124093774, "pairs": 3336, "res": "SAT", "t": 50.0}
+{"d": 0.133476089, "pairs": 3360, "res": "SAT", "t": 19.32}
+{"d": 0.182250189, "pairs": 2196, "res": "SAT", "t": 45.12}
+{"d": 0.195059822, "pairs": 120, "res": "SAT", "t": 61.5}
+{"d": 0.209239559, "pairs": 2730, "res": "SAT", "t": 95.08}
+
+===== stage1b_log.txt =====
+{"graph": "510", "num_forbidden_distances": 1, "last_added": [0.577350269, 1586], "sat": true, "t": 0.0}
+{"graph": "510", "num_forbidden_distances": 2, "last_added": [1.290994449, 1512], "sat": true, "t": 0.0}
+{"graph": "510", "num_forbidden_distances": 3, "last_added": [0.736595474, 1307], "sat": true, "t": 0.0}
+{"graph": "510", "num_forbidden_distances": 4, "last_added": [1.567618291, 1306], "sat": false, "t": 0.0}
+{"graph": "517", "num_forbidden_distances": 1, "last_added": [0.577350269, 1625], "sat": true, "t": 0.0}
+{"graph": "517", "num_forbidden_distances": 2, "last_added": [1.290994449, 1547], "sat": true, "t": 0.0}
+{"graph": "517", "num_forbidden_distances": 3, "last_added": [0.736595474, 1357], "sat": true, "t": 0.0}
+{"graph": "517", "num_forbidden_distances": 4, "last_added": [1.567618291, 1332], "sat": false, "t": 0.0}
+
+===== stage1c_log.txt =====
+0.577350269 d^2 = None
+1.290994449 d^2 = None
+0.736595474 d^2 = None
+1.567618291 d^2 = None
+{"graph": "510", "subsets": {"(0.577350269,)": "SAT", "(1.290994449,)": "SAT", "(0.736595474,)": "SAT", "(1.567618291,)": "SAT", "(0.577350269, 1.290994449)": "SAT", "(0.577350269, 0.736595474)": "SAT", "(0.577350269, 1.567618291)": "SAT", "(1.290994449, 0.736595474)": "SAT", "(1.290994449, 1.567618291)": "SAT", "(0.736595474, 1.567618291)": "UNSAT", "(0.577350269, 1.290994449, 0.736595474)": "SAT", "(0.577350269, 1.290994449, 1.567618291)": "SAT", "(0.577350269, 0.736595474, 1.567618291)": "UNSAT", "(1.290994449, 0.736595474, 1.567618291)": "UNSAT", "(0.577350269, 1.290994449, 0.736595474, 1.567618291)": "UNSAT"}}
+{"graph": "510", "clique_number_of_augmented_graph": 6}
+{"graph": "510", "vertex_minimal_unsat_subgraph_size": 10, "vertices": [390, 394, 417, 431, 432, 437, 451, 455, 461, 509]}
+{"graph": "510", "unit_edges_in_core": 10, "extra_pairs_in_core": 24, "core_points": [["-0.663072787572834", "1.19843260301003"], ["0.306087965856981", "0.952003233795734"], ["0.314430180307699", "1.40935426568304"], ["0.883342214450718", "0.941473950163237"], ["-0.365327036166571", "1.69308480491845"], ["-1.24032703616657", "1.20896188664252"], ["0.603833717263244", "1.44665543570416"], ["0.332667434526488", "2.40918795313239"], ["-0.244586814067248", "2.41971723676489"], ["0.0349216831202253", "1.91453575122397"]]}
+{"graph": "517", "subsets": {"(0.577350269,)": "SAT", "(1.290994449,)": "SAT", "(0.736595474,)": "SAT", "(1.567618291,)": "SAT", "(0.577350269, 1.290994449)": "SAT", "(0.577350269, 0.736595474)": "SAT", "(0.577350269, 1.567618291)": "SAT", "(1.290994449, 0.736595474)": "SAT", "(1.290994449, 1.567618291)": "SAT", "(0.736595474, 1.567618291)": "UNSAT", "(0.577350269, 1.290994449, 0.736595474)": "SAT", "(0.577350269, 1.290994449, 1.567618291)": "SAT", "(0.577350269, 0.736595474, 1.567618291)": "UNSAT", "(1.290994449, 0.736595474, 1.567618291)": "UNSAT", "(0.577350269, 1.290994449, 0.736595474, 1.567618291)": "UNSAT"}}
+{"graph": "517", "clique_number_of_augmented_graph": 6}
+{"graph": "517", "vertex_minimal_unsat_subgraph_size": 10, "vertices": [397, 401, 424, 438, 439, 444, 458, 462, 468, 516]}
+{"graph": "517", "unit_edges_in_core": 10, "extra_pairs_in_core": 24, "core_points": [["-0.663072787572834", "1.19843260301003"], ["0.306087965856981", "0.952003233795734"], ["0.314430180307699", "1.40935426568304"], ["0.883342214450718", "0.941473950163237"], ["-0.365327036166571", "1.69308480491845"], ["-1.24032703616657", "1.20896188664252"], ["0.603833717263244", "1.44665543570416"], ["0.332667434526488", "2.40918795313239"], ["-0.244586814067248", "2.41971723676489"], ["0.0349216831202253", "1.91453575122397"]]}
+
+===== stage1d_log.txt =====
+{"graph": "510", "hexagon_copies": 86}
+{"graph": "510", "property": "Q1_no_mono_alternate_triple", "free_5colouring": "SAT", "t": 0.01}
+{"graph": "510", "property": "Q2_ring_uses_ge3_colours", "free_5colouring": "SAT", "t": 0.01}
+{"graph": "510", "property": "Q3_no_mono_sqrt3_pair_on_ring", "free_5colouring": "SAT", "t": 0.01}
+{"graph": "517", "hexagon_copies": 98}
+{"graph": "517", "property": "Q1_no_mono_alternate_triple", "free_5colouring": "SAT", "t": 0.01}
+{"graph": "517", "property": "Q2_ring_uses_ge3_colours", "free_5colouring": "SAT", "t": 0.01}
+{"graph": "517", "property": "Q3_no_mono_sqrt3_pair_on_ring", "free_5colouring": "SAT", "t": 0.01}
+{"graph": "553", "hexagon_copies": 85}
+{"graph": "553", "property": "Q1_no_mono_alternate_triple", "free_5colouring": "SAT", "t": 0.01}
+{"graph": "553", "property": "Q2_ring_uses_ge3_colours", "free_5colouring": "SAT", "t": 0.01}
+{"graph": "553", "property": "Q3_no_mono_sqrt3_pair_on_ring", "free_5colouring": "SAT", "t": 0.01}
+510 4-colorable: False (15.8 s); 517 4-colorable: False (14.6 s)  [sanity: CaDiCaL, no symmetry breaking beyond v0=colour0]

@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+"""Fourier pairing test for the two-base problem (warm-up for the three-base Fourier approach).
+
+count(a,b) = #{n in S_3, n < 3^a : n mod 5^b in R_5(b)}  (R_5(b): residues with base-5 digits <= 2)
+           = sum_{xi mod m} Rhat(xi) * Shat(xi),   m = 5^b,
+   Rhat(xi) = (1/m) sum_{r in R} e(r xi/m)  = prod_{i<b} (1/5) sum_{d<=2} e(d 5^i xi/m)
+   Shat(xi) = sum_{n in S_3} e(-n xi/m)     = prod_{j<a} (1 + e(-3^j xi/m))
+Main term: xi=0 -> 2^a (3/5)^b.  We compare the true error, the L^1 bound sum_{xi!=0}|Rhat||Shat|,
+and the main term, as a grows (b chosen with 5^b ~ 3^a).
+If the L^1 bound grows faster than the main term, the naive L^1 Fourier approach cannot work.
+"""
+import numpy as np, math
+
+def run(a):
+    b = math.ceil(a * math.log(3) / math.log(5))
+    m = 5**b
+    xi = np.arange(m, dtype=np.float64)
+    # |Shat|
+    logS = np.zeros(m)
+    for j in range(a):
+        logS += np.log(np.maximum(np.abs(2 * np.cos(np.pi * (3**j % m) * xi / m)), 1e-300))
+    # |Rhat|
+    logR = np.zeros(m)
+    for i in range(b):
+        t = (5**i % m) * xi / m
+        val = np.abs(1 + np.exp(2j * np.pi * t) + np.exp(4j * np.pi * t)) / 5
+        logR += np.log(np.maximum(val, 1e-300))
+    absprod = np.exp(logS + logR)
+    main = 2.0**a * 0.6**b
+    L1err = absprod[1:].sum()
+    # true count via direct enumeration
+    S = np.array([int(bin(k)[2:], 3) for k in range(2**a)], dtype=np.int64)
+    R = {0}
+    for _ in range(b):
+        R = {5 * r + d for r in R for d in range(3)}
+    Rarr = np.zeros(m, dtype=bool); Rarr[list(R)] = True
+    count = int(Rarr[S % m].sum())
+    print(f"a={a:2d} b={b:2d} m={m:>8d} main={main:12.1f} count={count:8d} true_err={count-main:10.1f} "
+          f"L1_bound={L1err:14.1f}  L1/main={L1err/main:10.2f}")
+
+if __name__ == "__main__":
+    for a in range(6, 16):
+        run(a)

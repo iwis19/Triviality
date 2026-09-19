@@ -1,0 +1,47 @@
+"""Product ("independent intermediates") approximation to the Hardy-Littlewood prediction
+for CPAP-k with difference d:
+
+  density(t) ~ S(H)/(log t)^k * prod_{r in R} (1 - c_r/log t),  c_r = S(H u {r})/S(H)
+
+(c_r/log t is the HL conditional probability that n+r is prime given n+jd all prime,
+r ranging over intermediate offsets).  Exact inclusion-exclusion (hl_predict.py) is
+exponential; this is its first-order factorisation.  Used to (i) test against exact
+counts for small (k,d), (ii) predict the size of the smallest CPAP-7 (d=210) and CPAP-11.
+"""
+import math, sys
+from scipy.integrate import quad
+from hl_predict import singular_series
+
+def cond_coeffs(k, d):
+    H = [j * d for j in range(k)]
+    SH = singular_series(H)
+    R = [r for r in range(1, (k - 1) * d) if r % d]
+    cs = [singular_series(H + [r]) / SH for r in R]
+    return SH, [c for c in cs if c > 0]
+
+def density(u, k, SH, cs):  # u = log t
+    v = SH / u ** k
+    for c in cs:
+        v *= (1 - c / u)
+    return v
+
+def predict(k, d, x):
+    SH, cs = cond_coeffs(k, d)
+    f = lambda u: math.exp(u) * density(u, k, SH, cs)
+    lo = math.log(max(2.0, math.exp(max(cs) + 1e-9)))  # avoid negative factors near small t
+    return quad(f, lo, math.log(x), limit=800)[0]
+
+if __name__ == "__main__":
+    for k, d, x, exact in [(3, 6, 4e9, 1974856), (3, 12, 4e9, 1144017), (4, 6, 4e9, 132958),
+                           (4, 30, 4e9, 12068), (5, 30, 4e9, 368), (6, 30, 4e9, 8)]:
+        print(f"k={k} d={d} x={x:.0e}: product-approx {predict(k, d, x):.1f}  exact count {exact}")
+    for k, d in [(7, 210), (8, 210), (9, 210), (10, 210), (11, 2310)]:
+        SH, cs = cond_coeffs(k, d)
+        # find x with expected count 1 (rough location of the smallest CPAP-k)
+        lo, hi = 10.0, 400.0  # in log x
+        for _ in range(60):
+            mid = (lo + hi) / 2
+            if predict(k, d, math.exp(mid)) < 1: lo = mid
+            else: hi = mid
+        print(f"k={k} d={d}: S(H)={SH:.3g}, #intermediate coprime-compatible offsets={len(cs)}, "
+              f"expected count reaches 1 near x = 10^{lo/math.log(10):.1f}")

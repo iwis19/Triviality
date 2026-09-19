@@ -1,0 +1,75 @@
+import Mathlib
+
+open Finset
+
+/-- Erdős #389 reformulated: with `n = m + 1` and `N = n + k - 1 = m + k`,
+`n(n+1)⋯(n+k-1) ∣ (n+k)⋯(n+2k-1)` iff `C(2N, n-1) ∣ C(2N, N)`. -/
+theorem erdos389_choose_iff (m k : ℕ) :
+    (∏ i ∈ range k, (m + 1 + i)) ∣ (∏ i ∈ range k, (m + 1 + k + i)) ↔
+      Nat.choose (2 * (m + k)) m ∣ Nat.choose (2 * (m + k)) (m + k) := by
+  -- factorial identities for the two products
+  have h1 : m.factorial * ∏ i ∈ range k, (m + 1 + i) = (m + k).factorial := by
+    rw [← Nat.ascFactorial_eq_prod_range, Nat.factorial_mul_ascFactorial]
+  have h2 : (m + k).factorial * ∏ i ∈ range k, (m + 1 + k + i) = (m + 2 * k).factorial := by
+    have h := Nat.factorial_mul_ascFactorial (m + k) k
+    rw [Nat.ascFactorial_eq_prod_range] at h
+    have e : ∏ i ∈ range k, (m + k + 1 + i) = ∏ i ∈ range k, (m + 1 + k + i) := by
+      apply Finset.prod_congr rfl; intros; ring
+    rw [e] at h
+    rw [h]; congr 1; ring
+  -- binomial identities
+  have hc1 : Nat.choose (2 * (m + k)) m * m.factorial * (m + 2 * k).factorial
+      = (2 * (m + k)).factorial := by
+    have h := Nat.choose_mul_factorial_mul_factorial (show m ≤ 2 * (m + k) by omega)
+    have e : 2 * (m + k) - m = m + 2 * k := by omega
+    rw [e] at h; exact h
+  have hc2 : Nat.choose (2 * (m + k)) (m + k) * (m + k).factorial * (m + k).factorial
+      = (2 * (m + k)).factorial := by
+    have h := Nat.choose_mul_factorial_mul_factorial (show m + k ≤ 2 * (m + k) by omega)
+    have e : 2 * (m + k) - (m + k) = m + k := by omega
+    rw [e] at h; exact h
+  -- common core: (N!)^2 ∣ m! (m+2k)!
+  have core_left : (∏ i ∈ range k, (m + 1 + i)) ∣ (∏ i ∈ range k, (m + 1 + k + i)) ↔
+      (m + k).factorial * (m + k).factorial ∣ m.factorial * (m + 2 * k).factorial := by
+    rw [← Nat.mul_dvd_mul_iff_left (show 0 < m.factorial * (m + k).factorial by positivity)]
+    have e1 : m.factorial * (m + k).factorial * ∏ i ∈ range k, (m + 1 + i)
+        = (m + k).factorial * (m + k).factorial := by rw [mul_right_comm, h1]
+    have e2 : m.factorial * (m + k).factorial * ∏ i ∈ range k, (m + 1 + k + i)
+        = m.factorial * (m + 2 * k).factorial := by rw [mul_assoc, h2]
+    rw [e1, e2]
+  have core_right : Nat.choose (2 * (m + k)) m ∣ Nat.choose (2 * (m + k)) (m + k) ↔
+      (m + k).factorial * (m + k).factorial ∣ m.factorial * (m + 2 * k).factorial := by
+    have hpos : 0 < m.factorial * (m + 2 * k).factorial * ((m + k).factorial * (m + k).factorial) := by
+      positivity
+    rw [← Nat.mul_dvd_mul_iff_right hpos]
+    have e3 : Nat.choose (2 * (m + k)) m *
+        (m.factorial * (m + 2 * k).factorial * ((m + k).factorial * (m + k).factorial))
+        = (2 * (m + k)).factorial * ((m + k).factorial * (m + k).factorial) := by
+      rw [← hc1]; ring
+    have e4 : Nat.choose (2 * (m + k)) (m + k) *
+        (m.factorial * (m + 2 * k).factorial * ((m + k).factorial * (m + k).factorial))
+        = (2 * (m + k)).factorial * (m.factorial * (m + 2 * k).factorial) := by
+      rw [← hc2]; ring
+    rw [e3, e4, Nat.mul_dvd_mul_iff_left (Nat.factorial_pos _)]
+  rw [core_left, core_right]
+
+/-- The original Erdős #389 statement (in the formal-conjectures shape) is equivalent to:
+for every `m`, some `N ≥ m + 1` has `C(2N, m) ∣ C(2N, N)`. -/
+theorem erdos389_iff_choose_form :
+    (∀ n ≥ 1, ∃ k ≥ 1, (∏ i ∈ range k, (n + i)) ∣ (∏ i ∈ range k, (n + k + i))) ↔
+      (∀ m : ℕ, ∃ N ≥ m + 1, Nat.choose (2 * N) m ∣ Nat.choose (2 * N) N) := by
+  constructor
+  · intro h m
+    obtain ⟨k, hk, hdvd⟩ := h (m + 1) (by omega)
+    refine ⟨m + k, by omega, ?_⟩
+    rw [← erdos389_choose_iff]
+    simpa [add_right_comm] using hdvd
+  · intro h n hn
+    obtain ⟨N, hN, hdvd⟩ := h (n - 1)
+    refine ⟨N - (n - 1), by omega, ?_⟩
+    have e1 : n = (n - 1) + 1 := by omega
+    have e2 : N = (n - 1) + (N - (n - 1)) := by omega
+    have key := (erdos389_choose_iff (n - 1) (N - (n - 1))).2 (by rw [← e2]; exact hdvd)
+    have e3 : ∀ i, n - 1 + 1 + i = n + i := fun i => by omega
+    have e4 : ∀ i, n - 1 + 1 + (N - (n - 1)) + i = n + (N - (n - 1)) + i := fun i => by omega
+    simpa [e3, e4] using key

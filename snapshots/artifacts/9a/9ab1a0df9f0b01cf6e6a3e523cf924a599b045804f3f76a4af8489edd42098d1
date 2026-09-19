@@ -1,0 +1,22 @@
+C_m ansatz: (m,t): min objective (sum of squared 4-equidistance defects + convexity penalty); n=m*t
+m= 4 t=2 n=  8: obj=4.004e-06  per-type defects=['1.41e-03', '1.41e-03']  convex_pen=0.00e+00
+m= 5 t=2 n= 10: obj=1.603e-06  per-type defects=['8.95e-04', '8.95e-04']  convex_pen=0.00e+00
+m= 6 t=2 n= 12: obj=8.028e-06  per-type defects=['2.00e-03', '2.00e-03']  convex_pen=0.00e+00
+m= 7 t=2 n= 14: obj=2.810e-06  per-type defects=['1.19e-03', '1.19e-03']  convex_pen=0.00e+00
+m= 8 t=2 n= 16: obj=1.377e-05  per-type defects=['2.62e-03', '2.62e-03']  convex_pen=0.00e+00
+m= 9 t=2 n= 18: obj=4.460e-06  per-type defects=['1.49e-03', '1.49e-03']  convex_pen=0.00e+00
+m=10 t=2 n= 20: obj=2.129e-05  per-type defects=['3.26e-03', '3.26e-03']  convex_pen=0.00e+00
+m=11 t=2 n= 22: obj=6.571e-06  per-type defects=['1.81e-03', '1.81e-03']  convex_pen=0.00e+00
+m=12 t=2 n= 24: obj=3.072e-05  per-type defects=['3.92e-03', '3.92e-03']  convex_pen=0.00e+00
+m= 3 t=3 n=  9: obj=1.678e-06  per-type defects=['5.99e-04', '8.12e-04', '8.12e-04']  convex_pen=0.00e+00
+m= 4 t=3 n= 12: obj=1.883e-05  per-type defects=['3.03e-03', '7.03e-04', '3.03e-03']  convex_pen=0.00e+00
+m= 5 t=3 n= 15: obj=4.842e-05  per-type defects=['4.29e-03', '3.88e-03', '3.86e-03']  convex_pen=0.00e+00
+m= 6 t=3 n= 18: obj=2.467e-04  per-type defects=['9.66e-03', '7.74e-03', '9.66e-03']  convex_pen=0.00e+00
+m= 7 t=3 n= 21: obj=3.606e-05  per-type defects=['3.20e-03', '3.95e-03', '3.20e-03']  convex_pen=0.00e+00
+m= 8 t=3 n= 24: obj=7.404e-05  per-type defects=['5.95e-03', '5.95e-03', '1.79e-03']  convex_pen=0.00e+00
+m= 9 t=3 n= 27: obj=3.152e-05  per-type defects=['3.90e-03', '2.86e-03', '2.86e-03']  convex_pen=0.00e+00
+m=10 t=3 n= 30: obj=1.030e-04  per-type defects=['5.86e-03', '5.86e-03', '5.86e-03']  convex_pen=0.00e+00
+m=11 t=3 n= 33: obj=1.056e-04  per-type defects=['2.43e-03', '7.79e-03', '6.25e-03']  convex_pen=0.00e+00
+m=12 t=3 n= 36: obj=1.753e-04  per-type defects=['8.25e-03', '8.25e-03', '6.26e-03']  convex_pen=0.00e+00
+m= 3 t=4 n= 12: obj=4.827e-05  per-type defects=['3.85e-04', '3.98e-03', '4.06e-03', '3.97e-03']  convex_pen=0.00e+00
+m= 4 t=4 n= 16: obj=9.616e-04  per-type defects=['1.84e-02', '7.54e-03', '1.84e-02', '1.50e-02']  convex_pen=0.00e+00

@@ -1,0 +1,31 @@
+
+Dihedral group D_12 = ⟨r, s | r^6 = s^2 = 1, s r s = r^{-1}⟩ (order 12), written as permutations of Z/6:
+r: i ↦ i+1, and reflections f_c: i ↦ c − i (c ∈ Z/6), f_0 = s.
+Exact covering by 6 left cosets:
+  {e}                 = coset of the trivial subgroup           index 12
+  {f_1, f_3, f_5}     = f_1·⟨r^2⟩                               index 4
+  {f_0, r^3}          = f_0·⟨f_3⟩      (f_0 f_3 = r^3)          index 6
+  {r,   f_4}          = r·⟨f_3⟩        (r f_3 = f_4)            index 6
+  {f_2, r^4}          = f_2·⟨f_4⟩      (f_2 f_4 = r^{-2} = r^4) index 6
+  {r^2, r^5}          = r^2·⟨r^3⟩                               index 6
+Indices (12, 4, 6, 6, 6, 6): the LARGEST index 12 occurs exactly once, so both the Mirsky–Newman form
+('the two largest indices coincide') and the Znám form ('the largest index occurs ≥ p(n_k) times') of HS FAIL in D_12,
+while HS itself (some index repeated) holds. Found by exhaustive enumeration (hs_znam.py); verified by direct
+coset checks (see hs_search.Group). Among the groups tested, every group of order ≤ 11 and every other group of
+order 12 (C12, C2×C6, A4, Dic3) satisfies the strong form, so D_12 is the smallest group where the strong form fails
+(groups of order < 12 are nilpotent or dihedral of order 6 or 10, all tested; nilpotent groups satisfy the strong
+form by Berger–Felzenbaum–Fraenkel / Sun). Consistent with Sun (2004), whose strong form needs the G_i subnormal:
+the order-2 subgroups ⟨f_c⟩ of D_12 are not subnormal.
+
+
+Enumeration log:
+D8                   |G|= 16 partitions(k>=2, nontrivial subgroups only)=   72027 HS-violations=0 Znam-violations=0 min multiplicity of largest index by n_k={2: 2, 4: 2, 8: 2}
+SL(2,3)              |G|= 24 partitions(k>=2, nontrivial subgroups only)=    5683 HS-violations=0 Znam-violations=0 min multiplicity of largest index by n_k={3: 3, 4: 4, 6: 2, 8: 2, 12: 2}
+F20=AGL(1,5)         |G|= 20 partitions(k>=2, nontrivial subgroups only)=   33344 HS-violations=0 Znam-violations=0 min multiplicity of largest index by n_k={2: 2, 4: 2, 5: 5, 10: 2}
+F21=C7:C3            |G|= 21 partitions(k>=2, nontrivial subgroups only)=     134 HS-violations=0 Znam-violations=0 min multiplicity of largest index by n_k={3: 3, 7: 7}
+C3xS3                |G|= 18 partitions(k>=2, nontrivial subgroups only)=    1424 HS-violations=0 Znam-violations=0 min multiplicity of largest index by n_k={2: 2, 3: 3, 6: 2, 9: 3}
+D9                   |G|= 18 partitions(k>=2, nontrivial subgroups only)=  376255 HS-violations=0 Znam-violations=0 min multiplicity of largest index by n_k={2: 2, 3: 3, 6: 2, 9: 3}
+Dic5                 |G|= 20 partitions(k>=2, nontrivial subgroups only)=    1554 HS-violations=0 Znam-violations=0 min multiplicity of largest index by n_k={2: 2, 4: 2, 5: 5, 10: 2}
+D10                  |G|= 20 partitions(k>=2, nontrivial subgroups only)= 6243370 HS-violations=0 Znam-violations=0 min multiplicity of largest index by n_k={2: 2, 4: 2, 5: 5, 10: 2}
+(C3xC3):C2           |G|= 18 partitions(k>=2, nontrivial subgroups only)=  494797 HS-violations=0 Znam-violations=0 min multiplicity of largest index by n_k={2: 2, 3: 3, 6: 2, 9: 3}
+S4                   |G|= 24 partitions(k>=2, nontrivial subgroups only)=15974683 HS-violations=0 Znam-violations=0 min multiplicity of largest index by n_k={2: 2, 3: 3, 4: 4, 6: 2, 8: 2, 12: 2}

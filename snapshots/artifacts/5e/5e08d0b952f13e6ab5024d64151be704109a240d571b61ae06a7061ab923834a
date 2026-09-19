@@ -1,0 +1,45 @@
+# Danzer C_3 nonagon: exact solve (sympy) and 1-parameter family (scipy).
+# Coordinates of the A and B orbits from sallerk's forum comment (31 Aug 2026), relations
+# A1A2=A1A3=A1B3, B1B2=B1C2=B1B3, C1C2=C1A3=C1C3.  Part 1 solves for C1 exactly.
+import sympy as sp, math
+s3=sp.sqrt(3)
+rho=sp.Matrix([[-sp.Rational(1,2),-s3/2],[s3/2,-sp.Rational(1,2)]])
+A1=sp.Matrix([1,0]); B1=sp.Matrix([-sp.Rational(1,2)+s3, s3/2])
+x,y=sp.symbols('x y',real=True); C1=sp.Matrix([x,y])
+orb=lambda P:[P,rho*P,rho*rho*P]
+d2=lambda P,Q: sp.expand(((P-Q).T*(P-Q))[0])
+A=orb(A1); B=orb(B1)
+eq1=sp.expand(d2(B[0],B[1]) - d2(B[0],rho*C1))   # B1B2 = B1C2
+eq2=sp.expand(d2(C1,rho*C1) - d2(C1,A[2]))       # C1C2 = C1A3
+for s in sp.solve([eq1,eq2],[x,y],dict=True):
+    sx,sy=sp.simplify(s[x]),sp.simplify(s[y]); t=sp.symbols('t')
+    print(sx,sy,sp.degree(sp.minimal_polynomial(sx,t)),sp.degree(sp.minimal_polynomial(sy,t)))
+# Output: C1 = ((8+5*sqrt(3))*(-12+sqrt(-348+201*sqrt(3))+sqrt(3))/10+7+6*sqrt(3),
+#               -sqrt(3)/10-sqrt(-348+201*sqrt(3))/10+6/5)  -- both coordinates of degree 4 over Q;
+# all nine equidistant counts are exactly 3 and the nonagon is strictly convex.
+
+# Part 2: move B1 along |A1 - rho^2 B1| = sqrt3 (keeps A1A2=A1A3=A1B3) and re-solve for C1:
+import numpy as np
+from scipy.optimize import fsolve
+c,s=math.cos(2*math.pi/3),math.sin(2*math.pi/3); R=np.array([[c,-s],[s,c]])
+a1=np.array([1.0,0.0]); orbn=lambda P:[P,R@P,R@R@P]
+dd=lambda P,Q: float(np.dot(P-Q,P-Q))
+def system(C,Bp):
+    Bo=orbn(Bp); Co=orbn(C); Ao=orbn(a1)
+    return [dd(Bo[0],Bo[1])-dd(Bo[0],Co[1]), dd(Co[0],Co[1])-dd(Co[0],Ao[2])]
+def counts_convex(P):
+    n=len(P); cnt=[]
+    for i in range(n):
+        ds=[dd(P[i],P[j]) for j in range(n) if j!=i]
+        cnt.append(max(sum(1 for e in ds if abs(e-d)<1e-9) for d in ds))
+    pts=sorted(P,key=lambda t: math.atan2(t[1],t[0]))
+    cr=lambda o,a,b:(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0])
+    return cnt, all(cr(pts[i],pts[(i+1)%n],pts[(i+2)%n])>1e-9 for i in range(n))
+C0=np.array([0.9139163017136579,0.9890838702860313]); t0=-2*math.pi/3
+for dt in [0,0.02,0.05,0.1,0.15,0.2,-0.05,-0.1,-0.2]:
+    t=t0+dt; Bp=np.linalg.inv(R@R)@(a1+math.sqrt(3)*np.array([math.cos(t),math.sin(t)]))
+    sol=fsolve(lambda C:system(C,Bp),C0)
+    print(dt, sol.round(4), counts_convex(orbn(a1)+orbn(Bp)+orbn(sol)))
+# Output: for dt in {0,+-0.05,+-0.1,+0.1,-0.2} residual ~1e-15, all counts 3, strictly convex;
+# convexity is lost at dt=+0.15. So Danzer's nonagon sits in a 1-parameter family (expected
+# dimension +1 = 4 unknowns - 3 equations), not an isolated non-generic solution.

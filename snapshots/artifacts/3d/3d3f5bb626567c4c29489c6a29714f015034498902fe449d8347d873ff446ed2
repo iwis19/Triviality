@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+"""
+Third batch.
+ - L1cA' : exists i abundant in F with |{A in F : i abundant in F_{<=A}}| >= |F|/2
+ - hill-climb minimising  max_i |S_i|/|F|  (score of L1cA) and  max_{i abundant} |S_i|/|F|
+ - L3b-all-incl-y : for every y in top, some element of A(F_{∌y}) ∪ A(F_{∋y}) is abundant in F
+ - I3a-fix on n=6 samples
+ - exact minimum of max_i |S_i|/|F| over all union-closed families on n<=4
+"""
+import random, sys
+from collections import defaultdict
+from ucs_experiments import union_closure, all_union_closed_families, random_union_closed, freqs, top
+from ucs_experiments2 import abundant_set, test_I3a_fix
+
+def S_sets(fam, n):
+    fam = list(fam)
+    S = {i: set() for i in range(n)}
+    for C in fam:
+        d = [A for A in fam if A & ~C == 0]
+        for i in abundant_set(d, n): S[i].add(C)
+    return S
+
+def scoreA(fam, n, require_top=False):
+    fam = list(fam); F = len(fam); T = top(fam)
+    S = S_sets(fam, n)
+    vals = [len(S[i]) / F for i in range(n) if (not require_top or T in S[i])]
+    return max(vals) if vals else 0.0
+
+def test_batch(fam, n):
+    fam = list(fam); F = len(fam); T = top(fam)
+    S = S_sets(fam, n)
+    res = {"L1cA'": any(T in S[i] and 2 * len(S[i]) >= F for i in range(n))}
+    ab = abundant_set(fam, n)
+    ok = []
+    for y in range(n):
+        if not (T >> y & 1): continue
+        G1 = [A for A in fam if not (A >> y & 1)]
+        G2 = [A for A in fam if A >> y & 1]
+        ok.append(bool((abundant_set(G1, n) | abundant_set(G2, n)) & ab))
+    res["L3b-all-incl-y"] = all(ok)
+    return res
+
+def hill_climb(n, steps, rng, require_top, ngen=6):
+    gens = [rng.randrange(1, 1 << n) for _ in range(ngen)]
+    def sc(g):
+        fam = frozenset(union_closure(g))
+        return (2.0, fam) if len(fam) <= 1 else (scoreA(fam, n, require_top), fam)
+    best, bestfam = sc(gens)
+    for _ in range(steps):
+        g2 = list(gens); op = rng.random()
+        if op < 0.4 and len(g2) > 1: g2.pop(rng.randrange(len(g2)))
+        elif op < 0.7: g2.append(rng.randrange(1, 1 << n))
+        else: g2[rng.randrange(len(g2))] ^= 1 << rng.randrange(n)
+        s, fam = sc(g2)
+        if s <= best: best, bestfam, gens = s, fam, g2
+    return best, sorted(bestfam)
+
+if __name__ == "__main__":
+    rng = random.Random(11)
+    for n in (2, 3, 4):
+        fams = all_union_closed_families(n)
+        agg = defaultdict(lambda: [0, 0]); ex = {}
+        mn = min(scoreA(f, n) for f in fams); mnT = min(scoreA(f, n, True) for f in fams)
+        for f in fams:
+            for k, v in test_batch(f, n).items():
+                agg[k][1] += 1
+                if v: agg[k][0] += 1
+                elif k not in ex: ex[k] = sorted(f)
+        print(f"== exhaustive n={n}: {len(fams)} families; min over families of max_i |S_i|/|F| = {mn:.4f}; with i abundant in F: {mnT:.4f}")
+        for k in agg: print(f"  {k:16s} pass {agg[k][0]}/{agg[k][1]}" + ("" if agg[k][0] == agg[k][1] else f"  first failure {ex[k]}"))
+        argmin = [sorted(f) for f in fams if abs(scoreA(f, n, True) - mnT) < 1e-12][:3]
+        print(f"  extremal families for L1cA': {argmin}")
+    for n, k, N in ((5, 5, 1500), (6, 6, 600), (7, 8, 200)):
+        fams = set()
+        while len(fams) < N:
+            f = random_union_closed(n, k, rng)
+            if len(f) > 1: fams.add(f)
+        agg = defaultdict(lambda: [0, 0]); ex = {}
+        mnT = 9
+        t3 = f3 = 0; ex3 = None
+        for f in fams:
+            mnT = min(mnT, scoreA(f, n, True))
+            for kk, v in test_batch(f, n).items():
+                agg[kk][1] += 1
+                if v: agg[kk][0] += 1
+                elif kk not in ex: ex[kk] = sorted(f)
+            if n == 6:
+                t, ff, e = test_I3a_fix(f, n); t3 += t; f3 += ff
+                if e and ex3 is None: ex3 = e
+        print(f"== random n={n} k={k}: {N} families; min max_(i abundant) |S_i|/|F| = {mnT:.4f}")
+        for kk in agg: print(f"  {kk:16s} pass {agg[kk][0]}/{agg[kk][1]}" + ("" if agg[kk][0] == agg[kk][1] else f"  first failure {ex[kk]}"))
+        if t3: print(f"  I3a-fix          pass {t3 - f3}/{t3}" + ("" if f3 == 0 else f"  first failure {ex3}"))
+        sys.stdout.flush()
+    print("== hill climb minimising max_(i abundant in F) |S_i|/|F|  (L1cA' needs >= 1/2)")
+    for n in (5, 6, 7):
+        for trial in range(3):
+            s, fam = hill_climb(n, 600 if n < 7 else 250, rng, True)
+            print(f"  n={n} trial={trial} min score={s:.4f} |F|={len(fam)} family={fam}")
+            sys.stdout.flush()

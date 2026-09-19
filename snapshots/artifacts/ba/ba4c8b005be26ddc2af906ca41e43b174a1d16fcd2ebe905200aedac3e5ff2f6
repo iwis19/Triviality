@@ -1,0 +1,87 @@
+// Factorial collisions mod p.
+// For each prime p <= N: compute r(c) = #{n in [0,p-1] : n! ≡ c (mod p)}.
+// Output per prime: p, maxmult0 (over n in [0,p-1]), maxmult1 (over n in [1,p-1]),
+//   r(1), r(-1), S2 = sum_c C(r,2), S3 = sum_c C(r,3), S4 = sum_c C(r,4),
+//   witness value c attaining maxmult0.
+// Usage: ./fact_collisions N [every]   (prints every prime if every=1, else only records)
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+
+int main(int argc, char **argv) {
+    uint64_t N = argc > 1 ? strtoull(argv[1], 0, 10) : 100000;
+    int every = argc > 2 ? atoi(argv[2]) : 0;
+    char *sieve = calloc(N + 1, 1);
+    for (uint64_t i = 2; i * i <= N; i++) if (!sieve[i]) for (uint64_t j = i * i; j <= N; j += i) sieve[j] = 1;
+    uint8_t *cnt = malloc(N + 1);
+    uint64_t best[64]; // smallest prime with maxmult0 >= m
+    uint64_t best1[64]; // smallest prime with maxmult1 >= m
+    memset(best, 0, sizeof best); memset(best1, 0, sizeof best1);
+    double cumP = 0, cumS2 = 0, cumS3 = 0, cumS4 = 0;
+    printf("# p maxmult0 maxmult1 r1 rm1 S2 S3 S4 witness_c\n");
+    for (uint64_t p = 2; p <= N; p++) {
+        if (sieve[p]) continue;
+        memset(cnt, 0, p);
+        uint64_t f = 1;
+        cnt[1] = 1; // 0! = 1
+        for (uint64_t n = 1; n < p; n++) { f = f * n % p; if (cnt[f] < 255) cnt[f]++; }
+        int mm0 = 0; uint64_t wc = 0; uint64_t S2 = 0, S3 = 0, S4 = 0;
+        for (uint64_t c = 1; c < p; c++) {
+            int r = cnt[c];
+            if (r > mm0) { mm0 = r; wc = c; }
+            S2 += (uint64_t)r * (r - 1) / 2;
+            S3 += (uint64_t)r * (r - 1) * (r - 2) / 6;
+            S4 += (uint64_t)r * (r - 1) * (r - 2) * (r - 3) / 24;
+        }
+        // maxmult1: exclude n=0 (value 1 loses one)
+        int mm1 = 0;
+        for (uint64_t c = 1; c < p; c++) { int r = cnt[c] - (c == 1 ? 1 : 0); if (r > mm1) mm1 = r; }
+        int r1 = cnt[1], rm1 = cnt[p - 1];
+        cumP += p; cumS2 += S2; cumS3 += S3; cumS4 += S4;
+        for (int m = 1; m <= mm0 && m < 64; m++) if (!best[m]) { best[m] = p; fprintf(stderr, "NEW maxmult0>=%d at p=%llu (value %llu)\n", m, (unsigned long long)p, (unsigned long long)wc); }
+        for (int m = 1; m <= mm1 && m < 64; m++) if (!best1[m]) { best1[m] = p; fprintf(stderr, "NEW maxmult1>=%d at p=%llu\n", m, (unsigned long long)p); }
+        if (every) printf("%llu %d %d %d %d %llu %llu %llu %llu\n", (unsigned long long)p, mm0, mm1, r1, rm1,
+            (unsigned long long)S2, (unsigned long long)S3, (unsigned long long)S4, (unsigned long long)wc);
+    }
+    printf("# cumulative: sum p = %.6g, sum S2 = %.6g (ratio to sum p/2: %.4f), sum S3 = %.6g (ratio to sum p/6: %.4f), sum S4 = %.6g (ratio to sum p/24: %.4f)\n",
+        cumP, cumS2, cumS2 / (cumP / 2), cumS3, cumS3 / (cumP / 6), cumS4, cumS4 / (cumP / 24));
+    printf("# smallest p with maxmult0 >= m (formal convention, n in [0,p-1]):\n");
+    for (int m = 1; m < 64 && best[m]; m++) printf("# m=%d (k=%d): p=%llu\n", m, m - 1, (unsigned long long)best[m]);
+    printf("# smallest p with maxmult1 >= m (n in [1,p-1], OEIS A060427 convention?):\n");
+    for (int m = 1; m < 64 && best1[m]; m++) printf("# m=%d (k=%d): p=%llu\n", m, m - 1, (unsigned long long)best1[m]);
+    return 0;
+}
+
+/* ---- output header of ./fact_collisions 1000000 1 ---- 
+# p maxmult0 maxmult1 r1 rm1 S2 S3 S4 witness_c
+# cumulative: sum p = 3.75504e+10, sum S2 = 1.87758e+10 (ratio to sum p/2: 1.0000), sum S3 = 6.25924e+09 (ratio to sum p/6: 1.0001), sum S4 = 1.56526e+09 (ratio to sum p/24: 1.0004)
+# smallest p with maxmult0 >= m (formal convention, n in [0,p-1]):
+# m=1 (k=0): p=2
+# m=2 (k=1): p=2
+# m=3 (k=2): p=5
+# m=4 (k=3): p=17
+# m=5 (k=4): p=17
+# m=6 (k=5): p=23
+# m=7 (k=6): p=71
+# m=8 (k=7): p=599
+# m=9 (k=8): p=599
+# m=10 (k=9): p=3011
+# m=11 (k=10): p=3011
+# m=12 (k=11): p=52163
+# m=13 (k=12): p=52163
+# smallest p with maxmult1 >= m (n in [1,p-1], OEIS A060427 convention?):
+# m=1 (k=0): p=2
+# m=2 (k=1): p=5
+# m=3 (k=2): p=11
+# m=4 (k=3): p=17
+# m=5 (k=4): p=23
+# m=6 (k=5): p=71
+# m=7 (k=6): p=71
+# m=8 (k=7): p=599
+# m=9 (k=8): p=599
+# m=10 (k=9): p=3011
+# m=11 (k=10): p=27901
+# m=12 (k=11): p=52163
+# m=13 (k=12): p=778699
+*/

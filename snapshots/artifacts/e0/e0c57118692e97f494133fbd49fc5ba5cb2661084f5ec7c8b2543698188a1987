@@ -1,0 +1,5 @@
+violations of c_2(2j+1) = c_2(2j+2) + v_2(2j+2): 0
+j=0: |W_1|=22525 |W_2|=22958 |E_0|=22958; W_odd\W_even=0 W_even\W_odd=433; W_even\E=0 E\W_even=0; min W_odd=6 min W_even=6 min E=6
+j=1: |W_3|=2251 |W_4|=2283 |E_1|=2186; W_odd\W_even=66 W_even\W_odd=98; W_even\E=104 E\W_even=7; min W_odd=210 min W_even=210 min E=210
+j=2: |W_5|=230 |W_6|=249 |E_2|=212; W_odd\W_even=4 W_even\W_odd=23; W_even\E=39 E\W_even=2; min W_odd=2480 min W_even=990 min E=2480
+j=3: |W_7|=24 |W_8|=23 |E_3|=18; W_odd\W_even=3 W_even\W_odd=2; W_even\E=6 E\W_even=1; min W_odd=8178 min W_even=8178 min E=8178

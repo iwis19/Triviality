@@ -1,0 +1,29 @@
+(A) near-middle case via C4 + Stormer pairs, LIMIT = 1000000000000
+  i=4: B=6, #smooth odd <= LIMIT: 238, pairs (x,x+2): 3, largest pair x=25, candidate n: 6, (n,j) checked: 4, counterexamples: []
+  i=5: B=8, #smooth odd <= LIMIT: 1299, pairs (x,x+2): 6, largest pair x=243, candidate n: 15, (n,j) checked: 14, counterexamples: []
+  i=6: B=10, #smooth odd <= LIMIT: 1299, pairs (x,x+2): 6, largest pair x=243, candidate n: 18, (n,j) checked: 24, counterexamples: []
+  i=7: B=12, #smooth odd <= LIMIT: 4727, pairs (x,x+2): 9, largest pair x=243, candidate n: 33, (n,j) checked: 68, counterexamples: []
+  i=8: B=14, #smooth odd <= LIMIT: 13924, pairs (x,x+2): 15, largest pair x=1573, candidate n: 66, (n,j) checked: 196, counterexamples: []
+  i=9: B=16, #smooth odd <= LIMIT: 13924, pairs (x,x+2): 15, largest pair x=1573, candidate n: 75, (n,j) checked: 250, counterexamples: []
+  i=10: B=18, #smooth odd <= LIMIT: 33828, pairs (x,x+2): 22, largest pair x=2023, candidate n: 128, (n,j) checked: 530, counterexamples: []
+  i=11: B=20, #smooth odd <= LIMIT: 73288, pairs (x,x+2): 35, largest pair x=3969, candidate n: 230, (n,j) checked: 1115, counterexamples: []
+  i=12: B=22, #smooth odd <= LIMIT: 73288, pairs (x,x+2): 35, largest pair x=3969, candidate n: 250, (n,j) checked: 1332, counterexamples: []
+(B) middle-exclusion: minimal d=n-2j>=i compatible with C1
+    Kummer version:  C(n,i) <= n^pi(i-1) * prod_{|t|<i}(d-t)
+    EEES version:    C(n,i) <  (prod_{|t|<i}(d-t))^2   (outside 12 EEES exceptions)
+  i=3: n=1e3: dK=12 dE=7 (n^0.400=16) | n=1e4: dK=28 dE=14 (n^0.400=40) | n=1e5: dK=70 dE=27 (n^0.400=100) | n=1e6: dK=176 dE=53 (n^0.400=251) | n=1e7: dK=441 dE=106 (n^0.400=631) | n=1e9: dK=2783 dE=419 (n^0.400=3981)
+  i=4: n=1e3: dK=6 dE=7 (n^0.286=7) | n=1e4: dK=10 dE=12 (n^0.286=14) | n=1e5: dK=18 dE=22 (n^0.286=27) | n=1e6: dK=33 dE=42 (n^0.286=52) | n=1e7: dK=64 dE=80 (n^0.286=100) | n=1e9: dK=237 dE=298 (n^0.286=373)
+  i=5: n=1e3: dK=7 dE=6 (n^0.333=10) | n=1e4: dK=13 dE=11 (n^0.333=22) | n=1e5: dK=28 dE=19 (n^0.333=46) | n=1e6: dK=59 dE=36 (n^0.333=100) | n=1e7: dK=127 dE=68 (n^0.333=215) | n=1e9: dK=588 dE=243 (n^0.333=1000)
+  i=6: n=1e3: dK=6 dE=6 (n^0.273=7) | n=1e4: dK=8 dE=10 (n^0.273=12) | n=1e5: dK=14 dE=18 (n^0.273=23) | n=1e6: dK=25 dE=33 (n^0.273=43) | n=1e7: dK=45 dE=61 (n^0.273=81) | n=1e9: dK=157 dE=212 (n^0.273=285)
+  i=8: n=1e3: dK=8 dE=8 (n^0.267=6) | n=1e4: dK=8 dE=10 (n^0.267=12) | n=1e5: dK=12 dE=16 (n^0.267=22) | n=1e6: dK=21 dE=29 (n^0.267=40) | n=1e7: dK=37 dE=52 (n^0.267=74) | n=1e9: dK=124 dE=177 (n^0.267=251)
+  i=10: n=1e3: dK=10 dE=10 (n^0.316=9) | n=1e4: dK=11 dE=10 (n^0.316=18) | n=1e5: dK=19 dE=16 (n^0.316=38) | n=1e6: dK=36 dE=27 (n^0.316=78) | n=1e7: dK=74 dE=48 (n^0.316=162) | n=1e9: dK=314 dE=158 (n^0.316=695)
+  i=20: n=1e3: dK=20 dE=20 (n^0.308=8) | n=1e4: dK=20 dE=20 (n^0.308=17) | n=1e5: dK=20 dE=20 (n^0.308=35) | n=1e6: dK=27 dE=24 (n^0.308=70) | n=1e7: dK=50 dE=39 (n^0.308=143) | n=1e9: dK=199 dE=119 (n^0.308=588)
+(C) independence heuristic, n <= 20000, i <= 60
+  '>i' variant: expected #counterexamples = 34.012; by i: 2:22.877, 3:8.806, 4:1.114, 5:1.147, 6:0.022, 7:0.029, 8:0.007, 9:0.001, 11:0.004, 12:0.002, 13:0.002
+  '>=i' (the problem): expected = 11.5139; by i: 2:5.3431, 3:4.2642, 4:1.1143, 5:0.7301, 6:0.0218, 7:0.0275, 8:0.0066, 9:0.0014, 10:0.0008, 11:0.0004, 12:0.0022, 13:0.0017
+  observed '>i' failures with n <= 20000 (Cong 2026): 8 -> [10, 16, 28, 28, 244, 512, 2048, 2188]
+    model cumulative '>i' up to n=100: 18.411
+    model cumulative '>i' up to n=1000: 27.582
+    model cumulative '>i' up to n=3000: 31.635
+    model cumulative '>i' up to n=10000: 33.327
+    model cumulative '>i' up to n=20000: 34.012

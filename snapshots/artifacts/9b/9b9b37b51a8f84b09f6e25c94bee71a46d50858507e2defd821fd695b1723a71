@@ -1,0 +1,32 @@
+import Mathlib
+
+theorem nth_prime_of_ap_block (k a e : ℕ) (he : 0 < e) (hprime : ∀ j < k, (a + j * e).Prime)
+    (hgap : ∀ j, j + 1 < k → ∀ y, a + j * e < y → y < a + (j + 1) * e → ¬ y.Prime) :
+    ∃ i, ∀ j < k, Nat.nth Nat.Prime (i + j) = a + j * e := by
+  refine ⟨Nat.count Nat.Prime a, ?_⟩
+  have key : ∀ j, j < k → Nat.count Nat.Prime (a + j * e) = Nat.count Nat.Prime a + j := by
+    intro j
+    induction j with
+    | zero => intro _; simp
+    | succ j ih =>
+      intro hj
+      have ih' := ih (by omega)
+      have hsplit : a + (j + 1) * e = (a + j * e) + e := by ring
+      rw [hsplit, Nat.count_add, ih']
+      obtain ⟨e', rfl⟩ : ∃ e', e = 1 + e' := ⟨e - 1, by omega⟩
+      rw [Nat.count_add]
+      have h0 : Nat.count (fun m => Nat.Prime (a + j * (1 + e') + m)) 1 = 1 := by
+        rw [Nat.count_one]
+        simp only [add_zero]
+        rw [if_pos (hprime j (by omega))]
+      have h1 : Nat.count (fun m => Nat.Prime (a + j * (1 + e') + (1 + m))) e' = 0 := by
+        rw [Nat.count_iff_forall_not]
+        intro m hm
+        apply hgap j hj (a + j * (1 + e') + (1 + m))
+        · omega
+        · nlinarith
+      rw [h0, h1]
+      omega
+  intro j hj
+  rw [← key j hj]
+  exact Nat.nth_count (hprime j hj)

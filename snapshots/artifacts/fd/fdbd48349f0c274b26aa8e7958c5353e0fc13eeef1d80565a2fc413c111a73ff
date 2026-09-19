@@ -1,0 +1,36 @@
+"""Delsarte LP (distance-distribution form) for kissing configurations in R^5 with a
+forced antipodal pair: A_{-1} >= 2/N.  Tests the 'cheaper alternative' in 2527fc6b's
+next_experiment at the plain 2-point level."""
+import numpy as np
+from scipy.optimize import linprog
+from scipy.special import eval_gegenbauer
+
+n = 5
+lam = (n - 2) / 2
+deg = 30
+grid = np.concatenate([[-1.0], np.linspace(-1 + 1e-9, 0.5, 3001)])
+
+def G(k, t):
+    return eval_gegenbauer(k, lam, t) / eval_gegenbauer(k, lam, 1.0)
+
+Gk = np.array([G(k, grid) for k in range(1, deg + 1)])  # (deg, m)
+
+def lp(min_antipodal):
+    # maximize sum A_t  s.t.  sum_t A_t G_k(t) >= -1  (k>=1),  A_{-1} >= min_antipodal, A >= 0
+    m = len(grid)
+    c = -np.ones(m)
+    A_ub = -Gk
+    b_ub = np.ones(deg)
+    bounds = [(min_antipodal, None)] + [(0, None)] * (m - 1)
+    res = linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method="highs")
+    return 1 - res.fun, res.x
+
+val0, _ = lp(0.0)
+print(f"plain LP: {val0:.4f}")
+N = 46.0
+for it in range(6):
+    val, x = lp(2.0 / N)
+    print(f"A_-1 >= 2/{N:.3f}: LP = {val:.4f}")
+    N = val
+sup = [(grid[i], x[i]) for i in np.argsort(-x)[:12] if x[i] > 1e-6]
+print("support:", [(round(t, 4), round(a, 4)) for t, a in sup])

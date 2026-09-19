@@ -1,0 +1,107 @@
+#!/usr/bin/env python3
+"""CPAP-11 AP-covering experiment (Erdos #141, idea 4e240b43).
+
+Window: positions x in [0, W], W = 10*2310 = 23100. AP positions A = {2310*j : j=0..10}.
+For each prime p <= P we pick one residue a_p (meaning p | N + x  iff  x = a_p mod p),
+subject to a_p != (AP position mod p) for all 11 AP positions.
+Position x is covered if some p has x = a_p (mod p).  r(P) = number of uncovered
+non-AP positions in [0, W]  (23090 positions total).
+
+Greedy: primes ascending; residue maximising newly covered positions; smallest residue on ties.
+SA: single-prime residue moves, Metropolis.
+"""
+import sys, math, random, time
+import numpy as np
+
+W = 23100
+D = 2310
+AP = np.array([D * j for j in range(11)])
+NONAP = np.ones(W + 1, dtype=bool); NONAP[AP] = False
+NNONAP = int(NONAP.sum())  # 23090
+
+def primes_upto(n):
+    s = bytearray([1]) * (n + 1); s[0:2] = b'\0\0'
+    for i in range(2, int(n ** .5) + 1):
+        if s[i]: s[i*i::i] = bytearray(len(s[i*i::i]))
+    return [i for i in range(n + 1) if s[i]]
+
+def forbidden(p):
+    return set(int(a) for a in AP % p)
+
+def greedy(P):
+    ps = primes_upto(P)
+    cov = np.zeros(W + 1, dtype=np.int32)  # number of primes covering each position
+    res = {}
+    xs = np.arange(W + 1)
+    for p in ps:
+        unc = (cov == 0) & NONAP
+        cnt = np.bincount(xs[unc] % p, minlength=p)
+        forb = forbidden(p)
+        best, ba = -1, None
+        for a in range(p):
+            if a in forb: continue
+            if cnt[a] > best: best, ba = int(cnt[a]), a
+        res[p] = ba
+        cov[ba::p] += 1
+    r = int(((cov == 0) & NONAP).sum())
+    return ps, res, cov, r
+
+def anneal(ps, res, cov, steps, T0, T1, seed=0):
+    rng = random.Random(seed)
+    cov = cov.copy(); res = dict(res)
+    r = int(((cov == 0) & NONAP).sum())
+    best_r, best_res = r, dict(res)
+    forb = {p: forbidden(p) for p in ps}
+    nap = NONAP
+    logT0, logT1 = math.log(T0), math.log(T1)
+    for t in range(steps):
+        T = math.exp(logT0 + (logT1 - logT0) * t / steps)
+        p = ps[rng.randrange(len(ps))]
+        old = res[p]
+        new = rng.randrange(p)
+        if new == old or new in forb[p]: continue
+        # positions uncovered after removing old class: those in old class with cov==1
+        so = slice(old, W + 1, p); sn = slice(new, W + 1, p)
+        lose = int(((cov[so] == 1) & nap[so]).sum())
+        gain = int(((cov[sn] == 0) & nap[sn]).sum())
+        delta = lose - gain  # change in r
+        if delta <= 0 or rng.random() < math.exp(-delta / T):
+            cov[so] -= 1; cov[sn] += 1; res[p] = new; r += delta
+            if r < best_r: best_r, best_res = r, dict(res)
+    return best_r, best_res
+
+def verify(P, res):
+    """Independent recount of r from residues (and check forbidden constraint)."""
+    cov = np.zeros(W + 1, dtype=bool)
+    for p, a in res.items():
+        assert a not in forbidden(p), (p, a)
+        cov[a::p] = True
+    return int(((~cov) & NONAP).sum())
+
+if __name__ == '__main__':
+    mode = sys.argv[1]
+    if mode == 'greedy':
+        for P in [int(x) for x in sys.argv[2:]]:
+            ps, res, cov, r = greedy(P)
+            assert verify(P, res) == r
+            print(f"greedy P={P} nprimes={len(ps)} r={r}", flush=True)
+    elif mode == 'firstzero':
+        # find smallest P (prime) with greedy r=0, scanning primes
+        ps_all = primes_upto(int(sys.argv[2]))
+        lo = int(sys.argv[3])
+        prev_r = None
+        for P in ps_all:
+            if P < lo: continue
+            ps, res, cov, r = greedy(P)
+            if r == 0:
+                print(f"greedy first r=0 at P={P}; previous prime {prev} had r={prev_r}", flush=True); break
+            prev, prev_r = P, r
+    elif mode == 'anneal':
+        P = int(sys.argv[2]); steps = int(float(sys.argv[3])); seed = int(sys.argv[4])
+        T0 = float(sys.argv[5]) if len(sys.argv) > 5 else 3.0
+        T1 = float(sys.argv[6]) if len(sys.argv) > 6 else 0.05
+        ps, res, cov, r0 = greedy(P)
+        t = time.time()
+        br, bres = anneal(ps, res, cov, steps, T0, T1, seed)
+        assert verify(P, bres) == br
+        print(f"anneal P={P} greedy_r={r0} steps={steps} T0={T0} T1={T1} seed={seed} best_r={br} time={time.time()-t:.0f}s", flush=True)

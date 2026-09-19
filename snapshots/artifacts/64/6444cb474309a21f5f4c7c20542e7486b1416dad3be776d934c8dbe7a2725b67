@@ -1,0 +1,37 @@
+"""For N = 4 (a=2) and even k: solve the 'exact Runge branch'
+    P_j(X) = 2 P_j(Y),  E_j(X) = 4 E_j(Y)
+for half-integers X = u_m, Y = u_n (X = m+(k+1)/2, Y = n+(k+1)/2, m >= n+k).
+Also numerically check delta(u) = |sqrt(F_k(u)) - P_j(u)| against 1/(3 D_j) at and above the threshold T(k,2).
+"""
+import sympy as sp
+from runge_even import analyze
+from math import log
+u = sp.Symbol('u'); X, Y = sp.symbols('X Y')
+
+for k in range(4, 25, 2):
+    j, P, E, degE, e, D, T = analyze(k, 2)
+    PX, PY = P.subs(u, X), P.subs(u, Y)
+    EX, EY = E.subs(u, X), E.subs(u, Y)
+    eq1 = sp.expand(PX - 2*PY); eq2 = sp.expand(EX - 4*EY)
+    if degE == 0:
+        sols = "E constant: E(X)=4E(Y) impossible"
+    else:
+        R = sp.resultant(eq1, eq2, X)
+        Rp = sp.Poly(R, Y)
+        # rational roots Y (must be half-integer >= (k+1)/2)
+        roots = [r for r in sp.roots(Rp, filter='Q').keys()]
+        cands = []
+        for r in roots:
+            if r <= 0: continue
+            for x in sp.roots(sp.Poly(eq1.subs(Y, r), X), filter='Q').keys():
+                if eq2.subs({X: x, Y: r}) == 0 and x > r:
+                    cands.append((x, r))
+        sols = f"rational branch solutions (X,Y) with X>Y>0: {cands if cands else 'none'}"
+    # numerical check of delta at threshold and above
+    F = sp.prod([u**2 - sp.Rational(2*i-1, 2)**2 for i in range(1, j+1)])
+    def delta(val):
+        return abs(sp.sqrt(F.subs(u, val)) - P.subs(u, val)).evalf(30)
+    Tq = sp.nsimplify(sp.floor(T*2)+1)/2  # half-integer above T
+    checks = [ (3*delta(Tq*sp.Integer(2)**s) < sp.Rational(1, D)) for s in range(0, 6)]
+    print(f"k={k}: degE={degE}, D={D}, T(k,2)~{T}, n_min~{k*k/log(4)-2*k:.0f}; "
+          f"3*delta(u)<1/D at u=T*2^s (s=0..5): {checks}; {sols}")

@@ -1,0 +1,39 @@
+L= 2  d0=1 d1=1 d2=0 d3=0  last_n_with_d<=1=7  max_prefix_chain=2 at n=7
+L= 3  d0=1 d1=3 d2=0 d3=0  last_n_with_d<=1=15  max_prefix_chain=3 at n=15
+L= 4  d0=1 d1=2 d2=3 d3=2  last_n_with_d<=1=27  max_prefix_chain=4 at n=21
+L= 5  d0=1 d1=2 d2=6 d3=4  last_n_with_d<=1=63  max_prefix_chain=5 at n=45
+L= 6  d0=2 d1=2 d2=2 d3=7  last_n_with_d<=1=111  max_prefix_chain=6 at n=75
+L= 7  d0=0 d1=2 d2=6 d3=11  last_n_with_d<=1=231  max_prefix_chain=3 at n=201
+L= 8  d0=0 d1=2 d2=4 d3=9  last_n_with_d<=1=495  max_prefix_chain=7 at n=465
+L= 9  d0=0 d1=0 d2=4 d3=11  last_n_with_d<=1=0  max_prefix_chain=3 at n=621
+L=10  d0=0 d1=0 d2=3 d3=9  last_n_with_d<=1=0  max_prefix_chain=5 at n=1455
+L=11  d0=0 d1=0 d2=3 d3=4  last_n_with_d<=1=0  max_prefix_chain=8 at n=2145
+L=12  d0=0 d1=0 d2=3 d3=3  last_n_with_d<=1=0  max_prefix_chain=8 at n=5655
+L=13  d0=0 d1=0 d2=1 d3=0  last_n_with_d<=1=0  max_prefix_chain=6 at n=10275
+L=14  d0=0 d1=0 d2=0 d3=1  last_n_with_d<=1=0  max_prefix_chain=6 at n=31155
+L=15  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=6 at n=36015
+L=16  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=6 at n=113175
+L=17  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=8 at n=199815
+L=18  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=7 at n=442035
+L=19  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=8 at n=600705
+L=20  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=6 at n=1115775
+L=21  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=7 at n=2172855
+L=22  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=7 at n=4732035
+L=23  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=8 at n=9125325
+L=24  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=9 at n=25794165
+L=25  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=8 at n=61031955
+L=26  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=9 at n=113374635
+L=27  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=9 at n=168997335
+L=28  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=9 at n=297122475
+L=29  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=9 at n=681038865
+L=30  d0=0 d1=0 d2=0 d3=0  last_n_with_d<=1=0  max_prefix_chain=9 at n=2006244735
+least n with n-2^k prime for all 1<=k<=K (searched odd n <= 2^31):
+K=1 n=5 log2(n)/K=2.322
+K=2 n=7 log2(n)/K=1.404
+K=3 n=15 log2(n)/K=1.302
+K=4 n=21 log2(n)/K=1.098
+K=5 n=45 log2(n)/K=1.098
+K=6 n=75 log2(n)/K=1.038
+K=7 n=465 log2(n)/K=1.266
+K=8 n=2145 log2(n)/K=1.383
+K=9 n=25794165 log2(n)/K=2.736

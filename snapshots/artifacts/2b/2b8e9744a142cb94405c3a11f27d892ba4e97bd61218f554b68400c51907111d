@@ -1,0 +1,38 @@
+# Exact single-interval count at e = V \ N[x] for graph edge-closures, via the derived-subgraph description.
+# avoid(x) = #{T ⊆ N(x) : every vertex of e∪T has a neighbour in e∪T}
+# contain(x) = #{T ⊆ N(x), T≠∅ : every vertex of e has a neighbour in e∪T}
+# Compare with brute-force counts in the actual union-closure of the edge set.
+import itertools, random
+def closure(edges):
+    F=set(frozenset(e) for e in edges)
+    while True:
+        new={a|b for a in F for b in F}-F
+        if not new: break
+        F|=new
+    return F
+def check(n, edges):
+    adj={v:set() for v in range(n)}
+    for u,v in edges: adj[u].add(v); adj[v].add(u)
+    F=closure(edges)
+    for x in range(n):
+        Nx=adj[x]; e=frozenset(set(range(n))-Nx-{x})
+        av=sum(1 for A in F if e<=A and x not in A); co=sum(1 for A in F if e<=A and x in A)
+        pa=pc=0
+        for r in range(len(Nx)+1):
+            for T in itertools.combinations(sorted(Nx),r):
+                S=e|set(T)
+                if S and all(adj[v]&S for v in S): pa+=1
+                if T and all(adj[v]&S for v in e): pc+=1
+        assert (av,co)==(pa,pc),(n,edges,x,av,co,pa,pc)
+cnt=0
+for n in range(2,6):
+    allE=list(itertools.combinations(range(n),2))
+    for mask in range(1,1<<len(allE)):
+        edges=[allE[i] for i in range(len(allE)) if mask>>i&1]
+        check(n,edges); cnt+=1
+random.seed(1)
+for _ in range(200):
+    n=7; allE=list(itertools.combinations(range(n),2))
+    edges=[e for e in allE if random.random()<0.4]
+    if edges: check(n,edges); cnt+=1
+print("ok", cnt)

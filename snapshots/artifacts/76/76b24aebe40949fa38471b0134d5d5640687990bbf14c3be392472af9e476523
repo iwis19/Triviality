@@ -1,0 +1,55 @@
+"""
+Enumerate ALL exact coset coverings (partitions into left cosets, k>=2) of small groups and
+test the Znam/Newman-type strengthening (claim C3):
+   the largest index n_k occurs at least p(n_k) times, p(n_k) = least prime divisor of n_k.
+Also records the minimum multiplicity of the largest index observed, and checks HS itself.
+Usage: python3 hs_znam.py [--nontrivial] group names...
+"""
+import sys, itertools
+from hs_search import Group, GROUPS
+
+def least_prime(n):
+    for p in range(2, n + 1):
+        if n % p == 0: return p
+
+def all_partitions(G, subs, cap=None):
+    """yield lists of (subgroup index, coset) covering G exactly, choosing cosets containing the
+    smallest uncovered element; subgroups given as list of frozensets."""
+    # precompute: for each element x and subgroup H, the left coset xH
+    cos = [[G.left_coset(x, H) for H in subs] for x in range(G.N)]
+    count = [0]
+    def rec(covered, chosen):
+        if len(covered) == G.N:
+            yield list(chosen); return
+        x = min(set(range(G.N)) - covered)
+        for hi, H in enumerate(subs):
+            c = cos[x][hi]
+            if covered.isdisjoint(c):
+                chosen.append((hi, c))
+                yield from rec(covered | c, chosen)
+                chosen.pop()
+    yield from rec(frozenset(), [])
+
+def run(name, gens, nontrivial):
+    G = Group(name, gens)
+    subs = [H for H in G.subgroups() if len(H) < G.N and (len(H) > 1 or not nontrivial)]
+    total = 0; znam_viol = []; hs_viol = []; minmult = {}
+    for part in all_partitions(G, subs):
+        total += 1
+        idx = sorted(G.N // len(c) for _, c in part)
+        nk = idx[-1]; m = idx.count(nk)
+        minmult[nk] = min(minmult.get(nk, 10 ** 9), m)
+        if m < least_prime(nk): znam_viol.append(part)
+        if len(set(idx)) == len(idx): hs_viol.append(part)
+    print(f"{name:20s} |G|={G.N:3d} partitions(k>=2{', nontrivial subgroups only' if nontrivial else ''})={total:8d} "
+          f"HS-violations={len(hs_viol)} Znam-violations={len(znam_viol)} min multiplicity of largest index by n_k={dict(sorted(minmult.items()))}", flush=True)
+    return znam_viol
+
+if __name__ == "__main__":
+    args = sys.argv[1:]
+    nontrivial = "--nontrivial" in args
+    names = [a for a in args if not a.startswith("--")]
+    for nm in names:
+        v = run(nm, GROUPS[nm], nontrivial)
+        for part in v[:3]:
+            print("   Znam violation example:", [(sorted(c)) for _, c in part])

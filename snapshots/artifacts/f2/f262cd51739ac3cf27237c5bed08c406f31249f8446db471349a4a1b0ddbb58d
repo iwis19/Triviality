@@ -1,0 +1,111 @@
+import Mathlib
+
+open Nat Finset
+
+/-- No-carry criterion in terms of residues: `2 * (n % p^i) < p^i` for all `i ≥ 1` iff every
+base-`p` digit `d` of `n` satisfies `2 * d < p`. -/
+theorem two_mul_mod_pow_lt_iff_digits {p : ℕ} (hp : 2 ≤ p) :
+    ∀ n : ℕ, (∀ i, 1 ≤ i → 2 * (n % p ^ i) < p ^ i) ↔ ∀ d ∈ Nat.digits p n, 2 * d < p := by
+  intro n
+  induction n using Nat.strong_induction_on with
+  | _ n ih =>
+    rcases Nat.eq_zero_or_pos n with rfl | hn
+    · simp [(by omega : 0 < p)]
+    · have hp0 : 0 < p := by omega
+      rw [Nat.digits_def' (by omega) hn]
+      have hdiv : n / p < n := Nat.div_lt_self hn (by omega)
+      rw [List.forall_mem_cons, ← ih (n / p) hdiv]
+      constructor
+      · intro h
+        refine ⟨by simpa using h 1 le_rfl, fun i hi => ?_⟩
+        have h1 := h (i + 1) (by omega)
+        have hmod : n / p % p ^ i = n % p ^ (i + 1) / p := by
+          rw [_root_.pow_succ, Nat.mod_mul_left_div_self]
+        rw [hmod]
+        set m := n % p ^ (i + 1) with hm
+        rw [_root_.pow_succ] at h1
+        have hle : m / p * p ≤ m := Nat.div_mul_le_self m p
+        have : 2 * (m / p) * p < p ^ i * p := by
+          calc 2 * (m / p) * p = 2 * (m / p * p) := by ring
+            _ ≤ 2 * m := Nat.mul_le_mul_left 2 hle
+            _ < p ^ i * p := h1
+        exact Nat.lt_of_mul_lt_mul_right this
+      · rintro ⟨h0, h⟩ i hi
+        obtain ⟨j, rfl⟩ : ∃ j, i = j + 1 := ⟨i - 1, by omega⟩
+        have hj := h j
+        have hpj : 0 < p ^ j := by positivity
+        have key : n % p ^ (j + 1) = n % p + p * (n / p % p ^ j) := by
+          rw [_root_.pow_succ', Nat.mod_mul]
+        rw [key]
+        rcases Nat.eq_zero_or_pos j with rfl | hj0
+        · simp only [pow_zero, Nat.mod_one, mul_zero, add_zero, zero_add, pow_one]; omega
+        · have := hj hj0
+          rw [_root_.pow_succ']
+          nlinarith
+
+theorem centralBinom_coprime_prime_iff_digits {p : ℕ} (hp : p.Prime) (n : ℕ) :
+    n.centralBinom.Coprime p ↔ ∀ d ∈ Nat.digits p n, 2 * d < p := by
+  rw [← two_mul_mod_pow_lt_iff_digits hp.two_le]
+  have hcb : n.centralBinom ≠ 0 := n.centralBinom_ne_zero
+  set b := Nat.log p (n + n) + 1 with hb
+  have hfac : n.centralBinom.factorization p =
+      #{i ∈ Finset.Ico 1 b | p ^ i ≤ n % p ^ i + n % p ^ i} := by
+    rw [Nat.centralBinom_eq_two_mul_choose, two_mul]
+    exact Nat.factorization_choose' hp (Nat.lt_succ_self _)
+  have h1 : n.centralBinom.Coprime p ↔ n.centralBinom.factorization p = 0 := by
+    rw [Nat.coprime_comm, Nat.Prime.coprime_iff_not_dvd hp,
+      Nat.Prime.dvd_iff_one_le_factorization hp hcb]
+    omega
+  rw [h1, hfac, Finset.card_eq_zero, Finset.filter_eq_empty_iff]
+  constructor
+  · intro h i hi
+    by_cases hib : i < b
+    · have := h (Finset.mem_Ico.mpr ⟨hi, hib⟩)
+      omega
+    · -- i ≥ b > log p (n + n), so n + n < p ^ i
+      have hlt : n + n < p ^ i := Nat.lt_pow_of_log_lt hp.one_lt (by omega)
+      have := Nat.mod_le n (p ^ i)
+      omega
+  · intro h i hi
+    have := h i (Finset.mem_Ico.mp hi).1
+    omega
+
+theorem centralBinom_coprime_105_iff (n : ℕ) :
+    n.centralBinom.Coprime 105 ↔
+      (∀ d ∈ Nat.digits 3 n, d ≤ 1) ∧ (∀ d ∈ Nat.digits 5 n, d ≤ 2) ∧
+        (∀ d ∈ Nat.digits 7 n, d ≤ 3) := by
+  have h105 : (105 : ℕ) = 3 * (5 * 7) := by norm_num
+  rw [h105, Nat.coprime_mul_iff_right, Nat.coprime_mul_iff_right,
+    centralBinom_coprime_prime_iff_digits (by norm_num),
+    centralBinom_coprime_prime_iff_digits (by norm_num),
+    centralBinom_coprime_prime_iff_digits (by norm_num)]
+  constructor <;> rintro ⟨h3, h5, h7⟩ <;>
+    exact ⟨fun d hd => by have := h3 d hd; omega, fun d hd => by have := h5 d hd; omega,
+      fun d hd => by have := h7 d hd; omega⟩
+
+theorem setOf_centralBinom_coprime_105_eq :
+    { n : ℕ | n.centralBinom.Coprime 105 } =
+      { n : ℕ | (∀ d ∈ Nat.digits 3 n, d ≤ 1) ∧ (∀ d ∈ Nat.digits 5 n, d ≤ 2) ∧
+        (∀ d ∈ Nat.digits 7 n, d ≤ 3) } := by
+  ext n
+  exact centralBinom_coprime_105_iff n
+
+theorem erdos376_infinite_iff_digits :
+    { n : ℕ | n.centralBinom.Coprime 105 }.Infinite ↔
+      { n : ℕ | (∀ d ∈ Nat.digits 3 n, d ≤ 1) ∧ (∀ d ∈ Nat.digits 5 n, d ≤ 2) ∧
+        (∀ d ∈ Nat.digits 7 n, d ≤ 3) }.Infinite := by
+  rw [setOf_centralBinom_coprime_105_eq]
+
+/-- `log_g (10 g / t) > 1` is literally `t < 10`: the "exponent > 1" statement carries no
+information beyond `t < 10`. -/
+theorem bloomCroot_exponent_gt_one {g t : ℝ} (hg : 1 < g) (ht0 : 0 < t) (ht : t < 10) :
+    1 < Real.logb g (10 * g / t) := by
+  rw [Real.lt_logb_iff_rpow_lt hg (by positivity), Real.rpow_one, lt_div_iff₀ ht0]
+  nlinarith
+
+theorem bloomCroot_exponent_gt_one_357 :
+    1 < Real.logb 3 (10 * 3 / 2) ∧ 1 < Real.logb 5 (10 * 5 / 3) ∧
+      1 < Real.logb 7 (10 * 7 / 4) :=
+  ⟨bloomCroot_exponent_gt_one (by norm_num) (by norm_num) (by norm_num),
+   bloomCroot_exponent_gt_one (by norm_num) (by norm_num) (by norm_num),
+   bloomCroot_exponent_gt_one (by norm_num) (by norm_num) (by norm_num)⟩

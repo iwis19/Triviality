@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+"""Fiber-entropy slack on the Chase-Lovett-type layered family F_eps (see kfold_barrier.py).
+Theorem-level inequality (own short argument): for A,B iid uniform on union-closed F, C=A∪B,
+  P(C=c) <= |F_{<=c}|^2/|F|^2  =>  H(C) >= 2 log|F| - 2 E log|F_{<=C}|, and H(C) <= log|F|, so
+  2 E_C log2|F_{<=C}| >= log2|F|.   (*)
+Question: how much slack does (*) have on F_eps (approximately union-closed, maxfreq ~ psi)?
+We compute E_C log2|F_{<=C}| where C = A∪B with A,B iid uniform on F_eps, exactly by size classes,
+and compare with log2|F_eps|/2 and with the value for the Boolean lattice 2^[n] (where slack is 0 asymptotically? no: for 2^[n],
+|F_{<=C}| = 2^{|C|}, E|C| = 3n/4, so 2E log = 3n/2 vs log|F| = n).
+"""
+from fractions import Fraction
+from math import comb, sqrt, log2
+def analyze(n, p, eps):
+    lo, hi, big = int(round(p*n)), int(round((p+eps)*n)), int(round((1-p)*n))
+    allowed = [a for a in range(n+1) if lo <= a <= hi or a >= big]
+    W = {a: comb(n,a) for a in allowed}; tot = sum(W.values())
+    # distribution of |A∪B| (not necessarily in allowed)
+    dist = {}
+    for a in allowed:
+        for b in allowed:
+            pab = Fraction(W[a]*W[b], tot*tot)
+            for j in range(max(0,a+b-n), min(a,b)+1):
+                q = pab*Fraction(comb(a,j)*comb(n-a,b-j), comb(n,b))
+                dist[a+b-j] = dist.get(a+b-j, 0) + q
+    fib = lambda c: sum(comb(c,a) for a in allowed if a <= c)  # |F_{<=C}| for |C|=c (counts sets of F_eps inside C)
+    E = sum(float(q)*log2(fib(c)) for c,q in dist.items() if fib(c) > 0)
+    return log2(tot), E
+if __name__ == "__main__":
+    p = (3-sqrt(5))/2
+    for eps in (0.02, 0.04):
+        for n in (60, 120, 240):
+            L, E = analyze(n, p, eps)
+            print(f"eps={eps} n={n:4d} log2|F|={L:8.2f}  2E log2|F_<=C|={2*E:8.2f}  ratio={2*E/L:.3f}  (Boolean 2^[n] ratio -> 1.5)")

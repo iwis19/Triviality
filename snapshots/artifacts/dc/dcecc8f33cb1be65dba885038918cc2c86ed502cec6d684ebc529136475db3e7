@@ -1,0 +1,12 @@
+from pell_k2 import k2_square
+A=5000
+S=set(a for a in range(2,A+1) if k2_square(a))
+U=set(); y=3
+while 2*y<=A:
+    x,u=y,1
+    while True:
+        x,u=x*y+(y*y-1)*u, x+y*u
+        if u>A: break
+        U.add(u)
+    y+=2
+print(len(S),len(U),S==U)  # -> 1270 1270 True

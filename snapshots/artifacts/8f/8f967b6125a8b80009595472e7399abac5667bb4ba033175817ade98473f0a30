@@ -1,0 +1,31 @@
+// Least n (odd, n > 2^K + 4096) such that n - 2^k is prime for all 1 <= k <= K.  Search n <= 2^E.
+// Wheel on primes 3,5,7,11,13,17 (residues n mod p must avoid {2^k mod p : 1<=k<=K}); then filters for
+// primes 19..2000; then deterministic Miller-Rabin.  Candidates are visited in increasing order.
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+typedef unsigned __int128 u128; typedef uint64_t u64;
+static u64 mulmod(u64 a,u64 b,u64 m){return (u64)((u128)a*b%m);}
+static u64 powmod(u64 a,u64 e,u64 m){u64 r=1;a%=m;while(e){if(e&1)r=mulmod(r,a,m);a=mulmod(a,a,m);e>>=1;}return r;}
+static int is_prime(u64 n){ if(n<2)return 0; static const u64 sp[]={2,3,5,7,11,13,17,19,23,29,31,37}; for(int i=0;i<12;i++){if(n%sp[i]==0)return n==sp[i];}
+  u64 d=n-1;int s=0;while(!(d&1)){d>>=1;s++;} for(int i=0;i<12;i++){u64 x=powmod(sp[i],d,n); if(x==1||x==n-1)continue; int ok=0; for(int r=1;r<s;r++){x=mulmod(x,x,n); if(x==n-1){ok=1;break;}} if(!ok)return 0;} return 1; }
+static unsigned char bad[2100][2100];
+int main(int argc,char**argv){
+  int K=atoi(argv[1]), E=atoi(argv[2]); u64 N=(u64)1<<E;
+  int fp[400]; int nf=0;
+  for(int p=3;p<2000;p++){ int pr=1; for(int d=2;d*d<=p;d++) if(p%d==0){pr=0;break;} if(!pr) continue;
+    u64 x=1; for(int k=1;k<=K;k++){ x=(x*2)%p; bad[p][x]=1; } if(p>17) fp[nf++]=p; }
+  const int wp[6]={3,5,7,11,13,17}; u64 W=2*3*5*7*11*13*17; // 510510 (odd residues only)
+  u64 *res=malloc(W*sizeof(u64)); u64 nr=0;
+  for(u64 w=1;w<W;w+=2){ int ok=1; for(int i=0;i<6;i++) if(bad[wp[i]][w%wp[i]]){ok=0;break;} if(ok) res[nr++]=w; }
+  fprintf(stderr,"K=%d wheel residues %llu of %llu\n",K,(unsigned long long)nr,(unsigned long long)W);
+  u64 lo=((u64)1<<K)+4096; long tested=0;
+  for(u64 b=0; b*W<=N; b++){
+    for(u64 j=0;j<nr;j++){ u64 n=b*W+res[j]; if(n<lo) continue; if(n>N) break;
+      int ok=1; for(int a=0;a<nf;a++) if(bad[fp[a]][n%fp[a]]){ok=0;break;} if(!ok) continue;
+      tested++; int all=1; for(int k=1;k<=K;k++) if(!is_prime(n-((u64)1<<k))){all=0;break;}
+      if(all){ printf("K=%d least n=%llu (n>2^K+4096, searched to 2^%d) log2(n)/K=%.3f ; MR-tested=%ld\n",K,(unsigned long long)n,E,__builtin_log2((double)n)/K,tested); return 0; }
+    }
+  }
+  printf("K=%d: no n in (2^K+4096, 2^%d]\n",K,E); return 0;
+}

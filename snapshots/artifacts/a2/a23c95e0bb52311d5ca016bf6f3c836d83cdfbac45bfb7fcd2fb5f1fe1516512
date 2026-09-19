@@ -1,0 +1,120 @@
+"""
+Experiment: unit-distance graph on a ball of the "Moser ring" R = Z[omega, zeta]
+where omega = e^{i pi/3} and zeta = e^{i theta}, cos(theta)=5/6 (the Moser-spindle rotation).
+Vertices = all sums of at most L unit vectors from the 12 directions omega^k, omega^k*zeta.
+We (a) check k-colorability of the ball for k=4,5, and
+(b) search for 5-color "mono-forcers": pairs (u,v) such that every 5-coloring of the ball
+has c(u)=c(v).  A 5-mono-forcer at any distance d>0 would imply chi(plane) >= 6 (chain argument).
+Coordinates are floats rounded to 1e-7 (experimental; not a proof-grade computation).
+"""
+import itertools, math, sys, time
+from pysat.solvers import Cadical153
+
+L = int(sys.argv[1]) if len(sys.argv) > 1 else 3
+K_LIST = [4, 5]
+
+ct = 5.0 / 6.0
+st = math.sqrt(11.0) / 6.0
+dirs = []
+for k in range(6):
+    a = math.pi * k / 3.0
+    dirs.append((math.cos(a), math.sin(a)))
+    dirs.append((math.cos(a) * ct - math.sin(a) * st, math.sin(a) * ct + math.cos(a) * st))
+if len(sys.argv) > 2 and sys.argv[2] == '18':
+    # third family: i*sqrt(3)*(1-zeta) rotated by omega^k (also unit vectors of the module Z[w]+zeta*Z[w])
+    zr, zi = 0.0 - math.sqrt(3.0) * st, math.sqrt(3.0) * (1.0 - ct)
+    for k in range(6):
+        a = math.pi * k / 3.0
+        dirs.append((zr * math.cos(a) - zi * math.sin(a), zr * math.sin(a) + zi * math.cos(a)))
+
+def key(p):
+    return (round(p[0], 7), round(p[1], 7))
+
+pts = {key((0.0, 0.0)): (0.0, 0.0)}
+frontier = [(0.0, 0.0)]
+for step in range(L):
+    new = []
+    for p in frontier:
+        for d in dirs:
+            q = (p[0] + d[0], p[1] + d[1])
+            kq = key(q)
+            if kq not in pts:
+                pts[kq] = q
+                new.append(q)
+    frontier = new
+V = list(pts.values())
+n = len(V)
+print(f"L={L}: {n} vertices")
+
+# edges: use a grid hash for speed
+cell = {}
+for i, p in enumerate(V):
+    cell.setdefault((math.floor(p[0]), math.floor(p[1])), []).append(i)
+edges = []
+for i, p in enumerate(V):
+    cx, cy = math.floor(p[0]), math.floor(p[1])
+    for dx in (-2, -1, 0, 1, 2):
+        for dy in (-2, -1, 0, 1, 2):
+            for j in cell.get((cx + dx, cy + dy), []):
+                if j > i:
+                    q = V[j]
+                    if abs(math.hypot(p[0] - q[0], p[1] - q[1]) - 1.0) < 1e-6:
+                        edges.append((i, j))
+print(f"{len(edges)} unit-distance edges")
+
+def var(i, c, k):
+    return i * k + c + 1
+
+def build(k):
+    s = Cadical153()
+    for i in range(n):
+        s.add_clause([var(i, c, k) for c in range(k)])
+    for (i, j) in edges:
+        for c in range(k):
+            s.add_clause([-var(i, c, k), -var(j, c, k)])
+    return s
+
+for k in K_LIST:
+    t = time.time()
+    s = build(k)
+    # symmetry breaking: origin gets color 0
+    s.add_clause([var(0, 0, k)])
+    res = s.solve()
+    print(f"{k}-colorable ball: {res}  ({time.time()-t:.1f}s)")
+    s.delete()
+
+# forcer search for k=5: origin u=0, candidate v among vertices with |v| in a set of distances
+k = 5
+s = build(k)
+s.add_clause([var(0, 0, k)])
+origin = 0
+dist_of = lambda i: math.hypot(V[i][0], V[i][1])
+cands = [i for i in range(n) if 0 < dist_of(i) < 2.0 + 1e-9]
+# group by distance
+by_d = {}
+for i in cands:
+    by_d.setdefault(round(dist_of(i), 6), []).append(i)
+print(f"{len(by_d)} distinct distances from origin below 2; testing one representative per distance")
+forcers = []
+t = time.time()
+for d, lst in sorted(by_d.items()):
+    v = lst[0]
+    # is there a 5-coloring with c(v) != c(origin)=0 ?
+    ok = s.solve(assumptions=[-var(v, 0, k)])
+    if not ok:
+        forcers.append((d, v))
+        print(f"  FORCER at distance {d}: every 5-coloring has c(v)=c(0)")
+print(f"forcer scan done ({time.time()-t:.1f}s); forcers found: {len(forcers)}")
+
+# Also: how constrained are distances? for each distance, can (0,v) be mono AND non-mono?
+both = 0
+onlynon = 0
+for d, lst in sorted(by_d.items()):
+    v = lst[0]
+    mono = s.solve(assumptions=[var(v, 0, k)])
+    if mono:
+        both += 1
+    else:
+        onlynon += 1
+        print(f"  ANTI-FORCER at distance {d}: every 5-coloring has c(v)!=c(0)")
+print(f"distances realizable mono: {both}, forced non-mono: {onlynon}")

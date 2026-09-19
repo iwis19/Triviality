@@ -1,0 +1,456 @@
+Acta Math. Hung. 
+54 (3---4) (1989), 225--236. 
+ON THE MAXIMAL LENGTH OF TWO 
+SEQUENCES OF CONSECUTIVE INTEGERS 
+WITH THE SAME PRIME DIVISORS 
+R. BALASUBRAMANIAN, T. N. SHOREY (Bombay) and M. WALDSCHMIDT (Paris) 
+w 1. Introduction 
+The initial motivation of the present paper is the following problem of Erd6s 
+and Woods, whose solution would be of interest in logic (see [3, 6, 11, 10, 16]): 
+Does there exist an integer k >=2 with the following property : if x and y are positive 
+integers such that for l<=i<=k, the two numbers x+i and y+i have the same 
+prime factors, then x=y. 
+For each integer n->2, let us denote by Supp (n) the set of prime factors of n. 
+The only known examples of positive integers (x,y, k)with l<=x<y, k>=2 and 
+(1.1) Supp (x+/) = Supp (Y+0 for 1 <= i <- k 
+are given by 
+k=2, x=2h-3, y=2h(2h--2)--l, h=>2 
+and 
+k=2, x=74, y=1214. 
+Under the assumption (1.1), we shall give an upper bound for k in terms of x: 
+(1.2) log k <= cl (log x log log x) 1/2 for x _-> 3 
+and lower bounds for y-x either in terms of k: 
+(1.3) y-x > exp(c2k(logk)2/loglogk) for k => 3 
+or in terms of k and y: 
+(1.4) y-x > (k loglog y)Cflcloglogy(logloglogy)-I for y >= 27. 
+Here Cl, c2 and ca are effectively computable absolute positive constants. The ine- 
+quality (1.4) with k= 1 is Theorem 4 of Erd/is and Shorey [4]; in fact this will be 
+used in the proof of (1.4). 
+We consider also some related problems, where the assumption (1.1) is replaced 
+either by 
+(1.5) P(x+i) = P(y+i) for 1 ~ i<- k 
+where P(n) denotes the greatest prime factor of n and P(1)= 1, or by 
+k k 
+(1.6) Snpp (/-/(x+/)) = Supp(/-/(y+i)). 
+i=1 i=1 
+
+226 R. BALASUBRAMANIAN, T. N. SHOREY and M. WALDSCHMIDT 
+The arrangement of this paper is as follows. We, first, collect in Section 2 several 
+auxiliary lemmas from different sources. The main tool is a lower bound for linear 
+forms in logarithms of rational numbers, due to Baker [1]. The proofs are via esti- 
+mates for the greatest square free factors of products of integers from a bloc of 
+consecutive integers. 
+In Section 3, we study the problem (1.5) related to the greatest prime divisors. 
+In Section 4, we consider the problem (1.1) of Erd6s--Woods. In Section 5, we 
+deal with the assumption (1.6). 
+Throughout this paper, the letters n, x, y and k will denote positive integers 
+with n_->2 and with x<y. We denote by Q(n) the greatest square-free factor of 
+n and we write re(n) for the number of distinct prime factors of n and a~(1)=l. 
+As usual, we recall that re(n) is the number of primes less than or equal to n. 
+w 2. Preliminary results 
+In this section, we give several auxiliary lemmas which will be used in the next 
+sections. 
+L~A 2.1. Let n be a positive integer. 
+a) There exists a prime p satisfying n<p<=2n. 
+b) There exists an effectively computable absolute constant c4>0 such that for 
+n > cA, there is a prime p satisfying 
+n < p ~_ n+c4n 112+1121. 
+Part a) is the well-known "postulat de Bertrand". Part b) is due to Iwaniec and 
+Pintz [7]. 
+COROLLARY 2.2. If P(x+i)=P(y+i) for l<=i<-k, then y>k. If, further- 
+more k>-c4, then k<c4y 2~/4~. 
+PROOF OF COROLLARY 2.2. Assume y<-k. By Lemma 2.1, Part a), there exists 
+an i with l<=i<=k such that y+i is a prime number. Now P(x+i)=P(y+i) 
+implies that y+i divides x+i, which is impossible since y>x. 
+Hence y>k. Now if k>=c4, by Lemma 2.1, part b), there exists an i with 
+l<-i<=c4y 23/42 such that y+i is a prime number, and the same argument yields 
+k< cay ~8/4z. 
+LEMMA2.3. We put S={x+l, ...,x+k}. For every prime p<=k, we choose 
+an f(p)E S such that p does not appear to a higher power in the factorisation of any 
+other element of S: 
+If(p)[; ~ -= max {[nl; ~, nES}. 
+We denote by $1 the subset of S obtained by deletingfrom S all f(p) with p<=k. Then 
+/-/ //[nl~ -1 divides k!. n 6 S 1 p~k 
+On the other hand, it may be noticed that k! divides 
+binomial coefficient (x~ k) is aninteger. 
+/7/1 Inl~ -1, since the nES p~_k 
+Acta Mathematica Hungarica 54, 1989 
+
+ON THE MAXIMAL LENGTH OF TWO SEQUENCES OF CONSECUTIVE INTEGERS 227 
+PROOF. This result is due to ErdSs [2], Lemma 3. For the convenience of the 
+reader, we give here a proof. 
+Let us write, for each n_->2, 
+n =/17 p%(.) 
+P 
+so that 
+[nip = p-%(~). 
+For each integer j=>l, let us write 
+uj = card {nES1, v,(n) = j} 
+and 
+vj = X ui = card {nES1, v,(n) >=j}. i>=j 
+Therefore vj is the number of nCSx which is divisible by pL Notice that 
+Card {nES, vp(n) >-- j} <= [~]+ l. 
+{nES, vp(n)>=j} is not empty, then it contains f(p). Hence Further, if the set 
+v.<-[ k] and S-tp~ 1 
+But 
+Zb(n)= Z ju, = Z v,, nES 1 1~1 j>~l 
+and Lemma 2.3 follows. 
+We derive from Lemma 2.3 the following result. See Erd6s and Turk [5]. 
+COROLLARY 2.4. Denote by t the number of integers nES such that P(n)<=k. 
+Then 
+(2.5) t <= k logk +(k). 
+log x 
+PROOF. We consider the product of the nES1 such that P(n)<=k. This product 
+is at least x t-~(k), and divides k! by Lemma 2.3. Hence xt-~(k)~k k which implies 
+(2.5). 
+If k does not exceed a power of log x, inequality (2.5) can be strengthened as 
+follows. 
+LEMMA 2.6. Let 8>0. Assume that x>e k~ and k>=3. Let t be defined as in 
+Corollary 2.4. Then 
+t <_- csk(log k) -2 log log k 
+where c5>0 is an effectively computable number depending only on 8. 
+This is Theorem 2 of [12]. The proof of Lemma 2.6 depends on the theory of 
+linear forms in logarithms. As stated in Section 1, this theory is the main tool for 
+our investigations. Now we state a lower bound for linear forms in logarithms. 
+This is a special case of [1] and [15] which is relevant here. 
+Acta Mathematica Hungarica 54, 1989 
+
+228 R. BALASUBRAMANIAN, T. N. SHOREY and M. WALDSCHMIDT 
+LEMMA 2.7. Let Pl ..... p, be distinct prime numbers with n >=2 and let b 1 .... , b n 
+be rational integers which are not all zero. Define 
+Then 
+P = max pi and B = max Ib~l. 
+pbl _b 1] > exp (-- (e 6 n)" (log P)" + 1 (log B +log log P)) i ""/an" -- 
+with c8=2 2a. 
+The following result of Stormer is well-known, but we give a proof via Lemma 
+2.7 to illustrate the way we shall use Lemma 2.7. 
+COROLLARY 2.8. When m~oo, P(m(m+ 1)) tends to infinity effectively. 
+In particular for each x_>l, there are only finitely many y>x such that 
+P(x+l) = P(y+l) and P(x+2) =_P(y+2) 
+and these y can be effectively determined. It follows that for each x0>=l, it is a 
+finite problem to determine all x and y with x<-xo and y>x such that 
+Supp (x-t-l) = Supp (y+l) and Supp (x+2) = Supp (y+2). 
+Lehmer [91 applied Stormer's method on Pellian equations to investigate thisproblem. 
+PROOF OF COROLLARY 2.8. We decompose m and m + 1 in prime factors and we 
+write 
+1 m+l 
+-----m m 1 = (,~_/f~ pb')- 1 
+where P=P(m(m+l)), 2bp<--m+l. We apply Lemma 2.7 with B=3 logm (for 
+m>=2) and n<=~z(P). We conclude that for each e>0 
+P(m(m+ 1)) > (l-e) log log m for m > too(e) 
+where m0 (e) is an effectively computable number depending only on ~. 
+We shall need the following refinement of Corollary 2.8. 
+LEMMA 2.9. Let A>0. Let f(X) be a polynomial with integer coefficients and 
+with at least two distinct roots. Then there exists an effectively computable number 
+c7>0 depending only on f and A such that for every integer Y=>27 with f(Y)#O, 
+the inequality 
+log P([f(Y)I) <= (log log y)a 
+implies that 
+log log Y 
+co(]f(Y)l) >= c, ]o-g-lo-~ogY" 
+This is Theorem 2 of [13]. For an account and refinements of the results of this 
+section, see Chapter 7 of the book by T. N. Shorey and R. Tijdeman: Exponential 
+Diophantine Equations, Cambridge Tracts in Mathematics, 87 (1986). 
+Acta Mathematica Hungarica 54, !989 
+
+ON THE MAXIMAL LENGTH OF TWO SEQUENCES OF CONSECUTIVE INTEGERS 229 
+w 3. Sequences of consecutive integers with the same greatest prime factor 
+(3.3) 
+and 
+In this section, we denote by x, y and k three positive integers satisfying x<y, 
+k_->l and 
+(3.1) P(x+O = P(y+i) for 1 _<- i~ k. 
+It has been checked on a computer that (3.1) has no solution with y<5000 and 
+k=>3. It follows from a result of Tijdeman [14] that (3.l) implies that 
+y-x >= lO-61oglogx. 
+Our aim is to prove the bounds 
+y- x > k k/2 and y- x > (log log y)k/2 
+for k sufficiently large. Our actual result is sharper: the exponent k/2 is replaced by 
+k(1 -e) and we can even improve the ~. 
+PROPOSITION 3.2. There exist effectively computable absolute positive constants 
+c s and c a such that for k=>3, we have 
+f 
+log log k.) y- x > kk exP l- csk log k ) \ 
+,ik(1 -- ca(log k) - a log log k) 
+PROOF OF (3.3). We choose a sufficiently large absolute constant cs>0. If 
+(log k)Z-< ca log log k, then the right hand side of(3.3) is less than one, while y-x>=1. 
+Therefore we may assume that k is sufficiently large. From Corollary 2.2, we derive 
+y>k9/5. 
+Denote by tl the number of i with l<=i<-k and P(y+i)<=k. We apply Cor- 
+ollary 2.4 with x replaced by y to conclude that 
+5 5 2k 3 -<Z --]l~. h < ~lc+~(k) <=-~k~ logk - 5 
+Consequently, there are at least [2k/5]+1 integers i with 1 <=i<=k and P(y+i)>k. 
+By (3.1), we see that for distinct integers dl ..... d~ with l<=d,<-k (l~s=<v) and 
+P(y+d,)>k (1 =<s=<v), 
+(3.5) P(y + dl)...P(y + d~)l(y- x). 
+Since v>5k, we get y-x>k 2k/5, which implies that k<logy. We now apply 
+Lemma 2.6 to conclude that 
+(3.6) tl <= clok (log k) -2 log log k 
+where q0>0 is an effectively computable absolute constant. Now in (3.5) we have 
+v~k-q, hence 
+(3.7) k k-~l < y-x. 
+We combine (3.7) and 0.6) to complete the proof of (3.3). 
+A cta Mathematica Htmgarica 54, 1989 
+
+230 R. BALASUBRAMANIAN, T. N. SFIOREY and M. WALDSCHMIDT 
+PROOF OF (3.4). It is easy to check that the assumption (3.1) with k_->3 implies 
+3 that y> 100. Therefore log log y>~- and this enables us to assume that (log k)2> 
+:> c9 log log k. Thus we may assume that k is sufficiently large. 
+3 If log logy<=-)-k, then (3.3) implies (3.4). Therefore we may assume that 
+< 2 that ( 2 y]~," for other- k _~l~176 Finally, we may assume y-x<l.~loglog_ 
+wise (3.4) is clear. 
+We fix an integer i, 1 :t=k, and we use Lemma 2.7 for 
+with 
+y-__.__~x = 1- x +___._~/ 
+y+i y+i 
+5 n <_- ~ P (log p)-l, B <_- (log y)/log 2 
+where P=P(x+i)=P(y+i). We use the upper bound 
+y--X /" 2 ~(218) loglogy 
+y - < log log y) :1 < 
+2 and we get P->~log logy. Then we see from (3.5) with v>-_k-q: 
+2 y_x>(_~loglogy) k q. 
+Combining this estimate with (3,6), we obtain (3.4). 
+REMARK. The assumption (3.1) implies that 
+(3.8) o~(y-x) > k-clok(log k) -2 log log k. 
+Indeed, (3.3) shows that k<log y; and we apply (3.6) with 
+~o(y - x)>= 
+to complete the proof of (3.8). 
+1 >=k-t1 
+P(y + i) > k 
+w 4. Sequences of consecutive integers with the same prime factors 
+Throughout this section, we assume that x, y, k are integers satisfying 0<x<y, 
+k~l and 
+(4:1) Supp(x+i) = Supp(y+i) for 1 -<_ i <- k. 
+Let e>0. From Section 3, we deduce that for k~ko=ko(e) 
+(4.2) k log k < (1 +e) log (y-x) 
+.:Ic:a Mathematica Hungarica 54, 1989 
+
+ON THE MAXIMAL LENGTH OF TWO SEQUENCES OF CONSECUTIVE INTEGERS 231 
+and 
+(4.3) k log log log y < (1 +e) log (y-x). 
+We sharpen (4.2) and (4.3) as follows. 
+PROPOSITION 4.4. There exists an effectively computable absolute constant cla>0 
+such that 
+(4.5) y--x >- (k log log y) c11k(l~176 (logloglogy)-I 
+for y=>27. 
+Further, we prove 
+PROPOSITION 4.6. There exists an effectively computable absolute constant c1~ >0 
+such that 
+0.7) log x > c~2 (log k)~/log log k 
+for k>=3. 
+By (4.5) and (4.2), we obtain 
+y-x > exp (clak(logk)2(loglogk) -~) for k -> 3. 
+PROOF OF PROPOSITION 4.4. Denote by c~,, c~ and c16 effectively computable 
+absolute positive constants. In view of a result of ErdSs and Shorey [4] mentioned 
+in Section 1, we may assume that k>-c~ with c~4 sutiicienfly large. Then we see 
+from (4.2) that 
+(4.8) k < log y. 
+Further, we observe from (4.1) that 
+(4.9) Q((y+ 1)... (y +k))l(y-x). 
+Suppose that there are d~, ..., d~ integers between 1 and k such that v=[k/8]+l 
+and 
+P(y-Fd~) ~ exp((loglogy)l~176 1 =<j-< v. 
+In view of (4.8), observe that the right hand side of the above inequality exceeds k. 
+Therefore, by (4.9), we see that 
+t,(y + dO... e(y + d )l(y-x) and hence, 
+y--x --> exp log log y)10o 
+which, together with (4.8), implies (4.5). 
+Thus we may assume that there are at least [7k/8] integers i with l<=i<=k and 
+P(y +/) < exp ((log log y)lOo). 
+Consequently, there are at least [k/4] integers i with 1 <_- i< k and 
+P((y+ i)(y+ i+ i)) < exp ((log log 3;)10o). 
+Acta 3/Iathematlca Hungarlca 54,1989 
+
+232 R. BALASUBRAMANIAN, T. IW. SHOREY and M. WALDSCHMIDT 
+(4.10) 
+Further 
+Now we apply Lemma 2.9 with A = 101, f(X)=X(X+ 1) and Y=y+i to conclude 
+that 
+R:= ~ og(y+i) >= c15klol; gl~ y i=1 log log y" 
+p-<k tp / 
+which, together with (4.10) and (4.8), implies that 
+~o((y+l)...(y+k)) > cask loglogy 
+2 log log log y" 
+Now we multiply the prime factors of (y+l)...(y+k) to derive (4.5) from (4.9). 
+This completes the proof of Proposition 4.4. 
+Now we turn to the proof of Proposition 4.6. We shall derive Proposition 4.6 
+from the following result. 
+Pgoeosn'ION4.11. There exists an effectively computable absolute constant 
+c1~>0 such that 
+log log y (4.12) logx > e17 log k log log log y 
+for y=>27 and k>-2. 
+PROOF OF PgoPosmor~ 4.11. Denote by c18, c19, ..., c2~ effectively computable 
+absolute positive constants. Suppose that x=l. Then (4.1) with k->2 implies 
+y+l is a power of 2 and y+2 is a power of 3. Then it is well-known that y=7 
+which is a contradiction, since y=>27. Thus we may assume that x>l. Further 
+we see from Corollary 2.2 that y>k. Therefore we may assume that y>c18 with 
+c18 sufficiently large. Then we see from (4.2) that (4.8) is valid. Let 0<el< 1. We 
+assume that 
+, _ log log y 
+(4.13) log x < el log ~ log log log y 
+and we shall arrive at a contradiction for a suitable value of el. 
+For an integer i with l<-i<=k, we denote by co'(y+i) the number of prime 
+divisors of y+i which are greater than k. For l<-i<-_k, we see from (4.1) and 
+(4.13) that 
+log log y 
+(4.14) oY (y + i) <= el logloglogy q-1 
+and 
+(4.15) log P(y+ i) ~ 2 log k ~ log log y . log log log y 
+Now, as pointed out to us by K. Alladi, we observe that 
+A:= Zco(y+i)~= Z +1 + Xa/(y+i) i=l p~=k i=1 
+Acta Mathematica Hungar~ca 54, 1989 
+
+ON THE MAXIMAL LENGTH OF TWO SEQUENCES OF CONSECUTIVE INTEGERS 233 
+which, together with (4.14), implies that 
+log log y 
+(4.16) A ~ c79 k log log k + el k log log log y" 
+By (4.15) and (4.8), 
+log P(y + i) < (log log y)~, 1 <_- i <_- k. 
+Now we apply Lemma 2.9 with A =3, f(X)=X(X+ I) and Y=y+i to conclude 
+that 
+log log y ! <_-- i < k. co((y + 0(y+ i+ 1)) > = c20 log log log y' ' 
+Consequently, we have 
+. log log y 
+(4.17) A => c~lg Iog log-]-ogy" 
+Let e~ =(2c~1) -1. We combine (4.17) and (4.16) to conclude that 
+log log y 
+c~1 log log log y -<= 2c~9 log log k 
+which, together with (4.8), implies that Y<--c22. This is not possible if qs>c~2. 
+This completes the proof of Proposition 4.11. 
+PROOF OF PROPOSITION 4.6. Since k=>3, it is easy to see that (4.1) implies that 
+x> 1. Then we may assume that k exceeds a sufficiently large effectively computable 
+absolute constant. Then we derive (4.8) from (4.2). In particular, y>=27. Now (4.7) 
+follows immediately from (4.12) and (4.8). This completes the proof of Proposi- 
+tion 4.6. 
+REMARKS (i). Let x>l and k_->2. If 
+co (y- x) < 2 log log (y-- x), 
+then k/log x is bounded by an effectively computable absolute constant. 
+PROOF. We may assume that k exceeds a sufficiently large effectively computable 
+absolute constant. Then we see from (4.1), (4.8) and Lemma 2.6 with x replaced 
+by y that 
+co (y- x) >= Z 1 >= k/2. l~=iNk 
+P(y + i) ~ k 
+Hence k<4 log Iog y. Now the assertion follows from Proposition 4.11. 
+(ii) Woods proved that Hall's conjecture (see [8]) implies that k=<20 under the 
+assumption (4.1). It is remarked in [8] that Hall's conjecture would follow from a 
+very sharp refinement of Lemma 2.7. (See M. Langevin, C. R. Acad. Sc. Paris, 281 
+(1975), 491--493). 
+~tcta Mathematica Hungarica 54, 1989 
+
+234 R. BALASUBRAMANIAN, T. N. SHOREY and M. WALDSCHMIDT 
+w 5. Two sequences of products of k consecutive integers with the same prime factors 
+Throughout this section, we assume that x, y and k are positive integers satis- 
+fying y-x>=k and 
+(5. I) Supp (//(x +/)) = Supp ( 1-/(Y +/)). i=1 i=I 
+We prove 
+PROPOSITION 5.2. There exists an effectively computable absolute constant c~z>0 
+such that 
+(5.3) x > C~3 k 6114~. 
+PROOF OF PROPOSITION 5.2. Denote by c24, ..., c27 effectively computable ab- 
+solute positive constants. We may assume that k>=c24 with c24 sufficiently large, 
+otherwise (5.3) follows immediately. Since y-x>-k, we see from (5.1) that none 
+of y+l, ..., y+k is a prime number. Consequently, we derive from Lemma 2.1 that 
+(5.4) k < c~5 y~Zl~. 
+Denote by t~ the number of integers i with l<-i<-k and P(y+i)<-k. Then we see 
+from Corollary 2.4 and (5.4) that 
+tz <= (23/42)k +c~src(k). 
+Therefore the number of distinct prime factors >k of (y+l)...(y+k) is at least 
+(19/42)k-cz67r(k). Consequently, by (5.1), the number of distinct prime factors 
+>k of (x+ 1)...(x+k) is at least (19/42)k-c2nTr(k). Hence 
+(5.5) 
+On the other hand, 
+(5.6) 
+(Xqkk) > C~27 k(19/42)k" 
+We combine (5.5) and (5.6) to obtain (5.3). 
+Finally we give an upper bound for y in terms of x, assuming k->2. For small 
+values of k the next result is sharper than (4.12) and (5.3). 
+PROPOSITION 5.7. There exists an effectively computable absolute constant c~8 
+such that 
+log x > c~8 log log y 
+for x>-2 and k>=2. 
+PROOF OF PROPOSITION 5.7. Denote by c29, ..., cse effectively computable ab- 
+solute constants. We may assume that y:>c29 with c29 sufficiently large, otherwise 
+the assertion follows immediately. 
+Let us assume that 
+(5.8) log x < log log y. 
+Acta Mathematlca Hungarica 54, 1989 
+
+ON THE MAXIMAL LENGTH OF TWO SEQUENCES OF CONSECUTIVE INTEGERS 235 
+By (5.1) we have for l<-i<=k 
+k k 
+P(y+ i) <- P( II (Y+J)) = P( II (x +j)) <- x + k, j=l .]=1 
+and from (5.3) and (5.8) we deduce 
+log P(y+ i) <= (log log y)L 
+Now we apply Lemma 2.9 with A =3, f(X)=X(X+ 1) and 
+that 
+co(&+/)(y+ i+ 1)) :> Cso log log y/log log log y 
+Consequently, if we define 
+k 
+:= Z co(y+/), i=1 
+we have 
+(5.9) 
+For an integer 
+lr=y+i to conclude 
+(1 <_- i<k). 
+A -> c31 k log log y/log log log y. 
+n>0 we denote by co'(n) the number of prime divisors of n 
+which are greater than k. By (5.1) we have 
+k k k 
+2 co'(y+i) = co'( If (y+i)) <= co( 17 (x+i)). i=l i=J. i=l 
+For all integers n->3 we have 
+09 (n) <_- c32 log n/log log n, 
+k 
+co (/~ (x + 0) < c3s k log x/log log x. i=J. 
+hence (5.3) yields 
+Therefore 
+A <- +1 + Zco'(y+i)<= 
+_ i=1 
+<-- cs~ k log log k + ca3 k log x/log log x <-- cs5 k log x/log log x, 
+by (5.3). Therefore, we conclude from (5.9) 
+log log y/log log log y < can log x/log log x, 
+which completes the proof of Proposition 5.7. 
+RBMARI(S. The restriction (5.1) can be relaxed to 
+k k 
+Supp ( H (x + O) _-__ Supp (i__/]1 (y + 0) i=l 
+in Propositions 5.2 and 5.7. 
+5 Acta Mathematica Hungarica 54. 1989 
+
+236 R. BALASUBRAMANIAN, T. N, SHOREY and M. WALDSCHMIDT: ON THE MAXIMAL.., 
+References 
+[1] A. Baker, The theory of linear forms in logarithms, Transcendence theory: Advances and appli- 
+cations, Academic Press (London and New York, 1977), 1--27. 
+[2] P. Erd/Ss, On the product of consecutive integers, 111, Indag. Math., 17 (1955), 85--90. 
+[3] P. Erdrs, How many pairs of products of consecutive integers have the same prime factors, 
+Amer. Math. Monthly, 87 (1980), 391--392. 
+[4] P. ErdiSs and T. N. Shorey, On the greatest prime factor of 2 p- 1 for a prime p and other ex- 
+pressions, Acta Arith., 30 (1976), 257 265. 
+[5] P. Erd/Ss and J. Turk, Products of integers in short intervals, Aeta Arith., 44 (1984), 147--174. 
+[6] R. Guy, Unsolved Problems in Number Theory, Springer-Verlag (New York Heidelberg-- 
+Berlin, 1981), B 19, p. 42 and B 35, p. 50. 
+[7] H. Iwaniec and J. Pintz, Primes in short intervals, Mh. Math., 98 (1984), 115--143. 
+[8] S. Lang, Elliptic Curves Diophantine Analysis, Spdnger-Verlag (New York, Heidelberg and 
+Berlin, 1978). 
+[9] D. H. Lehmer, On a problem of St/Srmer, Illinois Jour. Math., 8 (1964), 57--79. 
+[10] D. Richard, D~finissabilit~ en arithm~tique et m~thode de codage ZBV appliqu~e ~ des langages 
+avec sueeesseur et eoprimaritO, Thbse (Lyon, 1985). 
+[11] D. Richard, Les relations arithm6tiques sur les entiers primaires sont d6finissables au premier 
+ordre par successeur et coprimarit6, C. R. Aead. Se. Paris, Sdr. L 299 (1984), 795--798. 
+[12] T. N. Shorey, On linear forms in the logarithms of algebraic numbers, Acta Arith., 30 (1976), 
+27---42. 
+[13] T. N. Shorey and R. Tijdeman, On the greatest prime faetors of polynomials at integer points, 
+Compositio Math., 33 (1976), 187--195. 
+[14] R. Tijdeman, On integers with many small prime factors, Compositio Math., 26 (1973), 319--330. 
+[ 15] M. Waldschmidt, A lower bound for linear forms in logarithms, Aeta A rith., 37 (1980), 257--283. 
+[16] A. Woods, Some problems in logic and number theory, and their connections, Thesis (Man- 
+chester, 1981). 
+(Received July 3, 1986) 
+SCHOOL OF MATHEMATICS 
+TATA INSTITUTE OF FUNDAMENTAL RESEARCH 
+HOMI BHABHA ROAD 
+BOMBAY 400 005 
+INDIA 
+INSTITUT HENRI POINCARI~ 
+11, RUE PIERRE ET MARIE CURIE 
+75231 PARIS CEDEX 05 
+FRANCE 
+Acta Mathematica Hungarlca 54, 1989 

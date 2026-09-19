@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""
+Erdős #97, idea I2: C_m-symmetric ansatz.  Points are t orbits
+  z_{i,j} = r_i * exp(i(phi_i + 2*pi*j/m)),  i=0..t-1, j=0..m-1,   (r_0=1, phi_0=0)
+so n = m*t.  Only t vertex types need checking.  Every vertex automatically has the
+pair (rho z, rho^{-1} z) at a common distance, so the ansatz needs only 2 more
+coincidences per type: 2t polynomial equations in 2t-2 unknowns (overdetermined by 2).
+
+Objective: sum over types of defect^2, where defect(v) = min over windows of 4
+consecutive sorted distances (d[i+3]-d[i]) (0 iff 4 others equidistant), plus a
+strict-convexity penalty.  Random restarts + Nelder-Mead / BFGS.  Reports the
+smallest defect found for each (m,t).  A defect that is genuinely 0 (to 1e-12)
+would be a candidate to certify algebraically.
+"""
+import sys, math, random
+import numpy as np
+from scipy.optimize import minimize
+
+def points(params, m, t):
+    r = np.concatenate([[1.0], params[: t - 1]])
+    phi = np.concatenate([[0.0], params[t - 1 :]])
+    P = []
+    for i in range(t):
+        for j in range(m):
+            a = phi[i] + 2 * math.pi * j / m
+            P.append((r[i] * math.cos(a), r[i] * math.sin(a)))
+    return np.array(P)
+
+def convexity_penalty(P):
+    # angular order about the origin (all C_m configs are star-shaped w.r.t. origin);
+    # strict convex position <=> every consecutive triple in angular order is a strict left turn
+    ang = np.arctan2(P[:, 1], P[:, 0])
+    order = np.argsort(ang)
+    Q = P[order]
+    n = len(Q)
+    pen = 0.0
+    for k in range(n):
+        o, a, b = Q[k - 1], Q[k], Q[(k + 1) % n]
+        cr = (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+        if cr < 1e-3:
+            pen += (1e-3 - cr)
+    return pen
+
+def defect_of_type(P, i, m):
+    v = P[i * m]
+    d = np.sort(np.array([np.hypot(*(v - q)) for k, q in enumerate(P) if k != i * m]))
+    return min(d[k + 3] - d[k] for k in range(len(d) - 3))
+
+def objective(params, m, t):
+    P = points(params, m, t)
+    if np.any(np.abs(params[: t - 1]) < 0.05) or np.any(np.abs(params[: t - 1]) > 20):
+        return 1e3
+    return sum(defect_of_type(P, i, m) ** 2 for i in range(t)) + 10.0 * convexity_penalty(P)
+
+def run(m, t, restarts, seed):
+    rng = random.Random(seed)
+    best = (float("inf"), None)
+    for _ in range(restarts):
+        x0 = np.array([rng.uniform(0.3, 3.0) for _ in range(t - 1)] + [rng.uniform(0, 2 * math.pi / m) for _ in range(t - 1)])
+        res = minimize(objective, x0, args=(m, t), method="Nelder-Mead", options={"xatol": 1e-10, "fatol": 1e-14, "maxiter": 4000})
+        if res.fun < best[0]:
+            best = (res.fun, res.x)
+    return best
+
+if __name__ == "__main__":
+    restarts = int(sys.argv[1]) if len(sys.argv) > 1 else 40
+    print("C_m ansatz: (m,t): min objective (sum of squared 4-equidistance defects + convexity penalty); n=m*t")
+    for t in (2, 3, 4):
+        for m in range(3, 13):
+            if m * t < 7:
+                continue
+            f, x = run(m, t, restarts, seed=1000 * m + t)
+            P = points(x, m, t)
+            defs = [defect_of_type(P, i, m) for i in range(t)]
+            print(f"m={m:2d} t={t} n={m*t:3d}: obj={f:.3e}  per-type defects={['%.2e' % d for d in defs]}  convex_pen={convexity_penalty(P):.2e}", flush=True)

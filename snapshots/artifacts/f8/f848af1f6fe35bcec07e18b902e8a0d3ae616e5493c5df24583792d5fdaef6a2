@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+"""Relations between W_m = {N : C(2N,m) | C(2N,N)} for m = 2j+1, 2j+2, and the #396 set E_j."""
+import sys
+from exp2 import *
+
+NMAX = int(sys.argv[1]) if len(sys.argv) > 1 else 200000
+spf = spf_sieve(2 * NMAX + 2)
+sp = [p for p in range(2, 200) if spf[p] == p]
+
+# (a) identity c_2(2j+1) = c_2(2j+2) + v_2(2j+2)
+bad = 0
+for j in range(0, 6):
+    for N in range(2 * j + 4, 5000):
+        v2 = (2 * j + 2 & -(2 * j + 2)).bit_length() - 1
+        if cp(2 * j + 1, N, 2) != cp(2 * j + 2, N, 2) + v2:
+            bad += 1
+print("violations of c_2(2j+1) = c_2(2j+2) + v_2(2j+2):", bad)
+
+for j in range(0, 4):
+    Wodd = set(); Weven = set(); E = set()
+    for N in range(2 * j + 4, NMAX):
+        if is389(N, 2 * j + 1, spf, sp): Wodd.add(N)
+        if is389(N, 2 * j + 2, spf, sp): Weven.add(N)
+        if is396(N, j, spf): E.add(N)
+    print(f"j={j}: |W_{2*j+1}|={len(Wodd)} |W_{2*j+2}|={len(Weven)} |E_{j}|={len(E)}; "
+          f"W_odd\\W_even={len(Wodd-Weven)} W_even\\W_odd={len(Weven-Wodd)}; "
+          f"W_even\\E={len(Weven-E)} E\\W_even={len(E-Weven)}; min W_odd={min(Wodd) if Wodd else None} min W_even={min(Weven) if Weven else None} min E={min(E) if E else None}",
+          flush=True)

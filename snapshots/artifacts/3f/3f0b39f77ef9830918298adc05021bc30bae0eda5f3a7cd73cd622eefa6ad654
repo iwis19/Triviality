@@ -1,0 +1,108 @@
+import Mathlib
+
+open Finset
+
+/-- C1: single-interval Hall witness. -/
+theorem no_superset_injection_of_interval {n : ℕ} (F : Finset (Finset (Fin n))) (x : Fin n)
+    (e : Finset (Fin n))
+    (h : (F.filter (fun A => e ⊆ A ∧ x ∈ A)).card < (F.filter (fun A => e ⊆ A ∧ x ∉ A)).card) :
+    ¬ ∃ f : Finset (Fin n) → Finset (Fin n),
+      (∀ A ∈ F, x ∉ A → f A ∈ F ∧ x ∈ f A ∧ A ⊆ f A) ∧
+      Set.InjOn f (↑(F.filter (fun A => x ∉ A)) : Set (Finset (Fin n))) := by
+  rintro ⟨f, hf, hinj⟩
+  have hle : (F.filter (fun A => e ⊆ A ∧ x ∉ A)).card ≤
+      (F.filter (fun A => e ⊆ A ∧ x ∈ A)).card := by
+    apply Finset.card_le_card_of_injOn f
+    · intro A hA
+      simp only [Finset.coe_filter, Set.mem_setOf_eq] at hA ⊢
+      obtain ⟨hAF, heA, hxA⟩ := hA
+      obtain ⟨h1, h2, h3⟩ := hf A hAF hxA
+      exact ⟨h1, heA.trans h3, h2⟩
+    · intro A hA B hB hAB
+      simp only [Finset.coe_filter, Set.mem_setOf_eq] at hA hB
+      exact hinj (by simp [hA.1, hA.2.2]) (by simp [hB.1, hB.2.2]) hAB
+  omega
+
+/-- C2: Hall characterisation of inclusion-respecting injections F_{¬x} → F_x. -/
+theorem superset_injection_iff_hall {n : ℕ} (F : Finset (Finset (Fin n))) (x : Fin n) :
+    (∃ f : Finset (Fin n) → Finset (Fin n),
+      (∀ A ∈ F, x ∉ A → f A ∈ F ∧ x ∈ f A ∧ A ⊆ f A) ∧
+      Set.InjOn f (↑(F.filter (fun A => x ∉ A)) : Set (Finset (Fin n)))) ↔
+    ∀ G ⊆ F.filter (fun A => x ∉ A),
+      G.card ≤ (F.filter (fun B => x ∈ B ∧ ∃ A ∈ G, A ⊆ B)).card := by
+  constructor
+  · rintro ⟨f, hf, hinj⟩ G hG
+    apply Finset.card_le_card_of_injOn f
+    · intro A hA
+      have hA' := hG hA
+      rw [Finset.mem_filter] at hA'
+      obtain ⟨h1, h2, h3⟩ := hf A hA'.1 hA'.2
+      simp only [Finset.coe_filter, Set.mem_setOf_eq]
+      exact ⟨h1, h2, A, hA, h3⟩
+    · exact hinj.mono (by exact_mod_cast hG)
+  · intro hall
+    classical
+    let S := F.filter (fun A => x ∉ A)
+    let t : S → Finset (Finset (Fin n)) :=
+      fun A => F.filter (fun B => x ∈ B ∧ (A : Finset (Fin n)) ⊆ B)
+    have key : ∀ s : Finset S, s.card ≤ (s.biUnion t).card := by
+      intro s
+      have hsub : s.map (Function.Embedding.subtype _) ⊆ S := by
+        intro A hA
+        rw [Finset.mem_map] at hA
+        obtain ⟨A', _, rfl⟩ := hA
+        exact A'.2
+      have h1 := hall _ hsub
+      rw [Finset.card_map] at h1
+      refine h1.trans (Finset.card_le_card ?_)
+      intro B hB
+      rw [Finset.mem_filter] at hB
+      obtain ⟨hBF, hxB, A, hA, hAB⟩ := hB
+      rw [Finset.mem_map] at hA
+      obtain ⟨A', hA's, rfl⟩ := hA
+      rw [Finset.mem_biUnion]
+      refine ⟨A', hA's, ?_⟩
+      simp only [t, Finset.mem_filter]
+      exact ⟨hBF, hxB, hAB⟩
+    obtain ⟨g, hginj, hgt⟩ := (Finset.all_card_le_biUnion_card_iff_exists_injective t).1 key
+    refine ⟨fun A => if h : A ∈ S then g ⟨A, h⟩ else A, ?_, ?_⟩
+    · intro A hAF hxA
+      have hA : A ∈ S := by simp [S, hAF, hxA]
+      simp only [dif_pos hA]
+      have h2 := hgt ⟨A, hA⟩
+      simp only [t, Finset.mem_filter] at h2
+      exact h2
+    · intro A hA B hB hAB
+      have hA' : A ∈ S := Finset.mem_coe.1 hA
+      have hB' : B ∈ S := Finset.mem_coe.1 hB
+      have hAB' : g ⟨A, hA'⟩ = g ⟨B, hB'⟩ := by
+        have h1 : (fun A => if h : A ∈ S then g ⟨A, h⟩ else A) A = g ⟨A, hA'⟩ := dif_pos hA'
+        have h2 : (fun A => if h : A ∈ S then g ⟨A, h⟩ else A) B = g ⟨B, hB'⟩ := dif_pos hB'
+        exact h1.symm.trans (hAB.trans h2)
+      exact congrArg Subtype.val (hginj hAB')
+
+/-- C3: the 16-set union-closure of the edges of the 5-cycle 0-1-2-3-4-0. -/
+def cycle5 : Finset (Finset (Fin 5)) :=
+  {{0,1},{1,2},{2,3},{3,4},{4,0},
+   {0,1,2},{1,2,3},{2,3,4},{3,4,0},{4,0,1},
+   {0,1,2,3},{1,2,3,4},{2,3,4,0},{3,4,0,1},{4,0,1,2},
+   {0,1,2,3,4}}
+
+theorem cycle5_card : cycle5.card = 16 := by decide
+
+theorem cycle5_unionClosed : ∀ A ∈ cycle5, ∀ B ∈ cycle5, A ∪ B ∈ cycle5 := by decide
+
+theorem cycle5_edges : ∀ i : Fin 5, ({i, i + 1} : Finset (Fin 5)) ∈ cycle5 := by decide
+
+theorem cycle5_maxFreq : ∀ x : Fin 5, (cycle5.filter (fun A => x ∈ A)).card = 10 := by decide
+
+theorem cycle5_interval_witness (x : Fin 5) :
+    (cycle5.filter (fun A => ({x + 2, x + 3} : Finset (Fin 5)) ⊆ A ∧ x ∈ A)).card <
+    (cycle5.filter (fun A => ({x + 2, x + 3} : Finset (Fin 5)) ⊆ A ∧ x ∉ A)).card := by
+  revert x; decide
+
+theorem cycle5_no_superset_injection (x : Fin 5) :
+    ¬ ∃ f : Finset (Fin 5) → Finset (Fin 5),
+      (∀ A ∈ cycle5, x ∉ A → f A ∈ cycle5 ∧ x ∈ f A ∧ A ⊆ f A) ∧
+      Set.InjOn f (↑(cycle5.filter (fun A => x ∉ A)) : Set (Finset (Fin 5))) :=
+  no_superset_injection_of_interval cycle5 x {x + 2, x + 3} (cycle5_interval_witness x)

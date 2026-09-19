@@ -1,0 +1,9 @@
+
+Observation (own reasoning). Let G_1,…,G_k have pairwise distinct indices n_1<…<n_k with Σ 1/n_i = 1. Choose
+a_1,…,a_k ∈ G independently and uniformly. Then P(a_iG_i ∩ a_jG_j ≠ ∅) = P(a_i^{-1}a_j ∈ G_iG_j) = |G_iG_j|/|G| =: μ_ij,
+and μ_ij ≥ |G_i|/|G| = 1/n_i for i<j because |G_iG_j| ≥ |G_i|. Since k ≥ 3 (k = 2 forces n_1 = n_2 = 2),
+  Σ_{i<j} μ_ij ≥ Σ_{i<k} (k−i)/n_i ≥ Σ_{i<k} 1/n_i + (k−2)/n_1 ≥ (1 − 1/n_k) + 1/n_1 > 1.
+So the expected number of intersecting pairs always exceeds 1: the first-moment (union-bound) method can never
+certify a counterexample to HS. Any probabilistic construction would have to exploit strong negative correlation
+between the events {a_iG_i ∩ a_jG_j ≠ ∅}, and any proof of HS along these lines needs exact counting
+(inclusion–exclusion over double-coset membership systems), not moments.

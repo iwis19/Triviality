@@ -1,0 +1,40 @@
+"""D5 kissing configuration (40 normalised roots) on S^4:
+ - distance distribution per point,
+ - covering radius (largest hole) -> can a 41st point be added?  (needs hole >= 60 deg),
+ - infinitesimal rigidity of the 60-degree contact graph on the sphere.
+"""
+import itertools, numpy as np
+
+roots = []
+for i, j in itertools.combinations(range(5), 2):
+    for si in (1, -1):
+        for sj in (1, -1):
+            v = np.zeros(5); v[i] = si; v[j] = sj; roots.append(v / np.sqrt(2))
+X = np.array(roots); N = len(X)
+G = X @ X.T
+vals, counts = np.unique(np.round(G[0], 6), return_counts=True)
+print("N =", N, "inner products from point 0:", dict(zip(vals, counts)))
+
+# covering radius: maximise min angular distance to configuration, many random starts
+rng = np.random.default_rng(0)
+def hole(y):
+    y = y / np.linalg.norm(y); return np.degrees(np.arccos(np.clip((X @ y).max(), -1, 1)))
+from scipy.optimize import minimize
+best = 0
+for _ in range(400):
+    y0 = rng.standard_normal(5)
+    r = minimize(lambda y: -hole(y), y0, method="Nelder-Mead", options=dict(xatol=1e-10, fatol=1e-12, maxiter=4000))
+    best = max(best, -r.fun)
+print(f"largest hole (covering radius) of D5 kissing config ~ {best:.4f} deg  (analytic candidates: e_i -> 45 deg, (1,1,1,1,1)/sqrt5 -> {np.degrees(np.arccos(2/np.sqrt(10))):.4f} deg)")
+
+# infinitesimal rigidity: edges = pairs at exactly 60 deg (inner product 1/2)
+E = [(i, j) for i in range(N) for j in range(i + 1, N) if abs(G[i, j] - 0.5) < 1e-9]
+rows = []
+for i, j in E:
+    r = np.zeros(N * 5); r[5*i:5*i+5] = X[j]; r[5*j:5*j+5] = X[i]; rows.append(r)   # d<xi,xj>
+for i in range(N):
+    r = np.zeros(N * 5); r[5*i:5*i+5] = X[i]; rows.append(r)                        # d|xi|^2
+R = np.array(rows)
+rank = np.linalg.matrix_rank(R, tol=1e-9)
+print(f"contact edges: {len(E)}, rigidity matrix rank {rank} of {N*5} columns; flex space dim = {N*5-rank}, dim SO(5) = 10")
+print("infinitesimally rigid (only trivial motions):", N*5 - rank == 10)

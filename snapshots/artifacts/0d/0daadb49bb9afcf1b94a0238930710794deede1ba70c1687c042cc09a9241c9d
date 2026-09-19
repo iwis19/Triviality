@@ -1,0 +1,411 @@
+===== FILE: rdist.c =====
+// Exhaustive distribution of r(n) = #{k>=1 : 2^k < n, n - 2^k prime} for odd n <= 2^LMAX.
+// Output: per block L (2^L < n <= 2^{L+1}), histogram of r(n) over odd n.
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <string.h>
+int main(int argc,char**argv){
+  int LMAX = argc>1?atoi(argv[1]):30;
+  uint64_t N = 1ULL<<LMAX;
+  uint8_t *comp = calloc(N/8+1,1);           // bit i set => i composite (odd numbers only used, but simple)
+  #define SET(i) (comp[(i)>>3] |= 1<<((i)&7))
+  #define ISP(i) (!(comp[(i)>>3]>>((i)&7)&1))
+  SET(0);SET(1);
+  for(uint64_t i=2;i*i<N;i++) if(ISP(i)) for(uint64_t j=i*i;j<N;j+=i) SET(j);
+  static uint64_t hist[70][70];
+  for(int L=1;L<LMAX;L++){
+    uint64_t lo=1ULL<<L, hi=1ULL<<(L+1);
+    for(uint64_t n=lo+1;n<hi;n+=2){
+      int r=0;
+      for(int k=1;k<=L;k++){ uint64_t m=n-(1ULL<<k); if(ISP(m)) r++; }
+      hist[L][r]++;
+    }
+    printf("L=%d",L);
+    for(int r=0;r<=L;r++) printf(" %llu",(unsigned long long)hist[L][r]);
+    printf("\n"); fflush(stdout);
+  }
+  return 0;
+}
+
+===== FILE: analyze.py =====
+"""Analysis for idea 6989e023 (moment method for r(n) = #{k : n-2^k prime}).
+Inputs: hist30.txt from rdist.c (per block L, histogram of r(n) over odd n in (2^L,2^{L+1})).
+Outputs:
+ (A) empirical moments M_j(L) = E[r^j | odd n in block L], j<=12, and the ratio M_j^{1/j}/log j (the constant C_j
+     that the claimed bound sum r^j <= X (C log j)^j would need), plus comparison with Poisson/Touchard moments.
+ (B) empirical tail P(r>=t) vs t, tested against exp(-c t/log t) (claim shape) and exp(-t log(t/lambda)) (Poisson shape).
+ (C) Hardy-Littlewood prediction of the falling-factorial moments via exact/Monte-Carlo singular series over j-subsets of
+     exponents, growth of the average singular series with j (tests the (C log j)^j local-factor heuristic).
+"""
+import math, random, itertools, sys
+from sympy import primerange, n_order, factorint
+random.seed(1)
+
+# ---------- read histogram ----------
+H = {}
+for line in open('hist30.txt'):
+    parts = line.split()
+    L = int(parts[0][2:]); H[L] = [int(x) for x in parts[1:]]
+
+def moments(h, jmax):
+    tot = sum(h)
+    return [sum(c * r**j for r, c in enumerate(h)) / tot for j in range(jmax + 1)]
+
+def stirling2(n, k):
+    return sum((-1)**(k - i) * math.comb(k, i) * i**n for i in range(k + 1)) // math.factorial(k)
+
+def touchard(j, lam):
+    return sum(stirling2(j, m) * lam**m for m in range(j + 1))
+def pois_tail(t, lam):
+    return sum(math.exp(-lam + r*math.log(lam) - math.lgamma(r+1)) for r in range(t, 200))
+
+out = []
+P = lambda *a: (print(*a), out.append(' '.join(map(str, a))))
+
+P("=== (A) empirical moments of r(n), odd n in (2^L,2^{L+1}) ===")
+JMAX = 12
+for L in sorted(H):
+    if L < 8: continue
+    if L == max(H): JMAX = L
+    M = moments(H[L], JMAX)
+    lam = M[1]
+    P(f"L={L} mean={lam:.4f} var={M[2]-lam**2:.4f}  max r={max(r for r,c in enumerate(H[L]) if c)}")
+    row = []
+    for j in range(2, JMAX + 1):
+        Cj = M[j]**(1/j) / math.log(j)
+        row.append(f"j={j}: M_j={M[j]:.4g} M_j^(1/j)={M[j]**(1/j):.3f} C_j={Cj:.3f} Touchard(lam)={touchard(j,lam):.4g} C_j(Poisson)={touchard(j,lam)**(1/j)/math.log(j):.3f}")
+    for s in row: P("   " + s)
+
+P("\n=== (B) tail P(r>=t) for the largest block, fits ===")
+L = max(H); h = H[L]; tot = sum(h)
+tail = [sum(h[t:]) / tot for t in range(len(h))]
+lam = moments(h, 1)[1]
+for t in range(1, len(h)):
+    if tail[t] == 0: P(f"t={t}: tail=0 (no odd n with r>={t} in block {L})"); break
+    P(f"t={t}: P(r>=t)={tail[t]:.3e}  -log P={-math.log(tail[t]):.3f}  t/log t={t/math.log(max(t,2)):.3f}  "
+      f"Poisson tail={pois_tail(t,lam):.3e}  ratio={tail[t]/pois_tail(t,lam):.3g}")
+# least squares: -log P = a * t/log t  and -log P = b * t log(t/lam) on t>=3
+ts = [t for t in range(3, len(h)) if tail[t] > 0]
+xs1 = [t / math.log(t) for t in ts]; xs2 = [t * math.log(t / lam) for t in ts if t > lam]; ys = [-math.log(tail[t]) for t in ts]
+a = sum(x*y for x,y in zip(xs1,ys)) / sum(x*x for x in xs1)
+ys2 = [-math.log(tail[t]) for t in ts if t > lam]
+b = sum(x*y for x,y in zip(xs2,ys2)) / sum(x*x for x in xs2)
+res1 = sum((y - a*x)**2 for x,y in zip(xs1,ys)); res2 = sum((y - b*x)**2 for x,y in zip(xs2,ys2))
+P(f"fit -logP = a t/log t: a={a:.3f} resid={res1:.3f};  fit -logP = b t log(t/lam): b={b:.3f} resid={res2:.3f}")
+
+P("\n=== (C) Hardy-Littlewood prediction with exact shift-dependent singular series ===")
+# odd n only: local factor at p=2 is trivial (n odd => n-2^k odd). For odd prime p:
+#   S_p(K) = (1 - omega_K(p)/p) / (1 - 1/p)^{|K|},  omega_K(p) = #{2^k mod p : k in K}.
+# For p with ord_p(2) >= L+1 (no two exponents in 1..L collide) omega = |K| and the factor is K-independent.
+PMAX = 200000
+LL = max(H)
+small = []   # primes with ord_p(2) <= LL (collisions possible among exponents 1..LL)
+generic_log = {}  # m -> sum over remaining primes of log((1-m/p)/(1-1/p)^m), truncated tail estimate added
+primes = list(primerange(3, PMAX))
+ords = {}
+for p in primes:
+    o = n_order(2, p)
+    if o <= LL: small.append((p, o))
+P("primes p<2e5 with ord_p(2) <= %d: %d" % (LL, len(small)), [p for p,_ in small][:40], '...')
+def generic_factor(m):
+    s = 0.0
+    for p in primes:
+        if ords.get(p, None) is None: pass
+        o = n_order(2, p) if p < 5000 else None  # cheap path: small primes list already has all small-order ones
+    return s
+# faster: generic primes = all primes minus small
+smallset = set(p for p,_ in small)
+gen_primes = [p for p in primes if p not in smallset]
+def log_generic(m):
+    s = sum(math.log(1 - m/p) - m*math.log(1 - 1/p) for p in gen_primes if p > m)
+    # tail p>PMAX: sum (m - m)/p + O(m^2/p^2) -> ~ -m(m-1)/2 * sum_{p>PMAX} 1/p^2 ~ negligible
+    s += -m*(m-1)/2 * (1/(PMAX*math.log(PMAX)))
+    return s
+def log_S(K, m):
+    s = log_generic_cache[m]
+    for p, o in small:
+        om = len(set(k % o for k in K))
+        s += math.log(1 - om/p) - m*math.log(1 - 1/p)
+    return s
+log_generic_cache = {m: log_generic(m) for m in range(0, 13)}
+P("log of generic (collision-free) singular series per m:", {m: round(v,4) for m,v in log_generic_cache.items()})
+
+for L in [16, 20, 24, 29]:
+    if L not in H: continue
+    h = H[L]; tot = sum(h)
+    P(f"-- block L={L}: falling-factorial moments E[(r)_m] empirical vs HL (odd n, n~1.5*2^L) --")
+    nmid = 1.5 * 2**L
+    exps = list(range(1, L + 1))
+    for m in range(1, 9):
+        # empirical E[binom(r,m)]
+        emp = sum(c * math.comb(r, m) for r, c in enumerate(h)) / tot
+        subsets = list(itertools.combinations(exps, m)) if math.comb(L, m) <= 200000 else None
+        if subsets is None:
+            subsets = [tuple(sorted(random.sample(exps, m))) for _ in range(200000)]
+            scale = math.comb(L, m) / len(subsets); mc = True
+        else:
+            scale = 1.0; mc = False
+        tot_pred = 0.0; sumS = 0.0
+        for K in subsets:
+            lS = log_S(K, m)
+            S = math.exp(lS); sumS += S
+            tot_pred += S * math.prod(2 / math.log(nmid - 2**k) for k in K)
+        tot_pred *= scale; avgS = sumS / len(subsets)
+        P(f"   m={m}: E[C(r,m)] emp={emp:.5g} HL={tot_pred:.5g} ratio={emp/tot_pred:.3f}  avgS={avgS:.4g} (avgS)^(1/m)={avgS**(1/m):.3f} {'MC' if mc else 'exact'}")
+
+open('analysis_out.txt', 'w').write('\n'.join(out))
+
+===== FILE: largesieve.py =====
+"""Large-sieve / Selberg sum L_j(Q) = sum_{q<=Q} mu^2(q) prod_{p|q} omega_K(p)/(p-omega_K(p))
+for the shift set K = {2^k : k=1..j} (omega_K(p) = #{2^k mod p : k in K}), evaluated exactly for Q=2^15, 2^20.
+Montgomery-Vaughan: #{n<=X : n-2^k prime for all k in K} <= (X + Q^2)/L_j(Q) (plus O(j) small primes).
+Tests the claimed uniform evaluation L_j(Q) >= (log Q/(C log j))^j against the standard (log Q)^j/(j! C^j) shape."""
+import math, sys
+from sympy import primerange, n_order
+out=[]
+def P(*a): print(*a); out.append(' '.join(map(str,a)))
+for LQ in (15, 20):
+    Q = 1 << LQ
+    primes = list(primerange(2, Q + 1))
+    ordp = {p: (1 if p == 2 else n_order(2, p)) for p in primes}
+    P(f"Q=2^{LQ}, log Q={math.log(Q):.3f}")
+    for j in list(range(1, 21)) + [25, 30]:
+        # multiplicative sieve of g(q)=mu^2(q) prod omega/(p-omega)
+        g = [0.0] * (Q + 1); g[1] = 1.0
+        for q in range(2, Q + 1): g[q] = 1.0
+        for p in primes:
+            om = min(j, ordp[p]) if p > 2 else 1
+            fac = om / (p - om)
+            for m in range(p, Q + 1, p): g[m] *= fac
+            p2 = p * p
+            for m in range(p2, Q + 1, p2): g[m] = 0.0
+        L = sum(g)
+        lj = L ** (1 / j)
+        C_needed = math.log(Q) / (lj * math.log(j)) if j > 1 else float('nan')
+        ratio_fact = L * math.factorial(j) / math.log(Q) ** j
+        P(f"  j={j:2d}: L_j(Q)={L:.4g}  L^(1/j)={lj:.3f}  C needed for L>=(logQ/(C log j))^j: {C_needed:.3f}   L*j!/(log Q)^j={ratio_fact:.4g}  bound (X+Q^2)/L per X: {2/L:.3e}")
+open('largesieve_out.txt','w').write('\n'.join(out))
+
+===== FILE: moments33.py =====
+import math
+H={}
+for line in open('hist33.txt'):
+    p=line.split(); H[int(p[0][2:])]=[int(x) for x in p[1:]]
+def st2(n,k): return sum((-1)**(k-i)*math.comb(k,i)*i**n for i in range(k+1))//math.factorial(k)
+def touch(j,l): return sum(st2(j,m)*l**m for m in range(j+1))
+def ptail(t,l): return sum(math.exp(-l+r*math.log(l)-math.lgamma(r+1)) for r in range(t,300))
+out=[]
+def P(*a): print(*a); out.append(' '.join(map(str,a)))
+for L in range(20,33):
+    h=H[L]; tot=sum(h); lam=sum(r*c for r,c in enumerate(h))/tot
+    var=sum(r*r*c for r,c in enumerate(h))/tot-lam*lam
+    P(f"L={L} #odd={tot} mean={lam:.5f} (2/ln2={2/math.log(2):.5f}) var={var:.4f} var/mean={var/lam:.4f} max r={max(r for r,c in enumerate(h) if c)}")
+L=32; h=H[L]; tot=sum(h); lam=sum(r*c for r,c in enumerate(h))/tot
+P("block L=32: moments")
+for j in range(2,33):
+    M=sum(c*r**j for r,c in enumerate(h))/tot
+    P(f"  j={j}: M_j^(1/j)={M**(1/j):.3f} C_j=M^(1/j)/log j={M**(1/j)/math.log(j):.3f}  Touchard(lam)^(1/j)={touch(j,lam)**(1/j):.3f}  ratio M/Touchard={M/touch(j,lam):.3g}")
+P("block L=32: tail")
+tail=[sum(h[t:])/tot for t in range(len(h))]
+for t in range(1,len(h)):
+    if tail[t]==0: P(f"  t={t}: no n"); break
+    P(f"  t={t}: P(r>=t)={tail[t]:.3e} -logP={-math.log(tail[t]):.3f} t/log t={t/math.log(max(t,2)):.3f} t*log(t/lam)={t*math.log(t/lam) if t>lam else 0:.3f} ratio to Poisson={tail[t]/ptail(t,lam):.3g}")
+ts=[t for t in range(4,len(h)) if tail[t]>0]
+ys=[-math.log(tail[t]) for t in ts]
+for name,xs in [("t/log t",[t/math.log(t) for t in ts]),("t log(t/lam)",[t*math.log(t/lam) for t in ts]),("t",ts)]:
+    a=sum(x*y for x,y in zip(xs,ys))/sum(x*x for x in xs); res=sum((y-a*x)**2 for x,y in zip(xs,ys))
+    P(f"  fit -logP = a*{name}: a={a:.3f} resid={res:.2f}")
+open('moments33_out.txt','w').write('\n'.join(out))
+
+===== hist33.txt (per block L: counts of odd n in (2^L,2^{L+1}) with r(n)=0,1,2,...) =====
+L=1 1 0
+L=2 0 1 1
+L=3 0 0 3 1
+L=4 0 2 3 2 1
+L=5 0 3 4 6 2 1
+L=6 1 4 14 7 2 2 2
+L=7 2 15 12 16 11 6 2 0
+L=8 4 17 42 29 21 9 4 2 0
+L=9 11 50 59 63 37 21 11 4 0 0
+L=10 28 87 139 101 77 44 24 9 3 0 0
+L=11 51 202 229 222 161 90 39 23 4 3 0 0
+L=12 117 385 479 437 306 181 90 35 12 3 3 0 0
+L=13 260 755 982 783 599 403 188 80 34 11 0 1 0 0
+L=14 551 1550 1925 1582 1165 735 394 189 64 29 7 1 0 0 0
+L=15 1169 3048 3816 3158 2314 1464 808 361 170 58 15 3 0 0 0 0
+L=16 2412 6126 7449 6411 4603 2843 1596 787 365 132 34 9 1 0 0 0 0
+L=17 4982 12332 14804 12617 9093 5728 3268 1603 721 266 87 28 6 1 0 0 0 0
+L=18 10514 24365 29247 25154 18121 11384 6612 3314 1485 585 215 56 18 2 0 0 0 0 0
+L=19 21528 49345 57798 49596 35839 23238 13186 6686 3070 1226 447 145 35 5 0 0 0 0 0 0
+L=20 43045 99114 115490 99091 71306 45767 26582 13493 6452 2591 943 297 88 24 4 1 0 0 0 0 0
+L=21 89129 198452 229006 195519 142153 91559 53465 27557 13141 5610 2027 717 182 46 12 1 0 0 0 0 0 0
+L=22 180958 397869 455133 389224 283426 183141 106619 55950 26669 11650 4389 1514 465 110 31 4 0 0 0 0 0 0 0
+L=23 367769 797485 907820 772159 562560 365625 214584 113077 55133 24027 9387 3356 969 273 63 13 3 0 1 0 0 0 0 0
+L=24 740575 1596267 1810909 1540539 1122500 729377 429674 228767 111118 49082 19755 6918 2331 619 141 31 4 1 0 0 0 0 0 0 0
+L=25 1517306 3198434 3596583 3055360 2229939 1458581 863032 463981 227764 102290 41962 14947 5051 1516 373 79 14 3 0 1 0 0 0 0 0 0
+L=26 3084677 6389487 7153794 6091794 4450861 2911207 1729012 936113 463721 209463 87063 32126 10833 3208 860 168 35 7 3 0 0 0 0 0 0 0 0
+L=27 6250305 12788000 14256159 12123347 8861535 5817064 3469627 1889279 941710 430347 179855 68650 23534 7037 1872 429 90 20 3 1 0 0 0 0 0 0 0 0
+L=28 12605142 25561144 28458814 24181735 17688052 11620512 6947072 3794516 1902258 875032 370262 142279 49761 15460 4358 1051 239 35 5 1 0 0 0 0 0 0 0 0 0
+L=29 25545386 51150965 56677362 48140450 35258370 23212086 13916774 7652137 3866841 1797693 766911 298170 105747 33851 9640 2397 562 98 15 1 0 0 0 0 0 0 0 0 0 0
+L=30 51501940 102246697 113065355 96090280 70410516 46383586 27856251 15361480 7795247 3647915 1570016 618702 222380 72579 20871 5491 1296 263 41 6 0 0 0 0 0 0 0 0 0 0 0
+L=31 104001798 204788651 225476921 191287700 140251348 92659112 55867149 30953869 15804977 7445219 3230415 1287733 469954 154648 46214 12332 2984 671 113 13 3 0 0 0 0 0 0 0 0 0 0 0
+L=32 209130252 409779107 450171299 381610352 279964555 185190139 111892469 62143428 31841346 15081255 6587629 2650166 976961 329001 99708 27468 6749 1440 272 42 10 0 0 0 0 0 0 0 0 0 0 0 0
+===== moments33_out.txt =====
+L=20 #odd=524288 mean=2.83134 (2/ln2=2.88539) var=3.6695 var/mean=1.2960 max r=15
+L=21 #odd=1048576 mean=2.83228 (2/ln2=2.88539) var=3.7409 var/mean=1.3208 max r=15
+L=22 #odd=2097152 mean=2.83376 (2/ln2=2.88539) var=3.7857 var/mean=1.3359 max r=15
+L=23 #odd=4194304 mean=2.83514 (2/ln2=2.88539) var=3.8369 var/mean=1.3534 max r=18
+L=24 #odd=8388608 mean=2.83705 (2/ln2=2.88539) var=3.8665 var/mean=1.3629 max r=17
+L=25 #odd=16777216 mean=2.83779 (2/ln2=2.88539) var=3.9261 var/mean=1.3835 max r=19
+L=26 #odd=33554432 mean=2.83911 (2/ln2=2.88539) var=3.9646 var/mean=1.3964 max r=18
+L=27 #odd=67108864 mean=2.84036 (2/ln2=2.88539) var=4.0039 var/mean=1.4096 max r=19
+L=28 #odd=134217728 mean=2.84138 (2/ln2=2.88539) var=4.0292 var/mean=1.4180 max r=19
+L=29 #odd=268435456 mean=2.84255 (2/ln2=2.88539) var=4.0679 var/mean=1.4311 max r=19
+L=30 #odd=536870912 mean=2.84349 (2/ln2=2.88539) var=4.0912 var/mean=1.4388 max r=19
+L=31 #odd=1073741824 mean=2.84449 (2/ln2=2.88539) var=4.1249 var/mean=1.4501 max r=20
+L=32 #odd=2147483648 mean=2.84545 (2/ln2=2.88539) var=4.1458 var/mean=1.4570 max r=20
+block L=32: moments
+  j=2: M_j^(1/j)=3.499 C_j=M^(1/j)/log j=5.048  Touchard(lam)^(1/j)=3.308  ratio M/Touchard=1.12
+  j=3: M_j^(1/j)=4.035 C_j=M^(1/j)/log j=3.673  Touchard(lam)^(1/j)=3.688  ratio M/Touchard=1.31
+  j=4: M_j^(1/j)=4.512 C_j=M^(1/j)/log j=3.254  Touchard(lam)^(1/j)=4.028  ratio M/Touchard=1.57
+  j=5: M_j^(1/j)=4.946 C_j=M^(1/j)/log j=3.073  Touchard(lam)^(1/j)=4.341  ratio M/Touchard=1.92
+  j=6: M_j^(1/j)=5.348 C_j=M^(1/j)/log j=2.985  Touchard(lam)^(1/j)=4.635  ratio M/Touchard=2.36
+  j=7: M_j^(1/j)=5.724 C_j=M^(1/j)/log j=2.942  Touchard(lam)^(1/j)=4.914  ratio M/Touchard=2.91
+  j=8: M_j^(1/j)=6.078 C_j=M^(1/j)/log j=2.923  Touchard(lam)^(1/j)=5.180  ratio M/Touchard=3.59
+  j=9: M_j^(1/j)=6.413 C_j=M^(1/j)/log j=2.919  Touchard(lam)^(1/j)=5.436  ratio M/Touchard=4.42
+  j=10: M_j^(1/j)=6.731 C_j=M^(1/j)/log j=2.923  Touchard(lam)^(1/j)=5.684  ratio M/Touchard=5.43
+  j=11: M_j^(1/j)=7.035 C_j=M^(1/j)/log j=2.934  Touchard(lam)^(1/j)=5.924  ratio M/Touchard=6.62
+  j=12: M_j^(1/j)=7.326 C_j=M^(1/j)/log j=2.948  Touchard(lam)^(1/j)=6.158  ratio M/Touchard=8.04
+  j=13: M_j^(1/j)=7.604 C_j=M^(1/j)/log j=2.965  Touchard(lam)^(1/j)=6.385  ratio M/Touchard=9.69
+  j=14: M_j^(1/j)=7.873 C_j=M^(1/j)/log j=2.983  Touchard(lam)^(1/j)=6.608  ratio M/Touchard=11.6
+  j=15: M_j^(1/j)=8.131 C_j=M^(1/j)/log j=3.002  Touchard(lam)^(1/j)=6.826  ratio M/Touchard=13.8
+  j=16: M_j^(1/j)=8.380 C_j=M^(1/j)/log j=3.022  Touchard(lam)^(1/j)=7.040  ratio M/Touchard=16.3
+  j=17: M_j^(1/j)=8.621 C_j=M^(1/j)/log j=3.043  Touchard(lam)^(1/j)=7.250  ratio M/Touchard=19
+  j=18: M_j^(1/j)=8.854 C_j=M^(1/j)/log j=3.063  Touchard(lam)^(1/j)=7.456  ratio M/Touchard=22.1
+  j=19: M_j^(1/j)=9.080 C_j=M^(1/j)/log j=3.084  Touchard(lam)^(1/j)=7.659  ratio M/Touchard=25.4
+  j=20: M_j^(1/j)=9.299 C_j=M^(1/j)/log j=3.104  Touchard(lam)^(1/j)=7.859  ratio M/Touchard=29
+  j=21: M_j^(1/j)=9.512 C_j=M^(1/j)/log j=3.124  Touchard(lam)^(1/j)=8.056  ratio M/Touchard=32.8
+  j=22: M_j^(1/j)=9.719 C_j=M^(1/j)/log j=3.144  Touchard(lam)^(1/j)=8.251  ratio M/Touchard=36.8
+  j=23: M_j^(1/j)=9.920 C_j=M^(1/j)/log j=3.164  Touchard(lam)^(1/j)=8.443  ratio M/Touchard=40.9
+  j=24: M_j^(1/j)=10.116 C_j=M^(1/j)/log j=3.183  Touchard(lam)^(1/j)=8.632  ratio M/Touchard=45
+  j=25: M_j^(1/j)=10.307 C_j=M^(1/j)/log j=3.202  Touchard(lam)^(1/j)=8.820  ratio M/Touchard=49.2
+  j=26: M_j^(1/j)=10.493 C_j=M^(1/j)/log j=3.220  Touchard(lam)^(1/j)=9.005  ratio M/Touchard=53.3
+  j=27: M_j^(1/j)=10.673 C_j=M^(1/j)/log j=3.238  Touchard(lam)^(1/j)=9.188  ratio M/Touchard=57.1
+  j=28: M_j^(1/j)=10.850 C_j=M^(1/j)/log j=3.256  Touchard(lam)^(1/j)=9.370  ratio M/Touchard=60.7
+  j=29: M_j^(1/j)=11.021 C_j=M^(1/j)/log j=3.273  Touchard(lam)^(1/j)=9.549  ratio M/Touchard=63.9
+  j=30: M_j^(1/j)=11.189 C_j=M^(1/j)/log j=3.290  Touchard(lam)^(1/j)=9.727  ratio M/Touchard=66.6
+  j=31: M_j^(1/j)=11.352 C_j=M^(1/j)/log j=3.306  Touchard(lam)^(1/j)=9.904  ratio M/Touchard=68.7
+  j=32: M_j^(1/j)=11.510 C_j=M^(1/j)/log j=3.321  Touchard(lam)^(1/j)=10.078  ratio M/Touchard=70.2
+block L=32: tail
+  t=1: P(r>=t)=9.026e-01 -logP=0.102 t/log t=1.443 t*log(t/lam)=0.000 ratio to Poisson=0.958
+  t=2: P(r>=t)=7.118e-01 -logP=0.340 t/log t=2.885 t*log(t/lam)=0.000 ratio to Poisson=0.917
+  t=3: P(r>=t)=5.022e-01 -logP=0.689 t/log t=2.731 t*log(t/lam)=0.159 ratio to Poisson=0.928
+  t=4: P(r>=t)=3.245e-01 -logP=1.126 t/log t=2.885 t*log(t/lam)=1.362 ratio to Poisson=1.02
+  t=5: P(r>=t)=1.941e-01 -logP=1.639 t/log t=3.107 t*log(t/lam)=2.819 ratio to Poisson=1.22
+  t=6: P(r>=t)=1.079e-01 -logP=2.227 t/log t=3.349 t*log(t/lam)=4.476 ratio to Poisson=1.56
+  t=7: P(r>=t)=5.576e-02 -logP=2.887 t/log t=3.597 t*log(t/lam)=6.301 ratio to Poisson=2.12
+  t=8: P(r>=t)=2.682e-02 -logP=3.618 t/log t=3.847 t*log(t/lam)=8.270 ratio to Poisson=3.02
+  t=9: P(r>=t)=1.200e-02 -logP=4.423 t/log t=4.096 t*log(t/lam)=10.364 ratio to Poisson=4.44
+  t=10: P(r>=t)=4.973e-03 -logP=5.304 t/log t=4.343 t*log(t/lam)=12.569 ratio to Poisson=6.68
+  t=11: P(r>=t)=1.905e-03 -logP=6.263 t/log t=4.587 t*log(t/lam)=14.874 ratio to Poisson=10.2
+  t=12: P(r>=t)=6.713e-04 -logP=7.306 t/log t=4.829 t*log(t/lam)=17.270 ratio to Poisson=15.4
+  t=13: P(r>=t)=2.164e-04 -logP=8.438 t/log t=5.068 t*log(t/lam)=19.750 ratio to Poisson=23.1
+  t=14: P(r>=t)=6.319e-05 -logP=9.669 t/log t=5.305 t*log(t/lam)=22.307 ratio to Poisson=33.8
+  t=15: P(r>=t)=1.675e-05 -logP=10.997 t/log t=5.539 t*log(t/lam)=24.935 ratio to Poisson=47.9
+  t=16: P(r>=t)=3.964e-06 -logP=12.438 t/log t=5.771 t*log(t/lam)=27.630 ratio to Poisson=64.5
+  t=17: P(r>=t)=8.214e-07 -logP=14.012 t/log t=6.000 t*log(t/lam)=30.387 ratio to Poisson=80.7
+  t=18: P(r>=t)=1.509e-07 -logP=15.707 t/log t=6.228 t*log(t/lam)=33.204 ratio to Poisson=94.7
+  t=19: P(r>=t)=2.421e-08 -logP=17.536 t/log t=6.453 t*log(t/lam)=36.076 ratio to Poisson=102
+  t=20: P(r>=t)=4.657e-09 -logP=19.185 t/log t=6.676 t*log(t/lam)=39.000 ratio to Poisson=139
+  t=21: no n
+  fit -logP = a*t/log t: a=1.913 resid=208.80
+  fit -logP = a*t log(t/lam): a=0.463 resid=5.14
+  fit -logP = a*t: a=0.760 resid=78.59
+===== largesieve_out.txt =====
+Q=2^15, log Q=10.397
+  j= 1: L_j(Q)=11.73  L^(1/j)=11.730  C needed for L>=(logQ/(C log j))^j: nan   L*j!/(log Q)^j=1.128  bound (X+Q^2)/L per X: 1.705e-01
+  j= 2: L_j(Q)=65.07  L^(1/j)=8.067  C needed for L>=(logQ/(C log j))^j: 1.860   L*j!/(log Q)^j=1.204  bound (X+Q^2)/L per X: 3.074e-02
+  j= 3: L_j(Q)=182.2  L^(1/j)=5.669  C needed for L>=(logQ/(C log j))^j: 1.669   L*j!/(log Q)^j=0.9726  bound (X+Q^2)/L per X: 1.098e-02
+  j= 4: L_j(Q)=519.9  L^(1/j)=4.775  C needed for L>=(logQ/(C log j))^j: 1.571   L*j!/(log Q)^j=1.068  bound (X+Q^2)/L per X: 3.847e-03
+  j= 5: L_j(Q)=782.3  L^(1/j)=3.790  C needed for L>=(logQ/(C log j))^j: 1.704   L*j!/(log Q)^j=0.7726  bound (X+Q^2)/L per X: 2.557e-03
+  j= 6: L_j(Q)=1163  L^(1/j)=3.243  C needed for L>=(logQ/(C log j))^j: 1.789   L*j!/(log Q)^j=0.6628  bound (X+Q^2)/L per X: 1.720e-03
+  j= 7: L_j(Q)=1768  L^(1/j)=2.910  C needed for L>=(logQ/(C log j))^j: 1.836   L*j!/(log Q)^j=0.6785  bound (X+Q^2)/L per X: 1.131e-03
+  j= 8: L_j(Q)=2831  L^(1/j)=2.701  C needed for L>=(logQ/(C log j))^j: 1.851   L*j!/(log Q)^j=0.836  bound (X+Q^2)/L per X: 7.064e-04
+  j= 9: L_j(Q)=4851  L^(1/j)=2.568  C needed for L>=(logQ/(C log j))^j: 1.843   L*j!/(log Q)^j=1.24  bound (X+Q^2)/L per X: 4.123e-04
+  j=10: L_j(Q)=1.113e+04  L^(1/j)=2.539  C needed for L>=(logQ/(C log j))^j: 1.778   L*j!/(log Q)^j=2.736  bound (X+Q^2)/L per X: 1.797e-04
+  j=11: L_j(Q)=1.624e+04  L^(1/j)=2.414  C needed for L>=(logQ/(C log j))^j: 1.796   L*j!/(log Q)^j=4.223  bound (X+Q^2)/L per X: 1.232e-04
+  j=12: L_j(Q)=2.997e+04  L^(1/j)=2.361  C needed for L>=(logQ/(C log j))^j: 1.772   L*j!/(log Q)^j=8.996  bound (X+Q^2)/L per X: 6.673e-05
+  j=13: L_j(Q)=3.306e+04  L^(1/j)=2.227  C needed for L>=(logQ/(C log j))^j: 1.821   L*j!/(log Q)^j=12.41  bound (X+Q^2)/L per X: 6.049e-05
+  j=14: L_j(Q)=3.704e+04  L^(1/j)=2.120  C needed for L>=(logQ/(C log j))^j: 1.858   L*j!/(log Q)^j=18.72  bound (X+Q^2)/L per X: 5.400e-05
+  j=15: L_j(Q)=4.237e+04  L^(1/j)=2.035  C needed for L>=(logQ/(C log j))^j: 1.887   L*j!/(log Q)^j=30.89  bound (X+Q^2)/L per X: 4.720e-05
+  j=16: L_j(Q)=5.058e+04  L^(1/j)=1.968  C needed for L>=(logQ/(C log j))^j: 1.906   L*j!/(log Q)^j=56.74  bound (X+Q^2)/L per X: 3.955e-05
+  j=17: L_j(Q)=6.584e+04  L^(1/j)=1.921  C needed for L>=(logQ/(C log j))^j: 1.911   L*j!/(log Q)^j=120.8  bound (X+Q^2)/L per X: 3.038e-05
+  j=18: L_j(Q)=1.09e+05  L^(1/j)=1.905  C needed for L>=(logQ/(C log j))^j: 1.888   L*j!/(log Q)^j=346.2  bound (X+Q^2)/L per X: 1.835e-05
+  j=19: L_j(Q)=1.127e+05  L^(1/j)=1.845  C needed for L>=(logQ/(C log j))^j: 1.914   L*j!/(log Q)^j=654.3  bound (X+Q^2)/L per X: 1.774e-05
+  j=20: L_j(Q)=1.17e+05  L^(1/j)=1.792  C needed for L>=(logQ/(C log j))^j: 1.936   L*j!/(log Q)^j=1306  bound (X+Q^2)/L per X: 1.709e-05
+  j=25: L_j(Q)=1.539e+05  L^(1/j)=1.612  C needed for L>=(logQ/(C log j))^j: 2.003   L*j!/(log Q)^j=9.016e+04  bound (X+Q^2)/L per X: 1.299e-05
+  j=30: L_j(Q)=3.194e+05  L^(1/j)=1.526  C needed for L>=(logQ/(C log j))^j: 2.004   L*j!/(log Q)^j=2.634e+07  bound (X+Q^2)/L per X: 6.261e-06
+Q=2^20, log Q=13.863
+  j= 1: L_j(Q)=15.2  L^(1/j)=15.196  C needed for L>=(logQ/(C log j))^j: nan   L*j!/(log Q)^j=1.096  bound (X+Q^2)/L per X: 1.316e-01
+  j= 2: L_j(Q)=104.8  L^(1/j)=10.238  C needed for L>=(logQ/(C log j))^j: 1.953   L*j!/(log Q)^j=1.091  bound (X+Q^2)/L per X: 1.908e-02
+  j= 3: L_j(Q)=353.8  L^(1/j)=7.073  C needed for L>=(logQ/(C log j))^j: 1.784   L*j!/(log Q)^j=0.7967  bound (X+Q^2)/L per X: 5.653e-03
+  j= 4: L_j(Q)=1189  L^(1/j)=5.872  C needed for L>=(logQ/(C log j))^j: 1.703   L*j!/(log Q)^j=0.7725  bound (X+Q^2)/L per X: 1.682e-03
+  j= 5: L_j(Q)=2046  L^(1/j)=4.594  C needed for L>=(logQ/(C log j))^j: 1.875   L*j!/(log Q)^j=0.4794  bound (X+Q^2)/L per X: 9.778e-04
+  j= 6: L_j(Q)=3441  L^(1/j)=3.885  C needed for L>=(logQ/(C log j))^j: 1.991   L*j!/(log Q)^j=0.349  bound (X+Q^2)/L per X: 5.813e-04
+  j= 7: L_j(Q)=5910  L^(1/j)=3.458  C needed for L>=(logQ/(C log j))^j: 2.060   L*j!/(log Q)^j=0.3027  bound (X+Q^2)/L per X: 3.384e-04
+  j= 8: L_j(Q)=1.072e+04  L^(1/j)=3.190  C needed for L>=(logQ/(C log j))^j: 2.090   L*j!/(log Q)^j=0.3168  bound (X+Q^2)/L per X: 1.866e-04
+  j= 9: L_j(Q)=2.072e+04  L^(1/j)=3.017  C needed for L>=(logQ/(C log j))^j: 2.091   L*j!/(log Q)^j=0.3976  bound (X+Q^2)/L per X: 9.653e-05
+  j=10: L_j(Q)=5.439e+04  L^(1/j)=2.975  C needed for L>=(logQ/(C log j))^j: 2.023   L*j!/(log Q)^j=0.7529  bound (X+Q^2)/L per X: 3.677e-05
+  j=11: L_j(Q)=8.798e+04  L^(1/j)=2.815  C needed for L>=(logQ/(C log j))^j: 2.054   L*j!/(log Q)^j=0.9664  bound (X+Q^2)/L per X: 2.273e-05
+  j=12: L_j(Q)=1.801e+05  L^(1/j)=2.741  C needed for L>=(logQ/(C log j))^j: 2.035   L*j!/(log Q)^j=1.712  bound (X+Q^2)/L per X: 1.111e-05
+  j=13: L_j(Q)=2.11e+05  L^(1/j)=2.568  C needed for L>=(logQ/(C log j))^j: 2.105   L*j!/(log Q)^j=1.881  bound (X+Q^2)/L per X: 9.481e-06
+  j=14: L_j(Q)=2.515e+05  L^(1/j)=2.431  C needed for L>=(logQ/(C log j))^j: 2.161   L*j!/(log Q)^j=2.265  bound (X+Q^2)/L per X: 7.952e-06
+  j=15: L_j(Q)=3.067e+05  L^(1/j)=2.322  C needed for L>=(logQ/(C log j))^j: 2.205   L*j!/(log Q)^j=2.988  bound (X+Q^2)/L per X: 6.522e-06
+  j=16: L_j(Q)=3.927e+05  L^(1/j)=2.237  C needed for L>=(logQ/(C log j))^j: 2.235   L*j!/(log Q)^j=4.415  bound (X+Q^2)/L per X: 5.093e-06
+  j=17: L_j(Q)=5.546e+05  L^(1/j)=2.177  C needed for L>=(logQ/(C log j))^j: 2.247   L*j!/(log Q)^j=7.647  bound (X+Q^2)/L per X: 3.606e-06
+  j=18: L_j(Q)=1.016e+06  L^(1/j)=2.156  C needed for L>=(logQ/(C log j))^j: 2.224   L*j!/(log Q)^j=18.2  bound (X+Q^2)/L per X: 1.968e-06
+  j=19: L_j(Q)=1.093e+06  L^(1/j)=2.079  C needed for L>=(logQ/(C log j))^j: 2.265   L*j!/(log Q)^j=26.81  bound (X+Q^2)/L per X: 1.831e-06
+  j=20: L_j(Q)=1.18e+06  L^(1/j)=2.012  C needed for L>=(logQ/(C log j))^j: 2.300   L*j!/(log Q)^j=41.77  bound (X+Q^2)/L per X: 1.695e-06
+  j=25: L_j(Q)=1.937e+06  L^(1/j)=1.784  C needed for L>=(logQ/(C log j))^j: 2.414   L*j!/(log Q)^j=854  bound (X+Q^2)/L per X: 1.032e-06
+  j=30: L_j(Q)=5.492e+06  L^(1/j)=1.677  C needed for L>=(logQ/(C log j))^j: 2.430   L*j!/(log Q)^j=8.086e+04  bound (X+Q^2)/L per X: 3.641e-07
+===== analyze.py part (C): Hardy-Littlewood vs empirical falling-factorial moments =====
+=== (C) Hardy-Littlewood prediction with exact shift-dependent singular series ===
+primes p<2e5 with ord_p(2) <= 29: 31 [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 41, 43, 47, 73, 89, 113, 127, 151, 233, 241, 257, 337, 601, 683, 1103, 1801, 2089, 2731, 8191, 131071, 178481] ...
+log of generic (collision-free) singular series per m: {0: 0.0, 1: 0.0, 2: -0.0042, 3: -0.0126, 4: -0.0254, 5: -0.0428, 6: -0.0649, 7: -0.0918, 8: -0.1237, 9: -0.1608, 10: -0.2033, 11: -0.2513, 12: -0.3052}
+-- block L=16: falling-factorial moments E[(r)_m] empirical vs HL (odd n, n~1.5*2^L) --
+   m=1: E[C(r,m)] emp=2.8237 HL=2.8138 ratio=1.004  avgS=1 (avgS)^(1/m)=1.000 exact
+   m=2: E[C(r,m)] emp=4.2804 HL=4.2431 ratio=1.009  avgS=1.143 (avgS)^(1/m)=1.069 exact
+   m=3: E[C(r,m)] emp=4.5786 HL=4.5055 ratio=1.016  avgS=1.478 (avgS)^(1/m)=1.139 exact
+   m=4: E[C(r,m)] emp=3.7564 HL=3.6736 ratio=1.023  avgS=2.108 (avgS)^(1/m)=1.205 exact
+   m=5: E[C(r,m)] emp=2.4272 HL=2.3817 ratio=1.019  avgS=3.237 (avgS)^(1/m)=1.265 exact
+   m=6: E[C(r,m)] emp=1.2401 HL=1.247 ratio=0.994  avgS=5.255 (avgS)^(1/m)=1.319 exact
+   m=7: E[C(r,m)] emp=0.49747 HL=0.52966 ratio=0.939  avgS=8.882 (avgS)^(1/m)=1.366 exact
+   m=8: E[C(r,m)] emp=0.15451 HL=0.18192 ratio=0.849  avgS=15.41 (avgS)^(1/m)=1.408 exact
+-- block L=20: falling-factorial moments E[(r)_m] empirical vs HL (odd n, n~1.5*2^L) --
+   m=1: E[C(r,m)] emp=2.8313 HL=2.8227 ratio=1.003  avgS=1 (avgS)^(1/m)=1.000 exact
+   m=2: E[C(r,m)] emp=4.4273 HL=4.3989 ratio=1.006  avgS=1.162 (avgS)^(1/m)=1.078 exact
+   m=3: E[C(r,m)] emp=4.988 HL=4.9327 ratio=1.011  avgS=1.539 (avgS)^(1/m)=1.154 exact
+   m=4: E[C(r,m)] emp=4.4086 HL=4.3321 ratio=1.018  avgS=2.253 (avgS)^(1/m)=1.225 exact
+   m=5: E[C(r,m)] emp=3.1716 HL=3.0895 ratio=1.027  avgS=3.556 (avgS)^(1/m)=1.289 exact
+   m=6: E[C(r,m)] emp=1.8961 HL=1.8221 ratio=1.041  avgS=5.944 (avgS)^(1/m)=1.346 exact
+   m=7: E[C(r,m)] emp=0.95481 HL=0.89646 ratio=1.065  avgS=10.36 (avgS)^(1/m)=1.396 exact
+   m=8: E[C(r,m)] emp=0.40837 HL=0.369 ratio=1.107  avgS=18.59 (avgS)^(1/m)=1.441 exact
+-- block L=24: falling-factorial moments E[(r)_m] empirical vs HL (odd n, n~1.5*2^L) --
+   m=1: E[C(r,m)] emp=2.837 HL=2.8301 ratio=1.002  avgS=1 (avgS)^(1/m)=1.000 exact
+   m=2: E[C(r,m)] emp=4.5391 HL=4.5154 ratio=1.005  avgS=1.176 (avgS)^(1/m)=1.085 exact
+   m=3: E[C(r,m)] emp=5.3096 HL=5.2654 ratio=1.008  avgS=1.586 (avgS)^(1/m)=1.166 exact
+   m=4: E[C(r,m)] emp=4.9359 HL=4.8782 ratio=1.012  avgS=2.373 (avgS)^(1/m)=1.241 exact
+   m=5: E[C(r,m)] emp=3.7831 HL=3.7248 ratio=1.016  avgS=3.841 (avgS)^(1/m)=1.309 exact
+   m=6: E[C(r,m)] emp=2.4377 HL=2.3903 ratio=1.020  avgS=6.599 (avgS)^(1/m)=1.370 exact
+   m=7: E[C(r,m)] emp=1.3346 HL=1.3018 ratio=1.025  avgS=11.85 (avgS)^(1/m)=1.424 MC
+   m=8: E[C(r,m)] emp=0.62376 HL=0.60678 ratio=1.028  avgS=22.04 (avgS)^(1/m)=1.472 MC
+-- block L=29: falling-factorial moments E[(r)_m] empirical vs HL (odd n, n~1.5*2^L) --
+   m=1: E[C(r,m)] emp=2.8425 HL=2.8375 ratio=1.002  avgS=1 (avgS)^(1/m)=1.000 exact
+   m=2: E[C(r,m)] emp=4.6527 HL=4.6355 ratio=1.004  avgS=1.192 (avgS)^(1/m)=1.092 exact
+   m=3: E[C(r,m)] emp=5.6407 HL=5.6082 ratio=1.006  avgS=1.638 (avgS)^(1/m)=1.179 exact
+   m=4: E[C(r,m)] emp=5.4959 HL=5.4519 ratio=1.008  avgS=2.503 (avgS)^(1/m)=1.258 exact
+   m=5: E[C(r,m)] emp=4.4647 HL=4.4183 ratio=1.010  avgS=4.146 (avgS)^(1/m)=1.329 exact
+   m=6: E[C(r,m)] emp=3.0858 HL=3.0523 ratio=1.011  avgS=7.316 (avgS)^(1/m)=1.393 MC
+   m=7: E[C(r,m)] emp=1.8363 HL=1.8076 ratio=1.016  avgS=13.48 (avgS)^(1/m)=1.450 MC
+   m=8: E[C(r,m)] emp=0.94767 HL=0.93057 ratio=1.018  avgS=25.77 (avgS)^(1/m)=1.501 MC

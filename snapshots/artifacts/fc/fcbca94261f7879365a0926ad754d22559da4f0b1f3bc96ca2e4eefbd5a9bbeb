@@ -1,0 +1,61 @@
+"""Cheap necessary conditions for a covering of Z/L by residue classes with distinct
+moduli d | L, d > 1 (hence for any odd distinct covering system with lcm dividing L).
+
+Notation: D = set of moduli used, w_d = L/d, E = sum_{d in D} w_d - L >= 0 (excess),
+G = F - 1 >= 0 where F(n) = number of classes containing n.
+
+(A) density:        E >= 0, i.e. sigma(L) >= 2L  (L odd abundant/perfect).
+(B) polygon (Fourier, any m | L, m > 1):  characters chi of exact order m give
+    |G^(chi)| = |sum_{d in D, m|d} w_d chi(a_d)| <= G^(1) = E, so
+        2 * max_{m|d} w_d - sum_{m|d} w_d <= E.
+(C) prime-class distribution (elementary, p | L prime): classes with p ∤ d are
+    equidistributed mod p; the class with p | d lies in one class mod p. Summing G
+    over n = r (mod p) for the class r receiving the largest weight w* among p | d:
+        w* + (E - S_p)/p <= E,  S_p = sum_{p|d} w_d,  i.e.  p*w* - S_p <= (p-1) E.
+All three are monotone under enlarging D (adding a modulus never breaks them), so
+testing D = all divisors > 1 of L is the strongest instance; if it fails, no covering
+of Z/L with distinct moduli dividing L exists.  (Own reasoning; the prime-class
+argument is classical in spirit, cf. Simpson-Zeilberger / Krukenberg-type counts.)
+"""
+import sys
+from sympy import divisors, divisor_sigma, factorint, primefactors
+
+
+def test(L):
+    ds = [d for d in divisors(L) if d > 1]
+    w = {d: L // d for d in ds}
+    E = sum(w.values()) - L
+    if E < 0:
+        return 'density'
+    for p in primefactors(L):
+        S = sum(w[d] for d in ds if d % p == 0)
+        wmax = w[p]
+        if p * wmax - S > (p - 1) * E:
+            return f'prime-class p={p}'
+    for m in ds:
+        vals = [w[d] for d in ds if d % m == 0]
+        if 2 * max(vals) - sum(vals) > E:
+            return f'polygon m={m}'
+    return None
+
+
+def main(bound):
+    stats = {}
+    survivors = []
+    n_ab = 0
+    for L in range(3, bound + 1, 2):
+        if divisor_sigma(L) < 2 * L:
+            continue
+        n_ab += 1
+        r = test(L)
+        key = r.split()[0] if r else 'survives'
+        stats[key] = stats.get(key, 0) + 1
+        if r is None:
+            survivors.append(L)
+    print(f"odd abundant L <= {bound}: {n_ab}; outcomes: {stats}")
+    print("first survivors:", [(L, dict(factorint(L)), round(float(divisor_sigma(L))/L - 2, 4)) for L in survivors[:15]])
+    return survivors
+
+
+if __name__ == '__main__':
+    main(int(sys.argv[1]) if len(sys.argv) > 1 else 100000)

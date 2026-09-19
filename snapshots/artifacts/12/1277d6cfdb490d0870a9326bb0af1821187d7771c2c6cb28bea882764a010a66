@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""
+Stress tests for Conjecture H (hereditary abundance):
+   exists i :  |S_i| >= |F|/2,   S_i = {A in F : i abundant in F_{<=A}}   (S_i ⊆ F_{∋i}, so H implies Frankl)
+ (a) simulated annealing on n=7,8,9 minimising max_i |S_i|/|F| among families with |F| >= 8
+ (b) annealing minimising max frequency (Frankl-extremal families), then report the H-score
+ (c) search for a Sarvate-Renaud-type family (unique smallest set of size 3, none of its elements abundant) and test H
+ (d) a few explicit structured families (power set ∪ big set, Hamming balls, FC-like Fano family)
+"""
+import math, random, sys, itertools
+from ucs_experiments import union_closure, freqs, top, popcount
+from ucs_experiments2 import abundant_set
+from ucs_experiments3 import S_sets
+
+def Hscore(fam, n):
+    fam = list(fam); F = len(fam)
+    S = S_sets(fam, n)
+    return max(len(S[i]) for i in range(n)) / F
+
+def maxfreq(fam, n):
+    return max(freqs(list(fam), n)) / len(fam)
+
+def anneal(n, steps, rng, objective, minsize=8, ngen=8, T0=0.05):
+    gens = [rng.randrange(1, 1 << n) for _ in range(ngen)]
+    def ev(g):
+        fam = frozenset(union_closure(g))
+        if len(fam) < minsize: return 9.0, fam
+        return objective(fam, n), fam
+    cur, curfam = ev(gens); best, bestfam = cur, curfam
+    for t in range(steps):
+        temp = T0 * (1 - t / steps) + 1e-4
+        g2 = list(gens); op = rng.random()
+        if op < 0.3 and len(g2) > 1: g2.pop(rng.randrange(len(g2)))
+        elif op < 0.6: g2.append(rng.randrange(1, 1 << n))
+        else: g2[rng.randrange(len(g2))] ^= 1 << rng.randrange(n)
+        s, fam = ev(g2)
+        if s <= cur or rng.random() < math.exp(-(s - cur) / temp):
+            cur, curfam, gens = s, fam, g2
+            if s < best: best, bestfam = s, fam
+    return best, sorted(bestfam)
+
+def sarvate_renaud_search(n, steps, rng):
+    """objective: (max over elements of the unique smallest 3-set of frequency) with penalty if smallest set is not a unique 3-set"""
+    def obj(fam, n):
+        fam = list(fam); F = len(fam)
+        sizes = sorted((popcount(A), A) for A in fam if A)
+        if not sizes or sizes[0][0] != 3 or (len(sizes) > 1 and sizes[1][0] == 3): return 5.0
+        A0 = sizes[0][1]; fr = freqs(fam, n)
+        return max(fr[i] for i in range(n) if A0 >> i & 1) / F
+    return anneal(n, steps, rng, obj, minsize=6, ngen=10)
+
+if __name__ == "__main__":
+    rng = random.Random(2026)
+    print("(a) anneal minimising H-score, |F|>=8")
+    for n in (6, 7, 8):
+        for trial in range(3):
+            s, fam = anneal(n, 1500 if n < 8 else 600, rng, Hscore)
+            print(f"  n={n} trial={trial} min H-score={s:.4f} |F|={len(fam)} maxfreq={maxfreq(fam,n):.4f} family={fam}")
+            sys.stdout.flush()
+    print("(b) anneal minimising max frequency, then H-score")
+    for n in (6, 7, 8):
+        for trial in range(3):
+            s, fam = anneal(n, 1500 if n < 8 else 600, rng, maxfreq)
+            print(f"  n={n} trial={trial} min maxfreq={s:.4f} |F|={len(fam)} H-score={Hscore(fam,n):.4f} family={fam}")
+            sys.stdout.flush()
+    print("(c) Sarvate-Renaud-type search (unique smallest set of size 3 with no abundant element)")
+    for n in (7, 8, 9):
+        s, fam = sarvate_renaud_search(n, 1500 if n < 9 else 500, rng)
+        print(f"  n={n} best max-frequency among elements of smallest 3-set={s:.4f} |F|={len(fam)} H-score={Hscore(fam,n):.4f} maxfreq={maxfreq(fam,n):.4f} family={fam}")
+        sys.stdout.flush()
+    print("(d) structured families")
+    n = 9
+    fams = {}
+    fams["2^[4] ∪ {[9]}"] = frozenset(set(range(16)) | {(1 << 9) - 1})
+    fams["Hamming ball |A|>=5 on [9] ∪ ∅"] = frozenset({0} | {A for A in range(1 << 9) if popcount(A) >= 5})
+    fano = [0b0000111, 0b0011001, 0b0101010, 0b1001100, 0b0110100, 0b1010001, 0b1100010]  # lines of Fano plane on 7 points
+    fams["union-closure of Fano lines (n=7)"] = frozenset(union_closure(fano))
+    fams["2^[3] ∪ {[3]∪X : X ⊆ {4..9}, X≠∅} (n=9)"] = frozenset(set(range(8)) | {7 | (X << 3) for X in range(1, 64)})
+    for name, fam in fams.items():
+        print(f"  {name:45s} |F|={len(fam):4d} maxfreq={maxfreq(fam,n):.4f} H-score={Hscore(fam,n):.4f}")

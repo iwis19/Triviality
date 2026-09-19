@@ -1,0 +1,360 @@
+===== safe.py =====
+"""Compute B_j = set of primes p > j such that some nonempty subset of {1..j}
+has reciprocal sum whose reduced numerator is divisible by p.  (p is 'j-safe' iff p not in B_j.)
+Writes minbad_J.txt: lines 'p j' with j = minimal level at which p in B_j (j<=J)."""
+from fractions import Fraction
+import sys
+
+def primes_dividing(n):
+    out = set(); d = 2
+    while d * d <= n:
+        while n % d == 0:
+            out.add(d); n //= d
+        d += 1
+    if n > 1: out.add(n)
+    return out
+
+def B(j):
+    sums = {Fraction(0)}
+    for m in range(1, j + 1):
+        sums |= {s + Fraction(1, m) for s in sums}
+    sums.discard(Fraction(0))
+    bad = set()
+    for s in sums:
+        bad |= {p for p in primes_dividing(s.numerator) if p > j}
+    return sorted(bad)
+
+if __name__ == "__main__":
+    J = int(sys.argv[1]) if len(sys.argv) > 1 else 12
+    minbad = {}
+    for j in range(1, J + 1):
+        b = B(j)
+        for p in b:
+            minbad.setdefault(p, j)
+        print(j, len(b), b if len(b) < 40 else b[:40] + ['...'])
+    # sanity: monotonicity B_{j-1} subset B_j (restricted to p>j)
+    with open(f"minbad_{J}.txt", "w") as f:
+        for p in sorted(minbad):
+            f.write(f"{p} {minbad[p]}\n")
+
+===== moduli.c (Part A) =====
+/* Part A: sweep N = 2..NMAX.  A gap<=2 counterexample S subset [n_1,N] (n_1,N in S, sum 1/n = 1)
+   must have n_1 <= n1max(N) := max{n : H(N)-H(n-1) >= 1}.
+   Forced-out elements (p-adic top-level lemma): m = a p with p prime, j = floor(N/p) <= J (so p^2 > N),
+   p not in B_j ('j-safe'), 1 <= a <= j, n1max(N) <= m <= N.   Then m-1, m+1 are forced INTO S
+   (gap<=2), and Q_l := l^{1+max_{n in S} v_l(n)} divides no element of S, hence none of these.
+   cnt[l][t] = #{forced-in g : l^t | g}.  Q_l can only be an 'unblocked' power (cnt==0).
+   Top-level parity/size: |T_l| >= 2 gives Q_2 <= 2N/3, Q_3 <= 3N/2.
+   'closed_by_Q2'  : no unblocked 2^t <= 2N/3            => no counterexample with n_k = N.
+   'closed_by_Q2Q3': every unblocked pair has Q_2*Q_3 <= N-n1max (violates CRT claim C-CRT) => closed.
+   Usage: ./moduli NMAX J minbadfile [printevery] */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+
+static int J;
+static unsigned char *minbad;  /* minimal j<=J with p in B_j, 0 if none (safe at all levels <= J) */
+static char *comp;
+static long NMAX;
+static long cnt2[64], cnt3[64];
+static inline int safe(long p,int j){ return minbad[p]==0 || minbad[p]>j; }
+
+static void addelem(long g, int sgn){
+  long x=g; int j=0; while(x%2==0){x/=2;j++;} for(int t=1;t<=j;t++) cnt2[t]+=sgn;
+  x=g; j=0; while(x%3==0){x/=3;j++;} for(int t=1;t<=j;t++) cnt3[t]+=sgn;
+}
+
+int main(int argc,char**argv){
+  NMAX=atol(argv[1]); J=atoi(argv[2]);
+  long printevery = argc>4? atol(argv[4]) : 1;
+  comp=calloc(NMAX+2,1); minbad=calloc(NMAX+2,1);
+  for(long i=2;i*i<=NMAX;i++) if(!comp[i]) for(long k=i*i;k<=NMAX;k+=i) comp[k]=1;
+  FILE*f=fopen(argv[3],"r"); long p; int j; while(fscanf(f,"%ld %d",&p,&j)==2) if(p<=NMAX) minbad[p]=j; fclose(f);
+  long double *H=malloc(sizeof(long double)*(NMAX+2)); H[0]=0; for(long i=1;i<=NMAX;i++) H[i]=H[i-1]+1.0L/i;
+  long n1max=1;
+  long pend[64]; int npend=0;
+  long stat_closed2=0, stat_small2=0, stat_Nkilled=0, stat_closed23=0, total=0;
+  long maxres2=0, maxres2N=0; long bin_tot[9]={0}, bin_closed[9]={0}, bin_closed23[9]={0};
+  long lastclosed=0, maxgap=0, maxgapN=0;
+  for(long N=2;N<=NMAX;N++){
+    for(int t=0;t<npend;t++) addelem(pend[t],+1); npend=0;
+    int Nkilled=0;
+    /* level events: N = j*p, p prime, j<=J  (p enters at j=1, leaves at j=J+1) */
+    for(int jj=1;jj<=J+1;jj++){
+      if(N%jj) continue; long q=N/jj; if(q<2||comp[q]) continue;
+      if(q<=n1max && jj==1) continue; /* n1max<=... p=N>n1max always for N>=2 actually */
+      if(jj==J+1){ /* p leaves: remove all current contributions if safe at level J */
+        if(safe(q,J)) for(int a=1;a<=J;a++){ long m=(long)a*q; if(m>=n1max){ addelem(m-1,-1); addelem(m+1,-1);} }
+        continue;
+      }
+      if(jj==1){ addelem(q-1,+1); pend[npend++]=q+1; Nkilled=1; continue; }
+      int wasafe=safe(q,jj-1), nowsafe=safe(q,jj);
+      if(wasafe && nowsafe){ addelem(N-1,+1); pend[npend++]=N+1; Nkilled=1; }
+      else if(wasafe && !nowsafe){ for(int a=1;a<jj;a++){ long m=(long)a*q; if(m>=n1max){ addelem(m-1,-1); addelem(m+1,-1);} } }
+    }
+    /* n1max update: remove forced elements m in [old,new) */
+    long old=n1max;
+    while(n1max+1<=N && H[N]-H[n1max] >= 1.0L) n1max++;
+    for(long m=old;m<n1max;m++){
+      for(int a=1;a<=J;a++){ if(m%a) continue; long q=m/a; if(q<2||comp[q]) continue; int lev=N/q; if(lev>J||lev<a) continue;
+        if(safe(q,lev)){ addelem(m-1,-1); addelem(m+1,-1);} }
+    }
+    if(N<(J+1)*(J+1)) continue;
+    total++;
+    long thr = (long)floorl(sqrtl((long double)(N-n1max)));
+    long Q=2; int t=1; while(cnt2[t]>0){ t++; Q*=2; }
+    long minQ2=Q; int res2=0; for(long q=Q;3*q<=2*N;q*=2) res2++;
+    long Q3=3; t=1; while(cnt3[t]>0){ t++; Q3*=3; }
+    long minQ3=Q3; int res3=0; for(long q=Q3;2*q<=3*N;q*=3) res3++;
+    int b=0; for(long x=N;x>=10;x/=10) b++;
+    bin_tot[b]++; if(res2==0) bin_closed[b]++;
+    int ok=0; for(long q=minQ2;3*q<=2*N;q*=2) for(long r=minQ3;2*r<=3*N;r*=3) if(q*r>N-n1max) ok=1;
+    if(!ok){stat_closed23++; bin_closed23[b]++;}
+    if(res2==0) stat_closed2++;
+    if(minQ2<=thr) stat_small2++;
+    if(Nkilled) stat_Nkilled++;
+    if(res2>maxres2){maxres2=res2;maxres2N=N;}
+    if(res2==0||!ok||Nkilled){ if(N-lastclosed>maxgap){maxgap=N-lastclosed;maxgapN=N;} lastclosed=N; }
+    if(N%printevery==0 || N<=120)
+      printf("N=%ld n1max=%ld sqrt(N-n1max)=%ld Nkilled=%d minQ2=%ld res2=%d minQ3=%ld res3=%d closed23=%d\n",N,n1max,thr,Nkilled,minQ2,res2,minQ3,res3,!ok);
+  }
+  for(int b=0;b<9;b++) if(bin_tot[b]) printf("decade 10^%d: N=%ld closed_by_Q2=%ld (%.1f%%) closed_by_Q2Q3=%ld (%.1f%%)\n",b,bin_tot[b],bin_closed[b],100.0*bin_closed[b]/bin_tot[b],bin_closed23[b],100.0*bin_closed23[b]/bin_tot[b]);
+  printf("SUMMARY NMAX=%ld J=%d analysed=%ld N_forced_out=%ld closed_by_Q2=%ld closed_by_Q2Q3=%ld minQ2<=sqrt(N-n1max)=%ld max_res2=%ld at N=%ld; longest run of N not closed by (Nkilled|Q2|Q2Q3): %ld ending at N=%ld\n",
+    NMAX,J,total,stat_Nkilled,stat_closed2,stat_closed23,stat_small2,maxres2,maxres2N,maxgap-1,maxgapN-1);
+  return 0;
+}
+
+===== survq.c (Part B) =====
+/* Part B: enumerate all S subset [n1,N] with n1,N in S, no two consecutive integers missing (gap<=2),
+   all forced-out elements (m=a p, p prime, j=floor(N/p)<=J, p j-safe, a<=j) excluded,
+   sum_{S} 1/n in [0.5,2], and v_2(sum) >= 0.  For survivors tabulate Q_2, Q_3 and check
+   Q_2*Q_3 > N-n1 (claim C-CRT) ; also report survivors with v_3>=0, v_5>=0 additionally.
+   Usage: ./survq n1 N J minbadfile */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+typedef unsigned long long u64;
+static int n1,N,J; static unsigned char minbad[100000]; static char comp[100000];
+static char forcedout[4096]; static char inS[4096];
+static u64 c2[4096]; static u64 c3[4096], c5[4096]; static u64 M2, M3, M5; static int e2,e3,e5;
+static double rem[4096]; static double inv[4096];
+static long leaves=0, surv2=0, surv23=0, surv235=0, crtviol=0;
+static long histQ2[64], histQ3[64]; static long histQ2_23[64];
+static u64 powmod(u64 b,u64 e,u64 m){u64 r=1;b%=m;while(e){if(e&1)r=(unsigned __int128)r*b%m;b=(unsigned __int128)b*b%m;e>>=1;}return r;}
+static u64 inv2_64(u64 a){u64 x=a;for(int i=0;i<6;i++)x*=2-a*x;return x;} /* a odd */
+static u64 invmod(u64 a,u64 m,u64 phi){return powmod(a,phi-1,m);}
+static int vp(int n,int p){int v=0;while(n%p==0){n/=p;v++;}return v;}
+static void leaf(){
+  leaves++;
+  u64 r2=0,r3=0,r5=0; double s=0; int a2=0,a3=0;
+  for(int n=n1;n<=N;n++) if(inS[n]){ r2+=c2[n]; r3=(r3+c3[n])%M3; r5=(r5+c5[n])%M5; s+=inv[n]; int v=vp(n,2); if(v>a2)a2=v; v=vp(n,3); if(v>a3)a3=v; }
+  if(s<0.5||s>2) return;
+  if((r2 & (M2-1))!=0) return;
+  surv2++; histQ2[a2+1]++; histQ3[a3+1]++;
+  long Q2=1L<<(a2+1), Q3=1; for(int i=0;i<=a3;i++) Q3*=3;
+  if(Q2*Q3<=N-n1){ crtviol++; }
+  if(r3==0){ surv23++; histQ2_23[a2+1]++; if(r5==0) surv235++; }
+}
+static void dfs(int n,int prevExcluded,double s,double smax){
+  /* smax = s + sum of inv over [n,N]; prune */
+  if(smax<0.5) return;
+  if(s>2) return;
+  if(n==N){ inS[N]=1; leaf(); return; }
+  if(!forcedout[n]){ inS[n]=1; dfs(n+1,0,s+inv[n],smax); }
+  if(!prevExcluded){ inS[n]=0; dfs(n+1,1,s,smax-inv[n]); }
+}
+int main(int argc,char**argv){
+  n1=atoi(argv[1]); N=atoi(argv[2]); J=atoi(argv[3]);
+  for(int i=2;i*i<100000;i++) if(!comp[i]) for(int k=i*i;k<100000;k+=i) comp[k]=1;
+  FILE*f=fopen(argv[4],"r"); long p; int j; while(fscanf(f,"%ld %d",&p,&j)==2) if(p<100000) minbad[p]=j; fclose(f);
+  /* forced out */
+  int nforced=0;
+  for(int m=n1;m<=N;m++){ for(int a=1;a<=J;a++){ if(m%a) continue; int q=m/a; if(q<2||comp[q]) continue; int lev=N/q; if(lev>J) continue; if((long)q*q<=N) continue;
+      if(minbad[q]==0||minbad[q]>lev){ forcedout[m]=1; } } if(forcedout[m]) nforced++; }
+  if(forcedout[n1]||forcedout[N]){ printf("n1=%d N=%d: endpoint forced out -> no set\n",n1,N); return 0; }
+  for(int m=n1;m<N;m++) if(forcedout[m]&&forcedout[m+1]){ printf("n1=%d N=%d: adjacent forced-out pair %d,%d -> no set\n",n1,N,m,m+1); return 0; }
+  /* moduli */
+  e2=0; while((1<<(e2+1))<=N) e2++; M2=1ULL<<e2;
+  e3=0; {long t=3; while(t<=N){t*=3;e3++;}} M3=1; for(int i=0;i<e3;i++) M3*=3;
+  e5=0; {long t=5; while(t<=N){t*=5;e5++;}} M5=1; for(int i=0;i<e5;i++) M5*=5;
+  /* L_odd mod 2^64, L/3^e3 mod 3^e3, L/5^e5 mod 5^e5 */
+  u64 Lodd=1, L3=1, L5=1;
+  for(int q=2;q<=N;q++) if(!comp[q]){ long pk=q; while(pk*q<=N) pk*=q;
+    if(q!=2) Lodd*= (u64)pk; if(q!=3) L3=(unsigned __int128)L3*pk%M3; if(q!=5) L5=(unsigned __int128)L5*pk%M5; }
+  u64 phi3=M3/3*2, phi5=M5/5*4;
+  for(int n=1;n<=N;n++){
+    inv[n]=1.0/n;
+    int v=vp(n,2); int nodd=n>>v; c2[n]=(Lodd*inv2_64(nodd))<<(e2-v);
+    v=vp(n,3); int n3=n; for(int i=0;i<v;i++) n3/=3; { u64 t=(unsigned __int128)L3*invmod(n3%M3,M3,phi3)%M3; for(int i=0;i<e3-v;i++) t=t*3%M3; c3[n]=t; }
+    v=vp(n,5); int n5=n; for(int i=0;i<v;i++) n5/=5; { u64 t=(unsigned __int128)L5*invmod(n5%M5,M5,phi5)%M5; for(int i=0;i<e5-v;i++) t=t*5%M5; c5[n]=t; }
+  }
+  double smax=0; for(int n=n1;n<=N;n++) smax+=inv[n];
+  memset(inS,0,sizeof inS); inS[n1]=1;
+  dfs(n1+1,0,inv[n1],smax);
+  printf("n1=%d N=%d len=%d forcedout=%d leaves(gap<=2,forced,sum-pruned)=%ld surv_v2=%ld surv_v2v3=%ld surv_v2v3v5=%ld CRTviol=%ld\n",n1,N,N-n1,nforced,leaves,surv2,surv23,surv235,crtviol);
+  printf("  Q2 hist (v2 survivors): "); for(int i=1;i<64;i++) if(histQ2[i]) printf("2^%d:%ld ",i,histQ2[i]); printf("\n");
+  printf("  Q2 hist (v2&v3 survivors): "); for(int i=1;i<64;i++) if(histQ2_23[i]) printf("2^%d:%ld ",i,histQ2_23[i]); printf("\n");
+  printf("  Q3 hist (v2 survivors): "); for(int i=1;i<64;i++) if(histQ3[i]) printf("3^%d:%ld ",i,histQ3[i]); printf("\n");
+  return 0;
+}
+
+===== Part A output, J=1 (./moduli 10000000 1 /dev/null 10000000) =====
+N=10000000 n1max=3678795 sqrt(N-n1max)=2514 Nkilled=0 minQ2=2097152 res2=2 minQ3=1594323 res3=3 closed23=0
+decade 10^0: N=6 closed_by_Q2=6 (100.0%) closed_by_Q2Q3=6 (100.0%)
+decade 10^1: N=90 closed_by_Q2=49 (54.4%) closed_by_Q2Q3=49 (54.4%)
+decade 10^2: N=900 closed_by_Q2=383 (42.6%) closed_by_Q2Q3=383 (42.6%)
+decade 10^3: N=9000 closed_by_Q2=1808 (20.1%) closed_by_Q2Q3=1808 (20.1%)
+decade 10^4: N=90000 closed_by_Q2=40845 (45.4%) closed_by_Q2Q3=40845 (45.4%)
+decade 10^5: N=900000 closed_by_Q2=637854 (70.9%) closed_by_Q2Q3=637854 (70.9%)
+decade 10^6: N=9000000 closed_by_Q2=48574 (0.5%) closed_by_Q2Q3=48574 (0.5%)
+decade 10^7: N=1 closed_by_Q2=0 (0.0%) closed_by_Q2Q3=0 (0.0%)
+SUMMARY NMAX=10000000 J=1 analysed=9999997 N_forced_out=664577 closed_by_Q2=729519 closed_by_Q2Q3=729519 minQ2<=sqrt(N-n1max)=0 max_res2=4 at N=3072; longest run of N not closed by (Nkilled|Q2|Q2Q3): 153 ending at N=4652506
+
+===== Part A output, J=12 (./moduli 10000000 12 minbad_12.txt 10000000) =====
+N=10000000 n1max=3678795 sqrt(N-n1max)=2514 Nkilled=0 minQ2=16777216 res2=0 minQ3=1594323 res3=3 closed23=1
+decade 10^2: N=831 closed_by_Q2=531 (63.9%) closed_by_Q2Q3=531 (63.9%)
+decade 10^3: N=9000 closed_by_Q2=5330 (59.2%) closed_by_Q2Q3=5330 (59.2%)
+decade 10^4: N=90000 closed_by_Q2=46735 (51.9%) closed_by_Q2Q3=46735 (51.9%)
+decade 10^5: N=900000 closed_by_Q2=732007 (81.3%) closed_by_Q2Q3=732007 (81.3%)
+decade 10^6: N=9000000 closed_by_Q2=2036558 (22.6%) closed_by_Q2Q3=3630881 (40.3%)
+decade 10^7: N=1 closed_by_Q2=1 (100.0%) closed_by_Q2Q3=1 (100.0%)
+SUMMARY NMAX=10000000 J=12 analysed=9999832 N_forced_out=2217273 closed_by_Q2=2821162 closed_by_Q2Q3=4415485 minQ2<=sqrt(N-n1max)=0 max_res2=2 at N=768; longest run of N not closed by (Nkilled|Q2|Q2Q3): 168 ending at N=168
+
+===== Part A, N=33,35,36 with J=4 =====
+N=33 n1max=12 minQ2=64 res2=0 minQ3=81 res3=0 closed
+N=35 n1max=13 minQ2=64 res2=0 closed
+N=36 n1max=13 minQ2=64 res2=0 closed
+===== Part B, J=1 forcing, residual N (./survq n1 N 1 minbad_12.txt) =====
+n1=24 N=66 len=42 forcedout=7 leaves(gap<=2,forced,sum-pruned)=116500 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=26 N=70 len=44 forcedout=8 leaves(gap<=2,forced,sum-pruned)=89000 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=27 N=72 len=45 forcedout=9 leaves(gap<=2,forced,sum-pruned)=55000 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=29 N=78 len=49 forcedout=9 leaves(gap<=2,forced,sum-pruned)=360000 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=31 N=84 len=53 forcedout=10 leaves(gap<=2,forced,sum-pruned)=720000 surv_v2=4880 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 2^5:4880 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 3^4:2440 3^5:2440 
+n1=33 N=90 len=57 forcedout=10 leaves(gap<=2,forced,sum-pruned)=4712500 surv_v2=126976 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 2^5:126976 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 3^4:63488 3^5:63488 
+n1=35 N=96 len=61 forcedout=9 leaves(gap<=2,forced,sum-pruned)=83980000 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+
+===== Part B, J=1 forcing, N=40..64 =====
+n1=15 N=40 len=25 forcedout=4 leaves(gap<=2,forced,sum-pruned)=1050 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=11 N=40 len=29 forcedout=4 leaves(gap<=2,forced,sum-pruned)=7200 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=16 N=44 len=28 forcedout=6 leaves(gap<=2,forced,sum-pruned)=650 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=12 N=44 len=32 forcedout=6 leaves(gap<=2,forced,sum-pruned)=4450 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=18 N=48 len=30 forcedout=6 leaves(gap<=2,forced,sum-pruned)=1780 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=14 N=48 len=34 forcedout=6 leaves(gap<=2,forced,sum-pruned)=12200 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=19 N=52 len=33 forcedout=6 leaves(gap<=2,forced,sum-pruned)=5500 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=15 N=52 len=37 forcedout=6 leaves(gap<=2,forced,sum-pruned)=37700 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=21 N=56 len=35 forcedout=7 leaves(gap<=2,forced,sum-pruned)=4200 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=17 N=56 len=39 forcedout=7 leaves(gap<=2,forced,sum-pruned)=28800 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=22 N=60 len=38 forcedout=7 leaves(gap<=2,forced,sum-pruned)=17000 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=18 N=60 len=42 forcedout=7 leaves(gap<=2,forced,sum-pruned)=116500 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=24 N=64 len=40 forcedout=7 leaves(gap<=2,forced,sum-pruned)=46600 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+n1=20 N=64 len=44 forcedout=7 leaves(gap<=2,forced,sum-pruned)=319400 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+  Q3 hist (v2 survivors): 
+
+===== Part B, no forcing (J=0), Q_2 distribution =====
+n1=15 N=50 len=35 forcedout=0 leaves(gap<=2,forced,sum-pruned)=14930352 surv_v2=338298 surv_v2v3=8224 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 2^2:128 2^3:7168 2^4:50220 2^5:280782 
+  Q3 hist (v2 survivors): 3^2:2322 3^3:88285 3^4:247691 
+n1=13 N=46 len=33 forcedout=0 leaves(gap<=2,forced,sum-pruned)=5702887 surv_v2=71786 surv_v2v3=2704 surv_v2v3v5=104 CRTviol=0
+  Q2 hist (v2 survivors): 2^2:128 2^3:8910 2^4:62748 
+  Q3 hist (v2 survivors): 3^2:612 3^3:20466 3^4:50708 
+n1=17 N=58 len=41 forcedout=0 leaves(gap<=2,forced,sum-pruned)=267914296 surv_v2=2281040 surv_v2v3=103911 surv_v2v3v5=2211 CRTviol=0
+  Q2 hist (v2 survivors): 2^2:512 2^3:91530 2^4:2188998 
+  Q3 hist (v2 survivors): 3^2:4662 3^3:168141 3^4:2108237 
+n1=19 N=54 len=35 forcedout=0 leaves(gap<=2,forced,sum-pruned)=14930352 surv_v2=168536 surv_v2v3=7018 surv_v2v3v5=219 CRTviol=0
+  Q2 hist (v2 survivors): 2^2:128 2^3:21717 2^4:146691 
+  Q3 hist (v2 survivors): 3^4:168536 
+n1=11 N=42 len=31 forcedout=0 leaves(gap<=2,forced,sum-pruned)=2178309 surv_v2=26322 surv_v2v3=1736 surv_v2v3v5=36 CRTviol=0
+  Q2 hist (v2 survivors): 2^2:64 2^3:2714 2^4:23544 
+  Q3 hist (v2 survivors): 3^2:756 3^3:6773 3^4:18793 
+n1=21 N=62 len=41 forcedout=0 leaves(gap<=2,forced,sum-pruned)=267914296 surv_v2=2331476 surv_v2v3=107558 surv_v2v3v5=1963 CRTviol=0
+  Q2 hist (v2 survivors): 2^2:512 2^3:112482 2^4:2218482 
+  Q3 hist (v2 survivors): 3^2:13104 3^3:167181 3^4:2151191 
+
+===== Part B, J=12 forcing, N=30..76 (non-'no set' lines) =====
+n1=12 N=33 len=21 forcedout=7 leaves(gap<=2,forced,sum-pruned)=4 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+n1=9 N=33 len=24 forcedout=7 leaves(gap<=2,forced,sum-pruned)=12 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+n1=6 N=33 len=27 forcedout=7 leaves(gap<=2,forced,sum-pruned)=52 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+n1=10 N=35 len=25 forcedout=8 leaves(gap<=2,forced,sum-pruned)=8 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+n1=7 N=35 len=28 forcedout=8 leaves(gap<=2,forced,sum-pruned)=32 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+n1=10 N=36 len=26 forcedout=8 leaves(gap<=2,forced,sum-pruned)=8 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+n1=7 N=36 len=29 forcedout=8 leaves(gap<=2,forced,sum-pruned)=32 surv_v2=0 surv_v2v3=0 surv_v2v3v5=0 CRTviol=0
+  Q2 hist (v2 survivors): 
+  Q2 hist (v2&v3 survivors): 
+===== Part B cross-check with idea 38105e5a (no forcing) =====
+n1=14 N=48: surv_v2=280782 surv_v2v3=5918 surv_v2v3v5=585 (matches the reported 585); n1=10 N=36: surv_v2v3v5=0 (matches)
