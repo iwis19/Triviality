@@ -1,0 +1,40 @@
+import Mathlib
+import MathLab.Basic
+
+/-!
+Minimal certifying denominator is unbounded (n = 7 nonzero speeds, k = 8 runners).
+
+For any bound `Q`, the speed set `v i = (i+1) * Q!` (7 distinct positive integers)
+has the property that every rational time `t` with denominator `≤ Q` puts some
+runner (in fact every runner) at distance `0 < 1/8` from the origin runner.
+Hence any time certifying loneliness of the origin runner for this speed set must
+have denominator `> Q`; i.e. `q_min(v) > Q` (whenever `q_min(v)` exists).
+
+Distance to the nearest integer is written `min (Int.fract x) (1 - Int.fract x)`.
+-/
+
+theorem qmin_unbounded (Q : ℕ) :
+    ∃ v : Fin 7 → ℕ, Function.Injective v ∧ (∀ i, 0 < v i) ∧
+      ∀ t : ℚ, t.den ≤ Q →
+        ∃ i, min (Int.fract ((v i : ℚ) * t)) (1 - Int.fract ((v i : ℚ) * t)) < 1 / 8 := by
+  refine ⟨fun i => (i.val + 1) * Nat.factorial Q, ?_, ?_, ?_⟩
+  · intro i j hij
+    have hQ : 0 < Nat.factorial Q := Nat.factorial_pos Q
+    have := Nat.eq_of_mul_eq_mul_right hQ hij
+    exact Fin.ext (by omega)
+  · intro i
+    exact Nat.mul_pos (Nat.succ_pos _) (Nat.factorial_pos Q)
+  · intro t ht
+    refine ⟨0, ?_⟩
+    have hden : t.den ∣ Nat.factorial Q := Nat.dvd_factorial t.den_pos ht
+    obtain ⟨c, hc⟩ := hden
+    have hval : (((0 : Fin 7).val + 1) * Nat.factorial Q : ℕ) * t = ((c * t.num : ℤ) : ℚ) := by
+      have h2 : t * (t.den : ℚ) = t.num := Rat.mul_den_eq_num t
+      simp only [Fin.val_zero, zero_add, one_mul]
+      rw [hc]
+      push_cast
+      calc (t.den : ℚ) * c * t = c * (t * t.den) := by ring
+        _ = c * t.num := by rw [h2]
+    simp only
+    rw [hval, Int.fract_intCast]
+    norm_num

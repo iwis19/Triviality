@@ -1,0 +1,68 @@
+import numpy as np, math
+d = np.load("/home/ubuntu/pp_data.npz")
+Ns, R, HL, PP = d["Ns"], d["R"], d["HL"], d["PP"]
+res = R - HL + PP
+def show(mask, label):
+    v = res[mask]; n = mask.sum()
+    print(f"{label:28s} n={n:6d} mean(R-HL+PP)={v.mean():+.3f}±{v.std(ddof=1)/math.sqrt(n):.3f}  rel={(v/HL[mask]).mean():+.6f}  mean PP={PP[mask].mean():.2f}  mean HL={HL[mask].mean():.0f}")
+print("== absolute residuals by divisibility ==")
+show(Ns % 3 == 0, "3 | N"); show(Ns % 3 != 0, "3 !| N")
+show(Ns % 5 == 0, "5 | N"); show(Ns % 5 != 0, "5 !| N")
+show(Ns % 7 == 0, "7 | N"); show(Ns % 7 != 0, "7 !| N")
+show((Ns % 3 != 0) & (Ns % 5 != 0) & (Ns % 7 != 0), "gcd(N,105)=1")
+show((Ns % 3 == 0) & (Ns % 5 != 0) & (Ns % 7 != 0), "3|N, 5,7 !| N")
+show((Ns % 15 == 0), "15 | N")
+print("== 3|N residual vs N (constant edge effect or ~sqrt(N)/log^2 N ?) ==")
+edges = [10**5, 2 * 10**5, 4 * 10**5, 7 * 10**5, 10**6 + 1]
+for lo, hi in zip(edges[:-1], edges[1:]):
+    m = (Ns >= lo) & (Ns < hi)
+    for lab, mm in (("3|N", m & (Ns % 3 == 0)), ("3!|N", m & (Ns % 3 != 0))):
+        v = res[mm]
+        print(f"[{lo},{hi}) {lab:5s} mean={v.mean():+.3f}±{v.std(ddof=1)/math.sqrt(mm.sum()):.3f}  mean PP={PP[mm].mean():.2f}  ratio res/PP={v.mean()/PP[mm].mean():+.4f}")
+# naive edge correction: for odd p | N the term t=p (and t=N-p) has HL density S/(log p log(N-p)) but N-p is never prime
+C2 = 0.66016181584686957
+def spf_factors(n):
+    f = []; p = 2
+    while p * p <= n:
+        if n % p == 0:
+            f.append(p)
+            while n % p == 0: n //= p
+        p += 1
+    if n > 1: f.append(n)
+    return f
+sub = np.arange(0, len(Ns), 20)
+E = np.zeros(len(sub))
+for i, j in enumerate(sub):
+    N = int(Ns[j]); S = HL[j] / (HL[j] / (2 * C2 * np.prod([(p - 1) / (p - 2) for p in spf_factors(N) if p > 2])))
+    E[i] = sum(2 * S / (math.log(p) * math.log(N - p)) for p in spf_factors(N) if p > 2)
+print("== naive t=p|N edge correction E(N) (subsample) ==")
+m3 = Ns[sub] % 3 == 0
+print(f"mean E | 3|N  = {E[m3].mean():.3f}   observed deficit 3|N = {res[sub][m3].mean():+.3f}")
+print(f"mean E | 3!|N = {E[~m3].mean():.3f}  observed 3!|N = {res[sub][~m3].mean():+.3f}")
+print(f"mean E overall = {E.mean():.3f}")
+
+
+# ---- output ----
+== absolute residuals by divisibility ==
+3 | N                        n=150000 mean(R-HL+PP)=-2.312±0.175  rel=-0.000273  mean PP=34.24  mean HL=11013
+3 !| N                       n=300001 mean(R-HL+PP)=+0.223±0.094  rel=+0.000050  mean PP=18.04  mean HL=5506
+5 | N                        n= 90001 mean(R-HL+PP)=-1.812±0.205  rel=-0.000215  mean PP=28.63  mean HL=9177
+5 !| N                       n=360000 mean(R-HL+PP)=-0.325±0.094  rel=-0.000018  mean PP=22.14  mean HL=6883
+7 | N                        n= 64286 mean(R-HL+PP)=-1.526±0.235  rel=-0.000184  mean PP=26.84  mean HL=8565
+7 !| N                       n=385715 mean(R-HL+PP)=-0.472±0.092  rel=-0.000037  mean PP=22.87  mean HL=7138
+gcd(N,105)=1                 n=205715 mean(R-HL+PP)=+0.501±0.110  rel=+0.000112  mean PP=16.63  mean HL=5019
+3|N, 5,7 !| N                n=102856 mean(R-HL+PP)=-1.564±0.205  rel=-0.000215  mean PP=31.57  mean HL=10038
+15 | N                       n= 30000 mean(R-HL+PP)=-4.362±0.422  rel=-0.000421  mean PP=41.81  mean HL=13766
+== 3|N residual vs N (constant edge effect or ~sqrt(N)/log^2 N ?) ==
+[100000,200000) 3|N   mean=-3.077±0.290  mean PP=23.10  ratio res/PP=-0.1332
+[100000,200000) 3!|N  mean=-0.061±0.156  mean PP=12.51  ratio res/PP=-0.0049
+[200000,400000) 3|N   mean=-1.900±0.283  mean PP=28.87  ratio res/PP=-0.0658
+[200000,400000) 3!|N  mean=+0.491±0.150  mean PP=15.35  ratio res/PP=+0.0320
+[400000,700000) 3|N   mean=-3.374±0.304  mean PP=35.25  ratio res/PP=-0.0957
+[400000,700000) 3!|N  mean=-0.346±0.163  mean PP=18.54  ratio res/PP=-0.0187
+[700000,1000001) 3|N   mean=-1.271±0.372  mean PP=40.52  ratio res/PP=-0.0314
+[700000,1000001) 3!|N  mean=+0.708±0.199  mean PP=21.18  ratio res/PP=+0.0334
+== naive t=p|N edge correction E(N) (subsample) ==
+mean E | 3|N  = 1.108   observed deficit 3|N = -3.987
+mean E | 3!|N = 0.298  observed 3!|N = -0.545
+mean E overall = 0.568

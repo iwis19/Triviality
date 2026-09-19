@@ -1,0 +1,14 @@
+# For m in {5,7,11,13}: is there a Z/m-linear functional f on A_m = (Z/m)^4 with f(n) != 0 for all norm-1 n?
+# (gives an m-colouring of Cay(A_m,N_m) by cosets of ker f, hence an m-colouring of the Moser-ring UDG)
+# Also: list N_m and the subgroup it generates (a proper subgroup would mean the Cayley graph is disconnected).
+import itertools
+from hn_pilot import mul
+for m in (5,7,11,13,17,19,23,25):
+    if m%2==0 or m%3==0: continue
+    elems = list(itertools.product(range(m), repeat=4))
+    mulm = lambda x,y: tuple(v % m for v in mul(x,y))
+    conjm = lambda x: (x[0], (-x[1])%m, (-x[2])%m, x[3])
+    N = [z for z in elems if mulm(z,conjm(z))==(1,0,0,0)]
+    good = [f for f in elems if any(f) and all(sum(a*b for a,b in zip(f,n))%m for n in N)]
+    # rank of N over Z/m (only meaningful for prime m)
+    print(f"m={m}: |N_m|={len(N)}  functionals avoiding N_m: {len(good)}  example: {good[0] if good else None}")

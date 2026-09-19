@@ -1,0 +1,50 @@
+import Mathlib
+
+/-!
+Core lemma behind claim 5120db71 (idea d93b4510): the union `S` of the odd-part classes
+`a_i mod c_i` is periodic with odd period `C = lcm c_i`, and it contains every integer outside the
+single class `a mod 2^e` of the (at most one) pure power-of-2 modulus.  Because `2^e ∤ C`, this
+already forces `S = ℤ`.  Only `¬ M ∣ C` is used, so the lemma is stated for an arbitrary modulus `M`.
+-/
+
+
+/-- If `S ⊆ ℤ` is closed under `x ↦ x - C` (in the form `x + C ∈ S → x ∈ S`), `M ∤ C`, and `S`
+contains every integer not congruent to `a` mod `M`, then `S = ℤ`. -/
+theorem mem_of_period_not_dvd (S : Set ℤ) (C M a : ℤ) (hM : ¬ M ∣ C)
+    (hper : ∀ x, x + C ∈ S → x ∈ S)
+    (hcov : ∀ x, ¬ x ≡ a [ZMOD M] → x ∈ S) : ∀ x, x ∈ S := by
+  intro x
+  by_cases h : x ≡ a [ZMOD M]
+  · apply hper
+    apply hcov
+    intro h2
+    apply hM
+    have h3 : x ≡ x + C [ZMOD M] := h.trans h2.symm
+    have h4 := Int.ModEq.dvd h3
+    simpa using h4
+  · exact hcov x h
+
+/-- General CRT form: if `S` has period `C`, `T` has period `M`, `IsCoprime C M`, `T ≠ ℤ` and
+`S ∪ T = ℤ`, then `S = ℤ`.  (Here `T` is the union of the pure power-of-2 classes, `S` the union of
+the odd-part classes.) -/
+theorem mem_of_period_coprime (S T : Set ℤ) (C M : ℤ) (hCM : IsCoprime C M)
+    (hS : ∀ x t : ℤ, x + C * t ∈ S → x ∈ S)
+    (hT : ∀ x t : ℤ, x ∈ T → x + M * t ∈ T)
+    (hTne : ∃ b, b ∉ T)
+    (hcov : ∀ x, x ∈ S ∨ x ∈ T) : ∀ x, x ∈ S := by
+  obtain ⟨b, hb⟩ := hTne
+  obtain ⟨u, v, huv⟩ := hCM
+  intro x
+  -- choose t = u * (b - x); then x + C * t = b - M * (v * (b - x))
+  apply hS x (u * (b - x))
+  have key : x + C * (u * (b - x)) = b + M * (-(v * (b - x))) := by
+    linear_combination (b - x) * huv
+  rw [key]
+  rcases hcov (b + M * (-(v * (b - x)))) with hs | ht
+  · exact hs
+  · exfalso
+    apply hb
+    have := hT _ (v * (b - x)) ht
+    have e : b + M * (-(v * (b - x))) + M * (v * (b - x)) = b := by ring
+    rwa [e] at this
+

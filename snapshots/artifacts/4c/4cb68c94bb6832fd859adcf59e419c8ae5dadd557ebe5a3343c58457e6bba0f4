@@ -1,0 +1,49 @@
+"""Experiment A (continued): larger Q via numpy injectivity check; sparser perturbations."""
+import numpy as np, random, sys
+from fractions import Fraction as Fr
+from expA_construction import base_pair, iterate_pair, normal_vector, content, brute_dissociated
+
+def injective_Q(u, Q):
+    vals = np.zeros(1, dtype=np.int64)
+    for ui in u:
+        vals = (vals[:, None] + np.arange(Q, dtype=np.int64)[None, :] * int(ui)).ravel()
+    return len(np.unique(vals)) == len(vals)
+
+def max_dissoc_Q(u, Qmax):
+    """largest power of two Q' <= Qmax with u Q'-dissociated (tests powers of two, top-down)."""
+    Q = Qmax
+    while Q >= 2:
+        if injective_Q(u, Q): return Q
+        Q //= 2
+    return 1
+
+def run(name, Lam, d, Q, Delta, trials, p, seed=1):
+    rnd = random.Random(seed)
+    B = [[int(c*Q) for c in g] for g in Lam]
+    assert all((c*Q).denominator == 1 for g in Lam for c in g)
+    best = None
+    for t in range(trials):
+        Bp = [[x + (rnd.choice([-1, 1]) if rnd.random() < p else 0) for x in row] for row in B]
+        u = normal_vector(Bp)
+        if content(u) != 1: continue
+        if sum(u) < 0: u = [-x for x in u]
+        if any(x <= 0 for x in u): continue
+        Qd = max_dissoc_Q(u, Q)
+        if Qd < 2: continue
+        l = Qd.bit_length() - 1
+        ratio = max(u) / 2**(l*(d-1))
+        if best is None or (ratio, -Qd) < (best[0], -best[1]): best = (ratio, Qd, l, u)
+    print(f"\n== {name}: d={d}, Q={Q}, predicted Delta={float(Delta):.4f}, perturb prob {p}")
+    if best is None: print("   nothing primitive/positive found"); return
+    ratio, Qd, l, u = best
+    A = sorted(2**j * ui for j in range(l) for ui in u); n = len(A)
+    print(f"   best u = {u}, Q'={Qd}, l={l}, n={n}, max A={max(A)}, max A/2^(n-1) = {ratio:.4f}")
+    if n <= 24: print("   brute-force distinct subset sums:", brute_dissociated(A))
+
+if __name__ == "__main__":
+    L3, v3 = base_pair(3); L5, v5 = base_pair(5); L7, v7 = base_pair(7)
+    D = lambda b: Fr(1+Fr(1, 2**b), Fr(3,2))
+    run("Lambda_1 b=5", L5, 5, 32, D(5), trials=25, p=0.15, seed=5)
+    run("Lambda_1 b=7", L7, 7, 8, D(7), trials=40, p=0.12, seed=7)
+    L9, v9 = iterate_pair(L3, v3, 3, L3, v3, 3)
+    run("Lambda_2 b=3 s=2", L9, 9, 8, Fr(9,8)**4/Fr(9,4), trials=6, p=0.08, seed=9)

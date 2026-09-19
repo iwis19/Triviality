@@ -1,0 +1,99 @@
+"""exp8: Montgomery large sieve on the reduced sequence m = n / M_S(K).
+
+For block K (2^K < n <= 2^{K+1}) the primitive-root wheel (claim C1) says every
+solution n with n > 2^K + K + 1 is a multiple of M = M_S(K) = prod{p <= K+1 : ord_p(2) = p-1}.
+Write n = M*m, m in an interval of length L' = 2^K / M.
+
+For p not dividing M, claim C9 says a solution avoids the omega(p) = min(K, ord_p(2))
+classes n = 2^k (mod p), k=1..K, except for n = 2^K + p.  In terms of m this is
+omega(p) forbidden classes mod p (M invertible mod p).  For p = 2: n odd, so omega(2) = 1.
+
+Montgomery's large sieve: Z <= (L' + Q^2) / L,  L = sum_{q <= Q} mu^2(q) prod_{p | q} omega(p)/(p - omega(p)),
+q running over squarefree integers composed of primes p <= Q, p not dividing M.
+Take Q = floor(sqrt(L')), so Z <= 2 L' / L.  Exceptions n = 2^K + p, p <= Q: at most Q.
+Also the K+1 integers in (2^K, 2^K+K+1] are handled separately (at most K+1).
+
+Output per K: log2 L', log2 M, theta(K)= (K - log2 M)/K, Q, log(L) (natural), and the
+normalizations log(L) / (K loglog K / log K) and log(L)/log K.
+"""
+import math, sys, json
+import numpy as np
+
+def primes_upto(n):
+    s = np.ones(n + 1, dtype=bool); s[:2] = False
+    for i in range(2, int(n ** 0.5) + 1):
+        if s[i]: s[i*i::i] = False
+    return np.nonzero(s)[0]
+
+def is_prim_root_2(p):
+    if p == 2: return False
+    m = p - 1; f = []; d = 2; x = m
+    while d * d <= x:
+        if x % d == 0:
+            f.append(d)
+            while x % d == 0: x //= d
+        d += 1
+    if x > 1: f.append(x)
+    return all(pow(2, m // q, p) != 1 for q in f)
+
+def omega_min_K(ps, K):
+    """min(K, ord_p(2)) for each odd prime in ps (vectorised)."""
+    ps = ps.astype(np.int64)
+    x = np.full(ps.shape, 2 % 1, dtype=np.int64); x = np.full(ps.shape, 2, dtype=np.int64) % ps
+    om = np.full(ps.shape, K, dtype=np.int64)
+    done = np.zeros(ps.shape, dtype=bool)
+    # x = 2^k mod p ; first k with x == 1 and k < K gives omega = k
+    for k in range(1, K):
+        hit = (~done) & (x == 1)
+        om[hit] = k; done |= hit
+        x = (x * 2) % ps
+    return om
+
+def run(K):
+    S = [p for p in range(3, K + 2) if is_prim_root_2(p) and all(p % d for d in range(2, int(p**0.5)+1))]
+    log2M = sum(math.log2(p) for p in S)
+    log2Lp = K - log2M
+    Lp = 2.0 ** log2Lp
+    Q = int(math.floor(math.sqrt(Lp)))
+    if Q < 2:
+        return dict(K=K, S=S, log2M=log2M, log2Lp=log2Lp, Q=Q, logL=0.0)
+    ps = primes_upto(Q)
+    Sset = set(S)
+    keep = np.array([p not in Sset for p in ps])
+    ps = ps[keep]
+    odd = ps[ps > 2]
+    om = omega_min_K(odd, K)
+    gp = {2: 1.0 / (2 - 1)}
+    for p, o in zip(odd.tolist(), om.tolist()):
+        gp[p] = o / (p - o)
+    # multiplicative sieve for L = sum_{q<=Q} mu^2(q) g(q) over q built from allowed primes
+    g = np.ones(Q + 1, dtype=np.float64)
+    allowed = np.zeros(Q + 1, dtype=bool); allowed[1] = True
+    # mark integers composed only of allowed primes and squarefree
+    for p in ps.tolist():
+        g[p::p] *= gp[p]
+    # kill non-squarefree
+    for p in ps.tolist():
+        if p * p <= Q: g[p*p::p*p] = 0.0
+    # kill integers with a prime factor in S (these are the excluded primes) -- they are not in ps, so
+    # multiples of them still have g contribution 1 from that prime; remove them:
+    for p in S:
+        if p <= Q: g[p::p] = 0.0
+    L = float(g.sum())
+    return dict(K=K, S=S, log2M=round(log2M, 3), log2Lp=round(log2Lp, 3), Q=Q, logL=math.log(L),
+                nprimes_used=int(len(ps)), min_omega=int(om.min()) if len(om) else None)
+
+if __name__ == "__main__":
+    Ks = list(range(8, 61, 4)) + list(range(64, 141, 8))
+    out = []
+    for K in Ks:
+        r = run(K)
+        llK = math.log(math.log(K)); lK = math.log(K)
+        r["logL_over_KloglogK_logK"] = r["logL"] / (K * llK / lK)
+        r["logL_over_logK"] = r["logL"] / lK
+        r["log2_bound_wheel"] = r["log2Lp"]
+        r["log2_bound_hybrid"] = r["log2Lp"] + 1 - r["logL"] / math.log(2)
+        out.append(r)
+        print(json.dumps(r), flush=True)
+    with open("/home/ubuntu/exp553/exp8_results.json", "w") as f:
+        json.dump(out, f, indent=1)

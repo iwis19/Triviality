@@ -1,0 +1,143 @@
+"""Residuals r(N) - HL_int(N) for even N <= X.
+
+r(N)      = #{(p,q) ordered, p,q prime, p+q=N}
+S(N)      = 2 C_2 prod_{p|N, p>2} (p-1)/(p-2)      (singular series, ordered-pair normalisation)
+HL_int(N) = S(N) * I(N),  I(N) = int_2^{N-2} dt / (log t log(N-t))
+
+Purpose (critic): measure the size of the residual and test whether the data up to 10^6
+can discriminate between N^{1/2} log^A N for different A (claim 8e4f73) -- i.e. whether the
+proposed 'falsifying computation' has any power.
+"""
+import sys, math, time
+import numpy as np
+from numpy.polynomial.legendre import leggauss
+from scipy.integrate import quad
+
+X = int(float(sys.argv[1])) if len(sys.argv) > 1 else 10**6
+C2 = 0.6601618158468695739278121100145557784326233602847334133194484233354056423
+t0 = time.time()
+
+# ---- primes and r(N) via FFT convolution ----
+is_p = np.ones(X + 1, dtype=bool); is_p[:2] = False
+for i in range(2, int(X**0.5) + 1):
+    if is_p[i]: is_p[i*i::i] = False
+primes = np.nonzero(is_p)[0]
+f = is_p.astype(np.float64)
+L = 1 << int(math.ceil(math.log2(2*X + 2)))
+F = np.fft.rfft(f, L)
+conv = np.fft.irfft(F*F, L)[:X+1]
+r = np.rint(conv).astype(np.int64)          # ordered pairs (p,q), p+q=N
+# sanity: exact convolution for small N
+for N in (10, 100, 1000):
+    exact = sum(1 for p in primes[primes < N] if is_p[N-p])
+    assert r[N] == exact, (N, r[N], exact)
+print(f"r(N) done, {time.time()-t0:.1f}s; r(100)={r[100]}, r(10^6)={r[10**6] if X>=10**6 else None}")
+
+# ---- singular series ----
+S = np.full(X + 1, 2*C2)
+for p in primes[primes > 2]:
+    S[p::p] *= (p-1)/(p-2)
+
+# ---- I(N) by Gauss-Legendre on [2, N/2] (symmetric integrand), n nodes ----
+def I_gl(Ns, n=1024):
+    x, w = leggauss(n)
+    Ns = np.asarray(Ns, dtype=np.float64)
+    half = (Ns/2 - 2)[:, None] / 2          # half-length
+    t = 2 + half*(x[None, :] + 1)
+    val = 1.0/(np.log(t)*np.log(Ns[:, None] - t))
+    return 2*half[:, 0]*(val*w[None, :]).sum(1)
+
+def I_quad(N):
+    return quad(lambda t: 1/(math.log(t)*math.log(N-t)), 2, N-2, limit=200, epsabs=0, epsrel=1e-12)[0]
+
+for N in (100, 1000, 10**5, X):
+    a, b = I_gl([N])[0], I_quad(N)
+    print(f"I({N}): GL1024={a:.10g} quad={b:.10g} rel.diff={abs(a-b)/b:.2e}")
+
+evens = np.arange(6, X+1, 2)
+I = np.empty(len(evens))
+for k in range(0, len(evens), 5000):
+    I[k:k+5000] = I_gl(evens[k:k+5000])
+HL = S[evens]*I
+res = r[evens] - HL
+print(f"HL_int done, {time.time()-t0:.1f}s")
+
+np.savez_compressed("/home/ubuntu/residuals.npz", N=evens, r=r[evens], HL=HL, S=S[evens], I=I)
+
+# ---- statistics ----
+z = res/np.sqrt(HL)                         # Poisson-type normalisation, sd ~ sqrt(HL)
+print("\nDyadic blocks: N in [2^k, 2^{k+1});  z = (r-HL_int)/sqrt(HL_int)")
+print(" k      count   mean(z)   sd(z)   min(z)   max(z)  max|res|  max|res|/sqrt(N)  max|res|/(sqrt N/log N)  min(res)/(sqrt N/log N)")
+rows = []
+for k in range(10, int(math.log2(X))+1):
+    m = (evens >= 2**k) & (evens < 2**(k+1))
+    if m.sum() < 50: continue
+    Nb, rb, zb = evens[m], res[m], z[m]
+    mx = np.abs(rb).max(); imx = np.abs(rb).argmax()
+    rows.append((2**k, mx, Nb[imx]))
+    print(f"{k:2d} {m.sum():9d}  {zb.mean():8.3f} {zb.std():7.3f} {zb.min():8.3f} {zb.max():8.3f} {mx:9.1f}  {mx/math.sqrt(Nb[imx]):9.3f}   "
+          f"{mx/(math.sqrt(Nb[imx])/math.log(Nb[imx])):9.3f}   {rb.min()/(math.sqrt(Nb[rb.argmin()])/math.log(Nb[rb.argmin()])):9.3f}")
+
+print(f"\nOverall: mean z={z.mean():.4f}, sd z={z.std():.4f}, min z={z.min():.3f} at N={evens[z.argmin()]}, max z={z.max():.3f} at N={evens[z.argmax()]}")
+print(f"Gaussian expectation for min of {len(z)} samples: about {-math.sqrt(2*math.log(len(z))):.2f} sd")
+# tail counts vs Gaussian
+from scipy.stats import norm
+for thr in (3, 4, 5):
+    print(f"  #z<-{thr}: {int((z < -thr).sum())}  (Gaussian expects {len(z)*norm.cdf(-thr)*z.std()**0:.1f} if sd=1; observed sd={z.std():.3f})")
+
+# ---- Fit power: max|res| over dyadic blocks vs sqrt(N) log^A N, for several A ----
+Nb = np.array([row[2] for row in rows], dtype=float); Mb = np.array([row[1] for row in rows])
+print("\nLeast-squares fit of log(max|res| per dyadic block) = log C + (1/2) log N + A log log N, A fixed; report C and RMS residual:")
+for A in (-2, -1, 0, 1, 2):
+    lc = np.log(Mb) - 0.5*np.log(Nb) - A*np.log(np.log(Nb))
+    print(f"  A={A:+d}: C={math.exp(lc.mean()):.4g}, rms(log-resid)={lc.std():.3f}")
+# free exponent theta in max|res| ~ C N^theta
+th, lc = np.polyfit(np.log(Nb), np.log(Mb), 1)
+print(f"Free power fit: max|res| ~ {math.exp(lc):.3g} N^{th:.3f}")
+# joint fit theta and A (ill-conditioned): design matrix [1, log N, log log N]
+Amat = np.vstack([np.ones_like(Nb), np.log(Nb), np.log(np.log(Nb))]).T
+coef, *_ = np.linalg.lstsq(Amat, np.log(Mb), rcond=None)
+cond = np.linalg.cond(Amat)
+print(f"Joint fit log C={coef[0]:.3f}, theta={coef[1]:.3f}, A={coef[2]:.3f}; condition number of design = {cond:.3g}")
+# N/log^B N mimic
+B = np.log(Nb[-1]/Nb[0]) / np.log(np.log(Nb[-1])/np.log(Nb[0])) - 0.5*np.log(Nb[-1]/Nb[0])/np.log(np.log(Nb[-1])/np.log(Nb[0]))
+print(f"N/log^B N with B={B:.2f} has the same growth ratio as sqrt(N) over [{Nb[0]:.3g},{Nb[-1]:.3g}]")
+print(f"total {time.time()-t0:.1f}s")
+
+# ---- output (X=1e6) ----
+# r(N) done, 0.1s; r(100)=12, r(10^6)=10804
+# I(100): GL1024=8.03979151 quad=8.03979151 rel.diff=1.33e-14
+# I(1000): GL1024=30.3717142 quad=30.3717142 rel.diff=2.19e-14
+# I(100000): GL1024=920.6156944 quad=920.6156944 rel.diff=1.26e-11
+# I(1000000): GL1024=6154.264033 quad=6154.266563 rel.diff=4.11e-07
+# HL_int done, 12.0s
+# 
+# Dyadic blocks: N in [2^k, 2^{k+1});  z = (r-HL_int)/sqrt(HL_int)
+#  k      count   mean(z)   sd(z)   min(z)   max(z)  max|res|  max|res|/sqrt(N)  max|res|/(sqrt N/log N)  min(res)/(sqrt N/log N)
+# 10       512    -0.635   0.595   -2.173    1.063      23.3      0.524       3.981      -3.981
+# 11      1024    -0.591   0.606   -2.514    1.433      32.1      0.537       4.393      -4.393
+# 12      2048    -0.533   0.629   -2.734    1.630      46.1      0.585       5.111      -5.111
+# 13      4096    -0.466   0.631   -3.080    1.784      69.3      0.552       5.339      -5.339
+# 14      8192    -0.443   0.636   -2.917    2.081      77.0      0.438       4.530      -4.530
+# 15     16384    -0.373   0.660   -2.945    2.272     104.4      0.462       5.004      -5.004
+# 16     32768    -0.361   0.676   -2.957    2.170     145.8      0.429       4.996      -4.996
+# 17     65536    -0.318   0.686   -3.331    2.525     212.7      0.432       5.357      -5.357
+# 18    131072    -0.300   0.708   -3.278    2.839     328.1      0.459       6.029      -6.029
+# 19    237857    -0.271   0.717   -3.361    3.155     461.1      0.466       6.426      -6.426
+# 
+# Overall: mean z=-0.3010, sd z=0.7049, min z=-3.361 at N=530822, max z=3.155 at N=712432
+# Gaussian expectation for min of 499998 samples: about -5.12 sd
+#   #z<-3: 25  (Gaussian expects 674.9 if sd=1; observed sd=0.705)
+#   #z<-4: 0  (Gaussian expects 15.8 if sd=1; observed sd=0.705)
+#   #z<-5: 0  (Gaussian expects 0.1 if sd=1; observed sd=0.705)
+# 
+# Least-squares fit of log(max|res| per dyadic block) = log C + (1/2) log N + A log log N, A fixed; report C and RMS residual:
+#   A=-2: C=52.94, rms(log-resid)=0.316
+#   A=-1: C=5.07, rms(log-resid)=0.136
+#   A=+0: C=0.4856, rms(log-resid)=0.107
+#   A=+1: C=0.0465, rms(log-resid)=0.281
+#   A=+2: C=0.004454, rms(log-resid)=0.470
+# Free power fit: max|res| ~ 0.73 N^0.462
+# Joint fit log C=1.497, theta=0.592, A=-1.365; condition number of design = 1.15e+03
+# N/log^B N with B=5.19 has the same growth ratio as sqrt(N) over [1.98e+03,9.8e+05]
+# total 13.2s

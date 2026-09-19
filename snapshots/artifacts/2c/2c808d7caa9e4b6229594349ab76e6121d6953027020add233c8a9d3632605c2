@@ -1,0 +1,67 @@
+// Test T5 on union-closures of (a) all graphs on [n], (b) all 3-uniform hypergraphs on [6],
+// (c) odd/even cycles C_m, (d) random union-closed families.  Usage: ./gen mode n
+#include "uc.h"
+#include <time.h>
+static int edges[64][2], ne;
+static int triples[64], nt;
+// canonical form under S_n (brute force over permutations; n<=7)
+static int perm[MAXN];
+static int used[MAXN];
+static unsigned long long best;
+static void canon_rec(const fam_t *F,int pos, unsigned long long *bestv, int *first){
+  int n=F->n;
+  if(pos==n){ unsigned long long v=0; // encode family as bitset over 2^n (n<=6 -> 64 bits)
+    for(int i=0;i<F->cnt;i++){ int A=F->sets[i], B=0; for(int x=0;x<n;x++) if(A>>x&1) B|=1<<perm[x]; v|=1ULL<<B; }
+    if(*first || v<*bestv){*bestv=v;*first=0;} return; }
+  for(int v=0;v<n;v++) if(!used[v]){used[v]=1;perm[pos]=v;canon_rec(F,pos+1,bestv,first);used[v]=0;}
+}
+static unsigned long long canon(const fam_t *F){ unsigned long long b=0; int first=1; memset(used,0,sizeof(used)); canon_rec(F,0,&b,&first); return b; }
+static int t5_any(const fam_t *F){ for(int x=0;x<F->n;x++) if(t5_holds_at(F,x)) return 1; return 0; }
+static int frankl(const fam_t *F){ return 2*maxfreq(F) >= F->cnt; }
+static void report(const fam_t *F, const char *tag){
+  printf("%s: |F|=%d maxfreq=%d T5=%d Frankl=%d : ",tag,F->cnt,maxfreq(F),t5_any(F),frankl(F)); fam_print(F,stdout); printf("\n");
+}
+int main(int argc,char**argv){
+  const char *mode=argv[1]; int n=atoi(argv[2]);
+  if(!strcmp(mode,"graphs")){
+    ne=0; for(int i=0;i<n;i++) for(int j=i+1;j<n;j++){edges[ne][0]=i;edges[ne][1]=j;ne++;}
+    long tot=0, f5=0, fF=0; unsigned long long seen[4096]; int nseen=0;
+    for(long g=1; g<(1L<<ne); g++){
+      int gens[64], k=0; for(int e=0;e<ne;e++) if(g>>e&1) gens[k++]=(1<<edges[e][0])|(1<<edges[e][1]);
+      for(int addempty=0; addempty<2; addempty++){
+        fam_t F; if(addempty) gens[k]=0; fam_from_list(&F,n,gens,k+addempty); fam_close(&F); tot++;
+        if(!frankl(&F)) fF++;
+        if(!t5_any(&F)){ f5++; if(n<=6){ unsigned long long c=canon(&F); int dup=0; for(int i=0;i<nseen;i++) if(seen[i]==c) dup=1; if(!dup && nseen<4096){ seen[nseen++]=c; report(&F,"NEW T5-FAIL graph closure"); } } else report(&F,"T5-FAIL graph closure"); }
+      }
+    }
+    printf("graphs on [%d]: %ld closures tested (with/without empty set), T5 failures %ld, Frankl failures %ld, iso classes of T5 failures %d\n",n,tot,f5,fF,nseen);
+  } else if(!strcmp(mode,"h3")){
+    nt=0; for(int i=0;i<n;i++) for(int j=i+1;j<n;j++) for(int l=j+1;l<n;l++) triples[nt++]=(1<<i)|(1<<j)|(1<<l);
+    long tot=0,f5=0,fF=0; unsigned long long seen[4096]; int nseen=0;
+    for(long g=1; g<(1L<<nt); g++){
+      int gens[64],k=0; for(int e=0;e<nt;e++) if(g>>e&1) gens[k++]=triples[e];
+      fam_t F; fam_from_list(&F,n,gens,k); fam_close(&F); tot++;
+      if(!frankl(&F)) fF++;
+      if(!t5_any(&F)){ f5++; unsigned long long c=canon(&F); int dup=0; for(int i=0;i<nseen;i++) if(seen[i]==c) dup=1; if(!dup && nseen<4096){ seen[nseen++]=c; report(&F,"NEW T5-FAIL 3-uniform closure"); } }
+    }
+    printf("3-uniform hypergraphs on [%d]: %ld closures, T5 failures %ld, Frankl failures %ld, iso classes %d\n",n,tot,f5,fF,nseen);
+  } else if(!strcmp(mode,"cycle")){
+    int gens[64],k=0; for(int i=0;i<n;i++) gens[k++]=(1<<i)|(1<<((i+1)%n));
+    fam_t F; fam_from_list(&F,n,gens,k); fam_close(&F);
+    printf("C_%d closure: |F|=%d maxfreq=%d Frankl=%d T5(any x)=%d ; per x:",n,F.cnt,maxfreq(&F),frankl(&F),t5_any(&F));
+    for(int x=0;x<n;x++) printf(" %d",t5_holds_at(&F,x)); printf("\n");
+    gens[k++]=0; fam_from_list(&F,n,gens,k); fam_close(&F);
+    printf("C_%d closure + empty: |F|=%d maxfreq=%d T5(any x)=%d\n",n,F.cnt,maxfreq(&F),t5_any(&F));
+  } else if(!strcmp(mode,"random")){
+    // random union-closed families on [n]: closure of m random sets, m random in [2, 2n]
+    long trials=atol(argv[3]); srand(12345); long f5=0, tot=0; int nseen=0; unsigned long long seen[4096];
+    for(long t=0;t<trials;t++){
+      int m=2+rand()%(2*n); int gens[64];
+      for(int i=0;i<m;i++) gens[i]=rand()%((1<<n)-1)+1;
+      fam_t F; fam_from_list(&F,n,gens,m); fam_close(&F); tot++;
+      if(!t5_any(&F)){ f5++; if(n<=6){unsigned long long c=canon(&F); int dup=0; for(int i=0;i<nseen;i++) if(seen[i]==c) dup=1; if(!dup && nseen<4096){seen[nseen++]=c; report(&F,"NEW T5-FAIL random");}} else if(f5<=20) report(&F,"T5-FAIL random"); }
+    }
+    printf("random closures on [%d]: %ld tested, T5 failures %ld, iso classes %d\n",n,tot,f5,nseen);
+  }
+  return 0;
+}

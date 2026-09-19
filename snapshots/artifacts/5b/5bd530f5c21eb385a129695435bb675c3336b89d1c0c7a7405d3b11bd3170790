@@ -1,0 +1,7 @@
+|S3∩S5∩[0,10^18)| = 1273210
+j=1: frac low-1 base-7 digits<=3: 0.57104  vs (4/7)^j=0.57143  ratio=0.9993   chi2/df=0.909
+j=2: frac low-2 base-7 digits<=3: 0.32584  vs (4/7)^j=0.32653  ratio=0.9979   chi2/df=0.941
+j=3: frac low-3 base-7 digits<=3: 0.18638  vs (4/7)^j=0.18659  ratio=0.9989   chi2/df=1.080
+j=4: frac low-4 base-7 digits<=3: 0.10651  vs (4/7)^j=0.10662  ratio=0.9990   chi2/df=1.044
+j=5: frac low-5 base-7 digits<=3: 0.06108  vs (4/7)^j=0.06093  ratio=1.0025   chi2/df=0.991
+j=6: frac low-6 base-7 digits<=3: 0.03519  vs (4/7)^j=0.03482  ratio=1.0109   chi2/df=0.994

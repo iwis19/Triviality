@@ -1,0 +1,65 @@
+"""Test, on ambient universe [4], the lemma  min_{B in P(G)} m_c(B) = min_{H in R(G)} m_c(H)  for EVERY weight vector c
+in the simplex (not just for the LP-optimal c), where m_c(B) = sum_i c_i |B_i| - |B|/2,
+  P(G) = { B union-closed, nonempty, B ⊆ 2^[4], B ⊎ G ⊆ B }   (Poonen's G-closed test families)
+  R(G) = { H union-closed, G ⊆ H ⊆ 2^[4] }                     (the 'recalled' class; R ⊆ P).
+Since R ⊆ P, min_P <= min_R always.  Equality for all c holds iff every B in P is dominated by the lower envelope of R:
+for all c, exists H in R with m_c(H) <= m_c(B).  Check 1 (exact, integer): a single H with
+|H_i| - |H|/2 <= |B_i| - |B|/2 for all i dominates B for every c.  Check 2 (LP, float): otherwise maximise
+t s.t. t <= m_c(H) - m_c(B) for all H in R, c in simplex; B is dominated iff t* <= 0.
+Scope: all union-closed G on [4] (with or without the empty set) whose union is [4], up to S_4-isomorphism.
+Output: number of (G,B) pairs needing the LP, and any undominated B (a witness that the two minima differ for some c).
+Assumption: floating-point LP (scipy/HiGHS) with tolerance 1e-9 in check 2; check 1 is exact.
+"""
+import itertools, numpy as np
+from scipy.optimize import linprog
+k=4; NS=1<<k
+def is_uc(mask):
+    sets=[A for A in range(NS) if mask>>A&1]
+    return all(mask>>(a|b)&1 for a in sets for b in sets)
+UC=[m for m in range(1,1<<NS) if is_uc(m)]
+def sets_of(m): return [A for A in range(NS) if m>>A&1]
+def vec(m):
+    S=sets_of(m); return np.array([sum(1 for A in S if A>>i&1)-len(S)/2 for i in range(k)])
+V={m:vec(m) for m in UC}
+def perm_mask(m,p):
+    out=0
+    for A in sets_of(m):
+        B=0
+        for i in range(k):
+            if A>>i&1: B|=1<<p[i]
+        out|=1<<B
+    return out
+perms=list(itertools.permutations(range(k)))
+seen=set(); classes=0; lp_needed=0; undominated=0; pairs=0
+for G in UC:
+    U=0
+    for A in sets_of(G): U|=A
+    if U!=NS-1: continue
+    cg=min(perm_mask(G,p) for p in perms)
+    if cg in seen: continue
+    seen.add(cg); classes+=1
+    Gs=sets_of(G)
+    P=[m for m in UC if all(m>>(b|g)&1 for b in sets_of(m) for g in Gs)]
+    R=[m for m in UC if (m&G)==G]
+    RV=np.array([V[m] for m in R])
+    for B in P:
+        if (B&G)==G: continue
+        pairs+=1
+        vb=V[B]
+        if np.any(np.all(RV<=vb+1e-12,axis=1)): continue   # check 1
+        lp_needed+=1
+        # check 2: maximise t s.t. t <= (RV[j]-vb).c for all j ; sum c = 1, c>=0
+        D=RV-vb
+        res=linprog(c=[0]*k+[-1],A_ub=np.hstack([-D,np.ones((len(R),1))]),b_ub=np.zeros(len(R)),
+                    A_eq=[[1]*k+[0]],b_eq=[1],bounds=[(0,None)]*k+[(None,None)],method='highs')
+        tstar=-res.fun
+        if tstar>1e-9:
+            undominated+=1
+            if undominated<=10:
+                print("UNDOMINATED: G=",[''.join(str(i+1) for i in range(k) if A>>i&1) or '{}' for A in Gs],
+                      " B=",[''.join(str(i+1) for i in range(k) if A>>i&1) or '{}' for A in sets_of(B)]," t*=%.4g"%tstar,
+                      " c=",np.round(res.x[:k],4))
+print(f"classes of G: {classes}; (G,B) pairs with B in P\\R: {pairs}; needed LP: {lp_needed}; undominated B: {undominated}")
+
+# OUTPUT:
+# classes of G: 330; (G,B) pairs with B in P\R: 116833; needed LP: 0; undominated B: 0

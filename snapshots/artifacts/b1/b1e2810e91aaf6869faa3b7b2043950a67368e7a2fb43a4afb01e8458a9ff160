@@ -1,0 +1,62 @@
+import Mathlib
+
+/-- The property in Erdős #1142: `n - 2^k` is prime for every `k ≥ 1` with `2^k < n`. -/
+def Erdos1142Prop (n : ℕ) : Prop := ∀ k : ℕ, 1 ≤ k → 2 ^ k < n → Nat.Prime (n - 2 ^ k)
+
+lemma not_prime_of_dvd_of_lt {p m : ℕ} (hp : p.Prime) (hdvd : p ∣ m) (hlt : p < m) :
+    ¬ m.Prime := by
+  intro hm
+  rcases (Nat.dvd_prime hm).1 hdvd with h | h
+  · exact hp.one_lt.ne' h
+  · exact hlt.ne h
+
+lemma erdos1142_aux {n p k : ℕ} (hp : p.Prime) (h : Erdos1142Prop n) (hk : 1 ≤ k)
+    (hlt : 2 ^ k + p < n) (hdvd : p ∣ n - 2 ^ k) : False :=
+  not_prime_of_dvd_of_lt hp hdvd (by omega) (h k hk (by omega))
+
+/-- If `2` is a primitive root modulo the prime `p` (i.e. `orderOf (2 : ZMod p) = p - 1`),
+then every `n > 2^(p-1) + p` with the Erdős #1142 property is divisible by `p`. -/
+theorem dvd_of_erdos1142_of_primitiveRoot (p : ℕ) [hp : Fact p.Prime]
+    (hord : orderOf (2 : ZMod p) = p - 1) (n : ℕ) (hn : 2 ^ (p - 1) + p < n)
+    (h : Erdos1142Prop n) : p ∣ n := by
+  by_contra hpn
+  have hp1 : 1 ≤ p - 1 := by have := hp.out.two_le; omega
+  have hne : (n : ZMod p) ≠ 0 := by
+    rwa [Ne, ZMod.natCast_zmod_eq_zero_iff_dvd]
+  have h2 : (2 : ZMod p) ≠ 0 := by
+    intro h20
+    rw [h20, orderOf_zero] at hord
+    omega
+  set u : (ZMod p)ˣ := Units.mk0 (2 : ZMod p) h2 with hu
+  set v : (ZMod p)ˣ := Units.mk0 (n : ZMod p) hne with hv
+  have hordu : orderOf u = p - 1 := by
+    rw [← orderOf_units, hu, Units.val_mk0, hord]
+  have htop : Subgroup.zpowers u = ⊤ := by
+    apply Subgroup.eq_top_of_card_eq
+    rw [Nat.card_zpowers, hordu, Nat.card_eq_fintype_card, ZMod.card_units]
+  have hvmem : v ∈ Subgroup.zpowers u := by rw [htop]; exact Subgroup.mem_top v
+  rw [← mem_powers_iff_mem_zpowers, Submonoid.mem_powers_iff] at hvmem
+  obtain ⟨m, hm⟩ := hvmem
+  -- reduce the exponent to the range [1, p-1]
+  set k : ℕ := if m % (p - 1) = 0 then p - 1 else m % (p - 1) with hk
+  have hk1 : 1 ≤ k := by
+    rw [hk]; split_ifs with h0
+    · exact hp1
+    · omega
+  have hkle : k ≤ p - 1 := by
+    rw [hk]; split_ifs with h0
+    · exact le_rfl
+    · exact (Nat.mod_lt _ (by omega)).le
+  have huk : u ^ k = v := by
+    rw [hk]; split_ifs with h0
+    · rw [← hordu, pow_orderOf_eq_one, ← hm, ← pow_mod_orderOf, hordu, h0, pow_zero]
+    · rw [← hm, ← hordu, pow_mod_orderOf]
+  have hcast : ((2 ^ k : ℕ) : ZMod p) = (n : ZMod p) := by
+    have := congrArg Units.val huk
+    rw [Units.val_pow_eq_pow_val, hu, hv, Units.val_mk0, Units.val_mk0] at this
+    rw [Nat.cast_pow, Nat.cast_ofNat]
+    exact this
+  have hmodeq : 2 ^ k ≡ n [MOD p] := (ZMod.natCast_eq_natCast_iff _ _ _).1 hcast
+  have hpow : 2 ^ k ≤ 2 ^ (p - 1) := Nat.pow_le_pow_right (by norm_num) hkle
+  have hdvd : p ∣ n - 2 ^ k := (Nat.modEq_iff_dvd' (by omega)).1 hmodeq
+  exact erdos1142_aux hp.out h hk1 (by omega) hdvd

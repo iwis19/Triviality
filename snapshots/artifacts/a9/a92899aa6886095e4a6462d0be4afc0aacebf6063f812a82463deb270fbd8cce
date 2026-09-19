@@ -1,0 +1,65 @@
+"""Do m-point codes on S^3 with min angle >= 60 deg (pairwise cos <= 1/2) and covering radius <= 45 deg exist
+for m in 16..23?  Maximise min_p max_i <p,x_i> subject to <x_i,x_j> <= 1/2 via penalty + projection, then
+verify exactly the min angle and the covering radius (Nelder-Mead holes).
+"""
+import sys, numpy as np
+from scipy.optimize import minimize
+rng = np.random.default_rng(7)
+P = rng.normal(size=(6000, 4)); P /= np.linalg.norm(P, axis=1)[:, None]
+
+def cover_cos(X, trials, rng):
+    f = lambda q: np.max(X @ (q/np.linalg.norm(q)))
+    best = 10
+    for _ in range(trials):
+        r = minimize(f, rng.normal(size=4), method="Nelder-Mead", options={"xatol":1e-10,"fatol":1e-12,"maxiter":3000})
+        best = min(best, r.fun)
+    return best
+
+def make_obj(m, t, mu):
+    iu = np.triu_indices(m, 1)
+    def obj(x):
+        Y = x.reshape(m, 4); nrm = np.linalg.norm(Y, axis=1)[:, None]; Yn = Y/nrm
+        S = P @ Yn.T
+        a = S.max(axis=1, keepdims=True); w = np.exp(t*(S-a)); Z = w.sum(axis=1, keepdims=True)
+        cov = (a + np.log(Z)/t).ravel()
+        b = cov.min(); v = np.exp(-t*(cov-b)); W = v.sum()
+        val = b - np.log(W)/t
+        dcov = v/W; dS = (w/Z)*dcov[:, None]; dYn = dS.T @ P
+        # penalty for pairwise cos > 1/2
+        Gm = Yn @ Yn.T; viol = np.maximum(Gm[iu] - 0.5, 0.0)
+        pen = mu*np.sum(viol**2)
+        dG = np.zeros((m, m)); dG[iu] = 2*mu*viol; dG = dG + dG.T
+        dYn_pen = dG @ Yn
+        dYn_tot = dYn - dYn_pen           # maximise val, minimise pen
+        dY = (dYn_tot - np.sum(dYn_tot*Yn, axis=1, keepdims=True)*Yn)/nrm
+        return -(val - pen), -dY.ravel()
+    return obj
+
+for m in [int(a) for a in sys.argv[1:]]:
+    best = (-1, None, None)
+    for rs in range(16):
+        X = rng.normal(size=(m, 4)); X /= np.linalg.norm(X, axis=1)[:, None]
+        for t, mu in ((30., 10.), (100., 100.), (300., 1000.), (300., 1e4), (300., 1e5), (300., 1e6), (300., 1e7)):
+            r = minimize(make_obj(m, t, mu), X.ravel(), jac=True, method="L-BFGS-B", options={"maxiter": 3000})
+            X = r.x.reshape(m, 4); X /= np.linalg.norm(X, axis=1)[:, None]
+        G = X @ X.T; np.fill_diagonal(G, -1); maxcos = G.max()
+        cc = cover_cos(X, 200, rng)
+        if maxcos <= 0.5 + 1e-5 and cc > best[0]:
+            best = (cc, maxcos, X.copy())
+    cc, maxcos, X = best
+    if X is None:
+        print("m=%d: no run reached max pairwise cos <= 0.5+1e-5" % m, flush=True); continue
+    print("m=%d (min angle >= 60 enforced): best min_p max_i <p,x_i> = %.5f -> covering radius %.3f deg; max pairwise cos = %.6f" % (m, cc, np.degrees(np.arccos(cc)), maxcos), flush=True)
+    np.save("cover_code_m%d.npy" % m, X)
+
+# ---- output ----
+# m=21 (min angle >= 60 enforced): best min_p max_i <p,x_i> = 0.70319 -> covering radius 45.316 deg; max pairwise cos = 0.500001
+# m=20 (min angle >= 60 enforced): best min_p max_i <p,x_i> = 0.70999 -> covering radius 44.766 deg; max pairwise cos = 0.500001
+# m=19 (min angle >= 60 enforced): best min_p max_i <p,x_i> = 0.69161 -> covering radius 46.243 deg; max pairwise cos = 0.500001
+# m=18 (min angle >= 60 enforced): best min_p max_i <p,x_i> = 0.68272 -> covering radius 46.943 deg; max pairwise cos = 0.500001
+# m=17 (min angle >= 60 enforced): best min_p max_i <p,x_i> = 0.67469 -> covering radius 47.570 deg; max pairwise cos = 0.500000
+# m=16 (min angle >= 60 enforced): best min_p max_i <p,x_i> = 0.66364 -> covering radius 48.422 deg; max pairwise cos = 0.500000
+# m=23 (min angle >= 60 enforced): best min_p max_i <p,x_i> = 0.50000 -> covering radius 60.000 deg; max pairwise cos = 0.500000
+# m=22 (min angle >= 60 enforced): best min_p max_i <p,x_i> = 0.70848 -> covering radius 44.888 deg; max pairwise cos = 0.500000
+# m=21 (min angle >= 60 enforced): best min_p max_i <p,x_i> = 0.71010 -> covering radius 44.757 deg; max pairwise cos = 0.500000
+# m=20 (min angle >= 60 enforced): best min_p max_i <p,x_i> = 0.71288 -> covering radius 44.530 deg; max pairwise cos = 0.500000

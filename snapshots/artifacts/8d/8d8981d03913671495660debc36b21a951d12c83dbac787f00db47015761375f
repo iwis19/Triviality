@@ -1,0 +1,63 @@
+"""Layered 'approximately union-closed under all k-fold unions' family (barrier construction).
+F = L_1 u ... u L_K u {[n]}, where L_j = all subsets of [n] with size in a window of half-width w*sqrt(n)
+around p_j n, p_j = 1-(1-p)^j.  Uniform measure on F.
+We compute exactly (log-space) for uniform A in L_i, B in L_j: P(|A u B| in window of L_{i+j}).
+Then: fraction of mass on L_1, pair-closure failure probability, and element frequency.
+Claim tested: for p slightly above psi=(3-sqrt5)/2, mass -> L_1, closure failure -> 0, frequency -> p."""
+import math, sys
+
+def logC(n, k):
+    if k < 0 or k > n: return -math.inf
+    return math.lgamma(n + 1) - math.lgamma(k + 1) - math.lgamma(n - k + 1)
+
+def logsumexp(xs):
+    m = max(xs)
+    if m == -math.inf: return m
+    return m + math.log(sum(math.exp(x - m) for x in xs))
+
+def layer_logsize(n, lo, hi):
+    return logsumexp([logC(n, s) for s in range(lo, hi + 1)])
+
+def union_in_window(n, a, b, lo, hi):
+    # A uniform of size a, B uniform of size b independent: |A n B| ~ Hypergeometric(n, a, b)
+    # |A u B| = a + b - |A n B|
+    logs = []
+    for t in range(max(0, a + b - n), min(a, b) + 1):
+        u = a + b - t
+        if lo <= u <= hi:
+            logs.append(logC(a, t) + logC(n - a, b - t) - logC(n, b))
+    return math.exp(logsumexp(logs)) if logs else 0.0
+
+def run(n, p, K, w):
+    psi = (3 - 5 ** 0.5) / 2
+    windows = []
+    for j in range(1, K + 1):
+        pj = 1 - (1 - p) ** j
+        c = round(pj * n); h = int(w * math.sqrt(n))
+        windows.append((max(0, c - h), min(n, c + h)))
+    logsizes = [layer_logsize(n, lo, hi) for lo, hi in windows]
+    logtotal = logsumexp(logsizes + [0.0])  # + the full set
+    mass = [math.exp(ls - logtotal) for ls in logsizes]
+    # closure failure: pairs (i,j) with i+j<=K must land in window i+j; pairs with i+j>K: we treat as failure unless
+    # window i+j would be [n] (we conservatively count them as failures).
+    fail = 0.0
+    for i in range(K):
+        for j in range(K):
+            if i + j + 2 <= K:
+                lo, hi = windows[i + j + 1]
+                # approximate with central sizes of L_i, L_j (windows are narrow; conservative check with worst corners below)
+                ai = round((1 - (1 - p) ** (i + 1)) * n); bj = round((1 - (1 - p) ** (j + 1)) * n)
+                pr = union_in_window(n, ai, bj, lo, hi)
+                fail += mass[i] * mass[j] * (1 - pr)
+            else:
+                fail += mass[i] * mass[j]
+    freq = sum(mass[j] * (1 - (1 - p) ** (j + 1)) for j in range(K)) + math.exp(0 - logtotal) * 1.0
+    print(f"n={n} p={p:.4f} (psi={psi:.4f}) K={K} w={w}: mass on L_1={mass[0]:.6f}, mass L_2={mass[1]:.2e}, "
+          f"pair-closure failure prob={fail:.3e}, element frequency={freq:.4f}")
+
+if __name__ == '__main__':
+    for n in (400, 1600, 6400):
+        for p in (0.39, 0.40, 0.42):
+            run(n, p, K=6, w=2.5)
+    print("Control: p below psi (layers L_2 dominate L_1, construction breaks):")
+    run(1600, 0.36, K=6, w=2.5)

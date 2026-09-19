@@ -1,0 +1,59 @@
+"""Exact maximum-loneliness ML(v) for integer speed sets.
+
+k runners = one stationary runner (speed 0, WLOG by translation) plus n=k-1 runners
+with distinct positive integer speeds v_1<...<v_n (gcd not required to be 1; scaling t
+handles it). ML(v) = max_t min_i ||v_i t||, where ||x|| is distance to nearest integer.
+The Lonely Runner Conjecture (for the stationary runner; by symmetry all runners)
+asserts ML(v) >= 1/k = 1/(n+1).
+
+Candidate maximizers of the piecewise-linear function f(t)=min_i ||v_i t|| on [0,1):
+ peaks of a single ||v_i t|| at t=(2m+1)/(2 v_i), and crossings ||v_i t|| = ||v_j t||,
+ i.e. v_i t = ±v_j t mod 1 -> t = m/(v_i+v_j) or m/(v_i-v_j).
+All computed with Fractions.
+"""
+from fractions import Fraction as F
+from itertools import combinations
+from math import gcd
+import sys
+
+def dist(x):
+    x = x - (x.numerator // x.denominator)
+    return min(x, 1 - x)
+
+def ML(v):
+    cands = set()
+    for a in v:
+        for m in range(a):
+            cands.add(F(2 * m + 1, 2 * a))
+    for a, b in combinations(v, 2):
+        for d in (a + b, a - b):
+            for m in range(d):
+                cands.add(F(m, d))
+    return max(min(dist(a * t) for a in v) for t in cands)
+
+def run(n, N):
+    k = n + 1
+    tight = []
+    below = []
+    second_best = None
+    for v in combinations(range(1, N + 1), n):
+        if gcd(*v) != 1:
+            continue
+        m = ML(v)
+        if m < F(1, k):
+            below.append((v, m))
+        elif m == F(1, k):
+            tight.append(v)
+        else:
+            if second_best is None or m < second_best[1]:
+                second_best = (v, m)
+    return k, tight, below, second_best
+
+if __name__ == "__main__":
+    for n, N in [(2, 30), (3, 30), (4, 24), (5, 18), (6, 14)]:
+        k, tight, below, sb = run(n, N)
+        print(f"k={k} (n={n} moving runners), speeds <= {N}, gcd=1")
+        print(f"  counterexamples to ML>=1/k: {len(below)}")
+        print(f"  tight sets (ML=1/k): {tight}")
+        print(f"  smallest ML strictly above 1/k: {sb}  (1/(k-1) = {F(1,k-1)})")
+        sys.stdout.flush()

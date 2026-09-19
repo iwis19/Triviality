@@ -1,0 +1,70 @@
+"""exp9: empirical size of the 'Hooley error' E(K) = sum_{p<=K+1, ord_p(2)=p-1} log p - A*K,
+A = Artin's constant = prod_q (1 - 1/(q(q-1))) = 0.3739558136192022...
+Under GRH (Hooley 1967) N_2(x) = A x/log x + O(x loglog x / log^2 x), so by partial summation
+E(K) = O(K loglog K / log K).  We tabulate E(K)/(K loglog K/log K), E(K)/sqrt(K), E(K)/(K/log K)
+at K = 10^j and at the argmax/argmin over dyadic ranges, K <= KMAX.
+"""
+import math, sys, json
+import numpy as np
+
+A = 0.3739558136192022880547280543464164151116292531
+KMAX = int(sys.argv[1]) if len(sys.argv) > 1 else 10**6
+
+N = KMAX + 2
+# smallest prime factor sieve
+spf = np.zeros(N + 1, dtype=np.int64)
+for i in range(2, int(N ** 0.5) + 1):
+    if spf[i] == 0:
+        blk = spf[i*i::i]
+        mask = blk == 0
+        blk[mask] = i
+        spf[i*i::i] = blk
+primes = np.nonzero(spf[2:] == 0)[0] + 2
+spf_l = spf.tolist()
+
+def prime_factors(m):
+    f = []
+    while m > 1:
+        d = spf_l[m] or m
+        f.append(d)
+        while m % d == 0: m //= d
+    return f
+
+E = np.zeros(N + 1)          # E[K] = sum_{p<=K+1 prim} log p
+cum = 0.0
+prim = np.zeros(N + 1, dtype=bool)
+for p in primes.tolist():
+    if p == 2: continue
+    m = p - 1
+    if all(pow(2, m // q, p) != 1 for q in prime_factors(m)):
+        prim[p] = True
+# cumulative sum: S(K) uses primes <= K+1
+logs = np.where(prim, np.log(np.arange(N + 1, dtype=np.float64).clip(1)), 0.0)
+cs = np.cumsum(logs)                    # cs[t] = sum_{p<=t} prim log p
+K = np.arange(2, KMAX + 1)
+sumlog = cs[K + 1]
+Err = sumlog - A * K
+norm1 = Err / (K * np.log(np.log(K)) / np.log(K))
+norm2 = Err / np.sqrt(K)
+norm3 = Err / (K / np.log(K))
+theta = 1 - sumlog / (K * math.log(2))
+rows = []
+for k in [10, 30, 100, 300, 1000, 3000, 10**4, 3*10**4, 10**5, 3*10**5, 10**6, 3*10**6, 10**7]:
+    if k <= KMAX:
+        i = k - 2
+        rows.append(dict(K=int(k), sumlog=float(sumlog[i]), Err=float(Err[i]), Err_norm_KloglogK_logK=float(norm1[i]),
+                         Err_over_sqrtK=float(norm2[i]), Err_over_K_logK=float(norm3[i]), theta=float(theta[i]),
+                         count_prim=int(prim[:k+2].sum())))
+        print(json.dumps(rows[-1]), flush=True)
+# extremes over dyadic ranges
+ext = []
+lo = 16
+while lo < KMAX:
+    hi = min(2 * lo, KMAX)
+    sl = slice(lo - 2, hi - 2)
+    ext.append(dict(range=[lo, hi], max_norm1=float(norm1[sl].max()), min_norm1=float(norm1[sl].min()),
+                    max_norm2=float(norm2[sl].max()), min_norm2=float(norm2[sl].min()),
+                    max_absErr=float(np.abs(Err[sl]).max())))
+    print(json.dumps(ext[-1]), flush=True)
+    lo = hi
+json.dump(dict(A=A, KMAX=KMAX, rows=rows, dyadic_extremes=ext), open(f"/home/ubuntu/exp553/exp9_results_{KMAX}.json", "w"), indent=1)

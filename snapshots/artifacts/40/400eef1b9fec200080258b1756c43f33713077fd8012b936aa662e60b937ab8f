@@ -1,0 +1,29 @@
+"""Rigorous-style tail bound for the n=5 Delsarte dual certificate.
+C_k^{(3/2)}(x) = P'_{k+1}(x); P'_{m}(x) = m (x P_m(x) - P_{m-1}(x))/(x^2-1);
+Bernstein: |P_m(cos th)| <= sqrt(2/(pi m)) / sqrt(sin th)  (m>=1, 0<th<pi).
+=> |G_k(t)| <= 2 (sqrt(2/(pi(k+1))) + sqrt(2/(pi k))) / ((k+2) (1-t^2)^{5/4}).
+"""
+import mpmath as mp
+mp.mp.dps = 30
+atoms = [(-0.7735, 4.6356), (-0.7731, 0.2549), (-0.4397, 5.0892), (-0.4394, 2.2054),
+         (-0.0887, 5.8243), (-0.0884, 12.1647), (0.5, 15.1634)]
+T = [mp.mpf(t) for t, _ in atoms]; M = [mp.mpf(m) for _, m in atoms]
+lam = mp.mpf(3)/2
+def geg_seq(t, K):
+    c0, c1 = mp.mpf(1), 2*lam*t; out = [c0, c1]
+    for k in range(1, K):
+        c2 = (2*(k+lam)*t*c1 - (k+2*lam-1)*c0)/(k+1); out.append(c2); c0, c1 = c1, c2
+    return out
+K = 3000
+seqs = [geg_seq(t, K) for t in T]
+G = lambda k, i: seqs[i][k]/(mp.mpf(k+1)*(k+2)/2)
+def bound(k, t):
+    return 2*(mp.sqrt(2/(mp.pi*(k+1))) + mp.sqrt(2/(mp.pi*k)))/((k+2)*(1-t*t)**mp.mpf('1.25'))
+viol = [(k, i) for k in range(1, K+1) for i in range(7) if abs(G(k, i)) > bound(k, T[i])]
+print("violations of the derived bound for k<=%d:" % K, viol[:5], len(viol))
+# smallest k0 with sum_i m_i bound(k,t_i) < 1 for all k > k0 (bound is decreasing in k)
+k = 1
+while sum(M[i]*bound(k, T[i]) for i in range(7)) >= 1:
+    k += 1
+print("sum m_i*bound(k) < 1 for all k >=", k, " (value at that k:", mp.nstr(sum(M[i]*bound(k, T[i]) for i in range(7)), 6), ")")
+print("value of sum m_i*bound at k=300:", mp.nstr(sum(M[i]*bound(300, T[i]) for i in range(7)), 6))

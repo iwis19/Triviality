@@ -1,0 +1,90 @@
+p=7
+# p=7 t=4
+k   L1/|A|        log_p(L1/|A|)   incremental exponent
+ 1       2.80194       0.52948       0.52948
+ 2       7.71644       1.05008       0.52060
+ 3      21.25906       1.57088       0.52080
+ 4      58.56882       2.09167       0.52079
+ 5     161.35741       2.61246       0.52079
+ 6     444.54053       3.13326       0.52079
+ 7    1224.71154       3.65405       0.52079
+ 8    3374.08682       4.17485       0.52079
+ 9    9295.62718       4.69564       0.52079
+
+p=5
+# p=5 t=3
+k   L1/|A|        log_p(L1/|A|)   incremental exponent
+ 1       2.49071       0.56701       0.56701
+ 2       6.06136       1.11960       0.55259
+ 3      14.76418       1.67276       0.55316
+ 4      35.96088       2.22589       0.55313
+ 5      87.58950       2.77902       0.55313
+ 6     213.34068       3.33215       0.55313
+ 7     519.63135       3.88528       0.55313
+ 8    1265.65984       4.43841       0.55313
+ 9    3082.75250       4.99154       0.55313
+
+p=3
+# p=3 t=2
+k   L1/|A|        log_p(L1/|A|)   incremental exponent
+ 1       2.00000       0.63093       0.63093
+ 2       3.87939       1.23399       0.60306
+ 3       7.54721       1.83976       0.60577
+ 4      14.67851       2.44525       0.60550
+ 5      28.54896       3.05078       0.60552
+ 6      55.52612       3.65630       0.60552
+ 7     107.99522       4.26182       0.60552
+ 8     210.04468       4.86734       0.60552
+ 9     408.52520       5.47286       0.60552
+10     794.55873       6.07838       0.60552
+11    1545.37245       6.68391       0.60552
+12    3005.66327       7.28943       0.60552
+
+
+# source: riesz_l1.py
+#!/usr/bin/env python3
+"""L^1 norm of the Riesz-product Fourier transform of the digit set
+A_p = {n < p^k : all base-p digits <= (p-1)/2} over Z/p^k, for k = 1..kmax.
+Reports e_k = log_p( sum_a |hat A(a)| / |A| ) and the incremental exponent
+log_p( L1_k / L1_{k-1} ) - log_p(t), t = (p+1)/2 (this converges to the true
+asymptotic L^1 exponent if the limit exists).
+
+Recursion: for a = a' + d p^{k-1} (a' < p^{k-1}), the factors for m <= k-1 depend
+only on a', and the new factor is g((a' + d p^{k-1}) / p^k) with
+g(theta) = |sum_{c<=t-1} e(c theta)| = |sin(pi t theta)/sin(pi theta)|.
+So W_k(a) = W_{k-1}(a') * g((a'/p^{k-1} + d)/p).  We keep the full vector W_k.
+"""
+import sys
+import numpy as np
+
+p = int(sys.argv[1]); kmax = int(sys.argv[2])
+t = (p + 1) // 2
+
+
+def g(theta):
+    theta = np.mod(theta, 1.0)
+    num = np.abs(np.sin(np.pi * t * theta))
+    den = np.abs(np.sin(np.pi * theta))
+    with np.errstate(divide='ignore', invalid='ignore'):
+        r = np.where(den < 1e-12, float(t), num / den)
+    return r
+
+
+W = np.ones(1)  # k=0
+prev = 1.0
+print(f"# p={p} t={t}")
+print("k   L1/|A|        log_p(L1/|A|)   incremental exponent")
+for k in range(1, kmax + 1):
+    Q1 = p ** (k - 1)
+    x = np.arange(Q1, dtype=np.float64) / Q1  # a'/p^{k-1}
+    Wn = np.empty(p * Q1)
+    for d in range(p):
+        Wn[d * Q1:(d + 1) * Q1] = W * g((x + d) / p)
+    W = Wn
+    L1 = W.sum()
+    A = float(t) ** k
+    ek = np.log(L1 / A) / np.log(p)
+    inc = (np.log(L1 / prev) - np.log(t)) / np.log(p)
+    prev = L1
+    print(f"{k:2d}  {L1/A:12.5f}  {ek:12.5f}  {inc:12.5f}")
+    sys.stdout.flush()

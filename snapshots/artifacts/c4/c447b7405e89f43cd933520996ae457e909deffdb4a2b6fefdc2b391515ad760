@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""Independent galloping enumeration of T = {n : base-3 digits <=1, base-5 digits <=2, base-7 digits <=3}
+(Kummer: binom(2n,n) coprime to 105) up to a bound X.  Prints elements one per line.
+
+Usage: python3 gallop.py X [outfile]
+"""
+import sys
+from gmpy2 import mpz
+
+BASES = ((3, 1), (5, 2), (7, 3))  # (p, max admissible digit)
+BAD = {p: set(str(d) for d in range(m + 1, p)) for p, m in BASES}
+ORD = {p: {str(d): d for d in range(p)} for p, _ in BASES}
+
+
+def next_p(x, p, maxd):
+    """least y >= x whose base-p digits are all <= maxd"""
+    bad = BAD[p]
+    while True:
+        s = x.digits(p)  # most significant first
+        i = -1
+        for k, ch in enumerate(s):
+            if ch in bad:
+                i = k
+                break
+        if i < 0:
+            return x
+        # position (from least significant) of the bad digit
+        pos = len(s) - 1 - i
+        pp = mpz(p) ** (pos + 1)
+        x = (x // pp + 1) * pp
+
+
+def main():
+    X = mpz(sys.argv[1])
+    out = open(sys.argv[2], 'w') if len(sys.argv) > 2 else sys.stdout
+    x = mpz(0)
+    steps = 0
+    count = 0
+    while x < X:
+        moved = True
+        while moved:
+            moved = False
+            for p, m in BASES:
+                y = next_p(x, p, m)
+                steps += 1
+                if y != x:
+                    x = y
+                    moved = True
+        if x >= X:
+            break
+        out.write(str(x) + '\n')
+        count += 1
+        x += 1
+    out.flush()
+    print(f"# count={count} steps={steps}", file=sys.stderr)
+
+
+if __name__ == '__main__':
+    main()

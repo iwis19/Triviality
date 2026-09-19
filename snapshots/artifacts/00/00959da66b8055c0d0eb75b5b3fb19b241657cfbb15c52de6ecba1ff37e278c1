@@ -1,0 +1,29 @@
+$ python3 critic_checks.py
+Sloane pack.5.40: 40 points, min angle 60.0000 deg
+Sloane pack.5.41: 41 points, min angle 59.0029 deg
+D5 min angle: 59.99999999999999
+D5 deepest hole (2000 Nelder-Mead starts): 50.7685 deg at [-0.4472 -0.4472  0.4472  0.4472 -0.4472]; predicted arccos(2/sqrt(10)) = 50.7685
+24-cell covering radius (numerical): 45.0000 deg (exact 45 deg => cos = 1/sqrt2)
+torus obstruction: 41*pi/4 = 32.20132469929538  vs max torus area 2*pi^2 = 19.739208802178716
+
+$ python3 c5_40b.py
+C5-40a (D5): N=40, max inner product 0.500000, min angle 60.0000, antipodal=True
+   deepest hole 50.7685 deg at [ 0.4472  0.4472 -0.4472 -0.4472 -0.4472]
+C5-40b: N=40, max inner product 0.500000, min angle 60.0000, antipodal=False
+   deepest hole 50.7685 deg at [-0.      0.      0.     -0.8944 -0.4472]
+Sloane pack.5.40 antipodal: True
+D5 ip histogram   : {-1.0: 20, -0.5: 240, 0.0: 280, 0.5: 240}
+C5-40b ip histogram: {-1.0: 12, -0.75: 32, -0.5: 192, -0.25: 32, 0.0: 272, 0.5: 240}
+Sloane40 ip histogram: {-1.0: 20, -0.5: 240, 0.0: 280, 0.5: 240}
+augment-then-relax from D5+hole: 41-point min angle 58.5288 deg
+augment-then-relax from C5-40b+hole: 41-point min angle 58.3467 deg
+
+$ (Cohn's table https://spherical-codes.org/plain, rows for dimension 5)
+5,39,0.499971927191
+5,40,0.5,2*x-1
+5,41,0.514705973641
+5,42,0.518241155863
+$ python3 -c '...' on https://spherical-codes.org/data/5/41 (41 x 5 coordinates)
+max inner product 0.51470597364077 -> min angle 59.0222 deg; 183 pairs at the max inner product; no antipodal pairs
+Data sources: http://neilsloane.com/packings/dim5/pack.5.40.txt , pack.5.41.txt (Sloane, Hardin, Smith et al., 'Spherical codes' tables);
+https://spherical-codes.org (H. Cohn, archived at https://hdl.handle.net/1721.1/153543).

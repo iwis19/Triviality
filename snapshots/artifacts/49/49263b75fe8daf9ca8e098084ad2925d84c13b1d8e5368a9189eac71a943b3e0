@@ -1,0 +1,60 @@
+"""Random test of Claim C3 (injective down-compression) for n=6..9.
+For a union-closed F (not a power set) whose nonempty members all have size >= 3, is there a nonempty S subset U
+such that D_S: A -> A\\S if A\\S not in F else A  is injective, changes F, and D_S(F) is union-closed?
+Also: does a singleton S = {y} suffice?"""
+import random, sys
+from itertools import combinations
+
+def closure(gens):
+    F = set(gens); frontier = list(F)
+    while frontier:
+        new = []
+        for a in frontier:
+            for b in list(F):
+                u = a | b
+                if u not in F: F.add(u); new.append(u)
+        frontier = new
+    return F
+
+def is_uc(F):
+    L = list(F)
+    return all((a | b) in F for i, a in enumerate(L) for b in L[i:])
+
+def D(F, S):
+    img = set(); changed = False
+    for A in F:
+        B = A & ~S
+        if B != A and B not in F: img.add(B); changed = True
+        else: img.add(A)
+    return img, changed
+
+n = int(sys.argv[1]); seed = int(sys.argv[2]); trials = int(sys.argv[3])
+random.seed(seed)
+tested = 0; fail = 0; singleton_ok = 0; sizes = []
+for t in range(trials):
+    g = random.randint(2, 6)
+    gens = []
+    for _ in range(g):
+        s = random.getrandbits(n)
+        while bin(s).count('1') < 3: s = random.getrandbits(n)
+        gens.append(s)
+    if random.random() < 0.5: gens.append(0)
+    F = closure(gens)
+    U = 0
+    for A in F: U |= A
+    if len(F) == 1 << bin(U).count('1'): continue
+    tested += 1; sizes.append(len(F))
+    found = None
+    # singletons first
+    cands = [1 << y for y in range(n) if U >> y & 1] + [S for S in range(1, 1 << n) if (S & U) == S and bin(S).count('1') >= 2]
+    for S in cands:
+        img, changed = D(F, S)
+        if changed and len(img) == len(F) and is_uc(img):
+            found = S; break
+    if found is None:
+        fail += 1
+        print("C3 FAILS for F =", [format(A, 'b').zfill(n)[::-1] for A in sorted(F)])
+    elif bin(found).count('1') == 1:
+        singleton_ok += 1
+print(f"n={n} seed={seed}: tested {tested} non-powerset families with all nonempty sets of size>=3; "
+      f"C3 failures: {fail}; singleton S sufficed: {singleton_ok}; |F| range {min(sizes)}-{max(sizes)}, mean {sum(sizes)/len(sizes):.1f}")

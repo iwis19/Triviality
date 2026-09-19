@@ -1,0 +1,104 @@
+"""SAT / MaxSAT checks for distinct covering systems with all moduli dividing L.
+
+Encoding: for every divisor d>1 of L and residue r mod d, boolean x[d,r] = "the class
+r mod d is used".  Constraints: at most one r per d ("distinct moduli"), and every
+n in Z/L lies in some chosen class.  Optionally an extra multiplicity budget: up to
+`dups` divisors may be used twice (used for the fibre-peeling reduction, idea I3).
+
+u(L) := min number of uncovered residues in Z/L over all assignments (one class per
+divisor).  An odd distinct covering with lcm L exists iff u(L)=0.  We compute u(L)
+exactly for small L by MaxSAT (RC2).
+"""
+import sys, itertools
+from math import gcd
+from pysat.formula import CNF, WCNF, IDPool
+from pysat.card import CardEnc, EncType
+from pysat.solvers import Cadical153
+from pysat.examples.rc2 import RC2
+
+
+def divisors(n):
+    ds = [1]
+    m, p = n, 2
+    fac = {}
+    while p * p <= m:
+        while m % p == 0:
+            fac[p] = fac.get(p, 0) + 1
+            m //= p
+        p += 1
+    if m > 1:
+        fac[m] = fac.get(m, 0) + 1
+    for p, e in fac.items():
+        ds = [d * p ** k for d in ds for k in range(e + 1)]
+    return sorted(ds), fac
+
+
+def sigma(n):
+    return sum(divisors(n)[0])
+
+
+def build(L, dups=0):
+    ds, _ = divisors(L)
+    ds = [d for d in ds if d > 1]
+    pool = IDPool()
+    cnf = CNF()
+    for d in ds:
+        lits = [pool.id(('x', d, r)) for r in range(d)]
+        if dups == 0:
+            cnf.extend(CardEnc.atmost(lits, bound=1, vpool=pool, encoding=EncType.seqcounter).clauses)
+        else:
+            # y[d] = 1 allows two classes for d
+            y = pool.id(('y', d))
+            two = CardEnc.atmost(lits, bound=2, vpool=pool, encoding=EncType.seqcounter).clauses
+            cnf.extend(two)
+            # if not y then at most one: encode via seqcounter with y relaxation
+            # simple pairwise: for r<s, x[d,r] & x[d,s] -> y
+            for r in range(d):
+                for s in range(r + 1, d):
+                    cnf.append([-pool.id(('x', d, r)), -pool.id(('x', d, s)), y])
+    if dups > 0:
+        ys = [pool.id(('y', d)) for d in ds]
+        cnf.extend(CardEnc.atmost(ys, bound=dups, vpool=pool, encoding=EncType.seqcounter).clauses)
+    cover = []
+    for n in range(L):
+        cover.append([pool.id(('x', d, n % d)) for d in ds])
+    return cnf, cover, pool, ds
+
+
+def is_coverable(L, dups=0):
+    cnf, cover, pool, ds = build(L, dups)
+    with Cadical153(bootstrap_with=cnf.clauses + cover) as s:
+        ok = s.solve()
+        model = s.get_model() if ok else None
+    if ok:
+        chosen = [(d, r) for d in ds for r in range(d) if model[pool.id(('x', d, r)) - 1] > 0]
+        return True, chosen
+    return False, None
+
+
+def u_exact(L):
+    cnf, cover, pool, ds = build(L)
+    w = WCNF()
+    for c in cnf.clauses:
+        w.append(c)
+    for c in cover:
+        w.append(c, weight=1)
+    rc2 = RC2(w)
+    rc2.compute()
+    return rc2.cost
+
+
+if __name__ == '__main__':
+    mode = sys.argv[1]
+    if mode == 'sat':
+        for L in map(int, sys.argv[2:]):
+            ok, ch = is_coverable(L)
+            print(L, 'sigma/L=%.4f' % (sigma(L) / L), 'COVERABLE' if ok else 'UNSAT', ch if ok else '')
+    elif mode == 'u':
+        for L in map(int, sys.argv[2:]):
+            print(L, 'u(L)=', u_exact(L))
+    elif mode == 'dups':
+        k = int(sys.argv[2])
+        for L in map(int, sys.argv[3:]):
+            ok, ch = is_coverable(L, dups=k)
+            print(L, 'dups<=%d' % k, 'COVERABLE' if ok else 'UNSAT', ch if ok else '')

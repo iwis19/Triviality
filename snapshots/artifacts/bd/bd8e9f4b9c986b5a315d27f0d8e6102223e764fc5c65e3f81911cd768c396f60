@@ -1,0 +1,61 @@
+"""Compare the systematic negative bias of r(N)-HL_int(N) with Granville's (2007, Funct. Approx. 37)
+secondary term: I*(N) = I(N) * (1 - (4/sqrt N) prod_{p>=3} (1 - (N/p)/(p-2))), (N/p) Legendre symbol,
+for even N (Granville writes 2N for our N). Uses residuals.npz from residuals.py.
+"""
+import math, sys
+import numpy as np
+
+P = int(sys.argv[1]) if len(sys.argv) > 1 else 10**4
+d = np.load("/home/ubuntu/residuals.npz")
+N, r, HL = d["N"], d["r"], d["HL"]
+res = r - HL
+
+# odd primes up to P
+sieve = np.ones(P+1, bool); sieve[:2] = False
+for i in range(2, int(P**0.5)+1):
+    if sieve[i]: sieve[i*i::i] = False
+primes = np.nonzero(sieve)[0]; primes = primes[primes > 2]
+
+prod = np.ones(len(N))
+for p in primes:
+    qr = np.zeros(p, dtype=np.int8)               # Legendre symbol table
+    sq = (np.arange(1, p)**2) % p
+    qr[sq] = 1
+    qr[(qr == 0)] = -1
+    qr[0] = 0
+    chi = qr[N % p]
+    prod *= 1 - chi/(p-2)
+corr = -HL*4/np.sqrt(N)*prod                       # Granville's predicted correction I* - I
+res2 = res - corr                                  # residual about I*
+
+print(f"P={P}: dyadic-block means of z=(r-I)/sqrt(I) vs predicted mean corr/sqrt(I), and z*=(r-I*)/sqrt(I*)")
+print(" k     mean z    mean pred    mean z*    sd z*   corr(res, corr) ")
+for k in range(10, 20):
+    m = (N >= 2**k) & (N < 2**(k+1))
+    zb = res[m]/np.sqrt(HL[m]); pb = corr[m]/np.sqrt(HL[m]); z2 = res2[m]/np.sqrt(HL[m]+corr[m])
+    cc = np.corrcoef(res[m], corr[m])[0, 1]
+    print(f"{k:2d}  {zb.mean():8.3f}   {pb.mean():8.3f}   {z2.mean():8.3f}  {z2.std():6.3f}   {cc:6.3f}")
+m = N >= 1024
+z2 = res2[m]/np.sqrt(HL[m]+corr[m])
+print(f"N>=1024: mean z*={z2.mean():.4f}, sd={z2.std():.4f}, min={z2.min():.3f}, max={z2.max():.3f}")
+print(f"max|r-I*| / sqrt(N) = {np.max(np.abs(res2[m])/np.sqrt(N[m])):.3f};  max|r-I|/sqrt(N) = {np.max(np.abs(res[m])/np.sqrt(N[m])):.3f}")
+print(f"variance ratio Var(r-I*)/I* (Poisson would be 1): {np.mean(z2**2):.3f};  Var(r-I)/I: {np.mean((res[m]/np.sqrt(HL[m]))**2):.3f}")
+print(f"ratio observed mean bias / predicted (Granville) over N>=1024: {res[m].mean()/corr[m].mean():.3f}")
+
+# ---- output (P=10^4) ----
+# P=10000: dyadic-block means of z=(r-I)/sqrt(I) vs predicted mean corr/sqrt(I), and z*=(r-I*)/sqrt(I*)
+#  k     mean z    mean pred    mean z*    sd z*   corr(res, corr) 
+# 10    -0.635     -0.902      0.317   0.764    0.638
+# 11    -0.591     -0.813      0.248   0.674    0.612
+# 12    -0.533     -0.734      0.215   0.609    0.623
+# 13    -0.466     -0.672      0.216   0.640    0.530
+# 14    -0.443     -0.619      0.183   0.652    0.473
+# 15    -0.373     -0.574      0.206   0.654    0.433
+# 16    -0.361     -0.536      0.178   0.672    0.396
+# 17    -0.318     -0.502      0.185   0.685    0.353
+# 18    -0.300     -0.472      0.173   0.698    0.339
+# 19    -0.271     -0.447      0.177   0.713    0.301
+# N>=1024: mean z*=0.1787, sd=0.6992, min=-3.206, max=5.120
+# max|r-I*| / sqrt(N) = 0.637;  max|r-I|/sqrt(N) = 0.585
+# variance ratio Var(r-I*)/I* (Poisson would be 1): 0.521;  Var(r-I)/I: 0.587
+# ratio observed mean bias / predicted (Granville) over N>=1024: 0.623

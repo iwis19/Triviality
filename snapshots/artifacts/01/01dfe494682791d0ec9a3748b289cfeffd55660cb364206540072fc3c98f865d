@@ -1,0 +1,69 @@
+"""Hardy-Littlewood + Cramer heuristic for the expected number E_k(X) of CPAP-k (k consecutive
+primes in AP) with first term <= X, and the predicted size of the smallest CPAP-k (E_k = 1).
+
+Model (heuristic, not a theorem):
+  E_k(X) = sum_{d = m*k#, m>=1} int_2^X  S_k(d) * exp(-Lambda(t,d)) / (log t)^k dt
+  S_k(d) = prod_p (1 - nu_p/p)/(1-1/p)^k   (singular series of the tuple {0,d,...,(k-1)d}),
+           nu_p = 1 if p|d else min(k,p)
+  Lambda(t,d) = expected number of primes strictly between AP members, conditional on the AP
+           members being prime; for an in-between offset r and p | d the local factor is
+           p/(p-1) if p | r  (x = t mod p, nonzero)   and   p(p-2)/(p-1)^2 if p !| r.
+Known minima (OEIS A006560): a(3)=3, a(4)=251, a(5)=9843019, a(6)=121174811, a(7)<=7.1e22.
+"""
+import math
+from sympy import primerange, primorial, factorint
+
+def singular_series(k, d, pmax=10**5):
+    s = 1.0
+    for p in primerange(2, pmax):
+        nu = 1 if d % p == 0 else min(k, p)
+        s *= (1 - nu / p) / (1 - 1 / p) ** k
+    return s
+
+def window_weight(k, d):
+    """sum over in-between offsets of the local factor (times (k-1) gaps)."""
+    ps = [p for p in factorint(d)]
+    tot = 0.0
+    for r in range(1, d):
+        f = 1.0
+        for p in ps:
+            f *= p / (p - 1) if r % p == 0 else p * (p - 2) / (p - 1) ** 2
+        tot += f
+    return (k - 1) * tot
+
+_cache = {}
+def table(k, mmax=40):
+    if k in _cache: return _cache[k]
+    kp = primorial(len(list(primerange(2, k + 1))))
+    tab = []
+    for m in range(1, mmax + 1):
+        d = m * kp
+        tab.append((singular_series(k, d, 10**4), window_weight(k, d)))
+    _cache[k] = tab
+    return tab
+
+def expected_count(k, logX):
+    # integrate in u = log t from log 3 to logX with a simple grid (integrand smooth)
+    us = [math.log(3) + (logX - math.log(3)) * i / 400 for i in range(401)]
+    h = us[1] - us[0]
+    total = 0.0
+    for S, W in table(k):
+        vals = [math.exp(u) * S * math.exp(-W / u) / u ** k for u in us]
+        total += h * (sum(vals) - 0.5 * (vals[0] + vals[-1]))
+    return total
+
+def predict(k):
+    lo, hi = math.log(3), 400.0
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        if expected_count(k, mid) < 1: lo = mid
+        else: hi = mid
+    return hi
+
+if __name__ == "__main__":
+    known = {3: 3, 4: 251, 5: 9843019, 6: 121174811, 7: 71137654873189893604531}
+    for k in range(3, 13):
+        L = predict(k)
+        kn = known.get(k)
+        extra = f"   known smallest: 10^{math.log10(kn):.1f}" + (" (upper bound only)" if k == 7 else "") if kn else ""
+        print(f"k={k:2d}: predicted smallest CPAP-{k} ~ 10^{L/math.log(10):.1f}{extra}")

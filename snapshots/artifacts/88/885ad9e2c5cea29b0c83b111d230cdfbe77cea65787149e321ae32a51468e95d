@@ -1,0 +1,51 @@
+// T8: generalized down-compression D_S (S any nonempty subset of [n]): A -> A\S if A\S not in F, else A.
+// For each non-power-set union-closed F on [n]: does some S give a union-closed D_S(F) != F ?
+// Print counts and a sample of the D_S-stable families; also how many of the stable ones contain a set of size <= 2.
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+static int n, N;
+static int is_uc(uint32_t fam) {
+    int sets[32], k = 0;
+    for (int s = 0; s < N; s++) if ((fam >> s) & 1) sets[k++] = s;
+    for (int i = 0; i < k; i++) for (int j = i + 1; j < k; j++) if (!((fam >> (sets[i] | sets[j])) & 1)) return 0;
+    return 1;
+}
+static void print_fam(uint32_t fam) {
+    printf("{");
+    for (int s = 0; s < N; s++) if ((fam >> s) & 1) { printf("{"); for (int x = 0; x < n; x++) if ((s >> x) & 1) printf("%d", x + 1); printf("}"); }
+    printf("}");
+}
+int main(int argc, char **argv) {
+    n = atoi(argv[1]); N = 1 << n;
+    FILE *f = fopen(argv[2], "rb"); uint32_t fam;
+    long total = 0, stable = 0, stable_small = 0, printed = 0, stable_maxfreq_half_plus = 0;
+    long hist[40] = {0};
+    while (fread(&fam, 4, 1, f) == 1) {
+        if (fam == 0 || fam == 1) continue;
+        int sets[32], k = 0, U = 0;
+        for (int s = 0; s < N; s++) if ((fam >> s) & 1) { sets[k++] = s; U |= s; }
+        if (k == (1 << __builtin_popcount(U))) continue;
+        total++;
+        int good = 0;
+        for (int S = 1; S < N && !good; S++) {
+            if ((S & U) != S) continue;
+            uint32_t g = 0; int changed = 0;
+            for (int i = 0; i < k; i++) { int A = sets[i], B = A & ~S;
+                if (B != A && !((fam >> B) & 1)) { g |= 1u << B; changed = 1; } else g |= 1u << A; }
+            if (changed && __builtin_popcount(g) == k && is_uc(g)) good = 1;
+        }
+        if (!good) {
+            stable++; hist[k]++;
+            int small = 0; for (int i = 0; i < k; i++) if (sets[i] && __builtin_popcount(sets[i]) <= 2) small = 1;
+            if (small) stable_small++;
+            int cnt[8] = {0}, mx = 0; for (int i = 0; i < k; i++) for (int x = 0; x < n; x++) if ((sets[i] >> x) & 1) cnt[x]++;
+            for (int x = 0; x < n; x++) if (cnt[x] > mx) mx = cnt[x];
+            if (2 * mx > k) stable_maxfreq_half_plus++;
+            if (!small && printed < 15) { printed++; printf("T8 D_S-stable, no set of size<=2: |F|=%d maxcnt=%d ", k, mx); print_fam(fam); printf("\n"); }
+        }
+    }
+    printf("n=%d non-powerset families: %ld ; D_S-stable for all S: %ld ; of which containing a nonempty set of size<=2: %ld ; with maxfreq>1/2 strictly: %ld\n", n, total, stable, stable_small, stable_maxfreq_half_plus);
+    printf("size histogram of D_S-stable families:"); for (int k = 0; k < 33; k++) if (hist[k]) printf(" %d:%ld", k, hist[k]); printf("\n");
+    return 0;
+}

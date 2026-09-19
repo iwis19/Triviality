@@ -1,0 +1,118 @@
+"""Reproducible checks for the critique of idea dcb7e441 (CPAP-11 cost model).
+
+1. Recompute the number r of 'uncovered' intermediate positions for the actual
+   CP10 template (m = 193#, x = 77-digit constant from Dubner-Forbes-Lygeros-
+   Mizony-Nelson-Zimmermann 1998/2002), k = 10, d = 210, window 1890.
+2. Greedy one-residue-per-prime covering for k = 10 and k = 11 and the resulting
+   r_greedy(P).
+3. A transparent heuristic cost model (Mertens/Cramer) for the CP10-style search,
+   calibrated on the CP10 project's own estimate (3000 trillion N's), then applied
+   to k = 11 for several sieve depths R.
+"""
+import math, sys
+from sympy import primerange, primepi
+
+def theta(P):
+    return sum(math.log(p) for p in primerange(2, P + 1))
+
+def uncovered_positions(k, d, x_mod, P):
+    """positions i in (0,(k-1)d), d∤i, with gcd(x+i, P#)=1, given x mod p for p<=P."""
+    W = (k - 1) * d
+    alive = [True] * (W + 1)
+    for p in primerange(2, P + 1):
+        r = (-x_mod(p)) % p            # x + i ≡ 0 (mod p)  <=>  i ≡ -x (mod p)
+        for i in range(r, W + 1, p):
+            alive[i] = False
+    return [i for i in range(1, W) if i % d and alive[i]]
+
+def greedy_cover(k, d, P, verbose=False):
+    """Greedy: primes in increasing order, choose the residue class of x mod p
+    (subject to x + j d ≢ 0 mod p for all j<k) that kills the most still-alive
+    intermediate positions. Returns dict P' -> r(P') for every prime P' <= P."""
+    W = (k - 1) * d
+    alive = set(i for i in range(1, W) if i % d)
+    out = {}
+    for p in primerange(2, P + 1):
+        forbidden = {(-j * d) % p for j in range(k)}  # x ≡ -jd would kill an AP term
+        best, bestc = None, -1
+        cnt = {}
+        for i in alive:
+            cnt[(-i) % p] = cnt.get((-i) % p, 0) + 1
+        for r_ in range(p):
+            if r_ in forbidden:
+                continue
+            c = cnt.get(r_, 0)
+            if c > bestc:
+                best, bestc = r_, c
+        if best is None:      # p <= k and p ∤ d: impossible template
+            continue
+        alive = {i for i in alive if (best + i) % p != 0}
+        out[p] = len(alive)
+        if verbose:
+            print(p, len(alive))
+    return out
+
+# ---------- 1. CP10 template ----------
+x77 = 54538241683887582668189703590110659057865934764604873840781923513421103495579
+P10 = 193
+unc = uncovered_positions(10, 210, lambda p: x77 % p, P10)
+ap_ok = all(math.gcd(x77 + 210 * j, p) == 1 for j in range(10) for p in primerange(2, P10 + 1))
+print("CP10 template: AP terms coprime to 193#:", ap_ok)
+print("CP10 template: uncovered intermediate positions r =", len(unc), "of 1881")
+lnN = 93 * math.log(10)
+q0 = math.exp(0.5772156649) * math.log(P10) / lnN
+print("q0 = e^gamma ln193 / lnN =", round(q0, 4), " exp(-q0 r) =", math.exp(-q0 * len(unc)),
+      " (project's own figure: 1/100)")
+
+# ---------- 2. greedy coverings ----------
+g10 = greedy_cover(10, 210, 400)
+z10 = [p for p, r in g10.items() if r == 0]
+print("greedy k=10: r(193) =", g10[193], "; first P<=400 with r=0:", z10[0] if z10 else None,
+      "; r(397) =", g10[397])
+g11 = greedy_cover(11, 2310, 6000)
+z11 = [p for p, r in g11.items() if r == 0]
+print("greedy k=11: first P with r=0:", z11[0] if z11 else None)
+for p in [200, 300, 500, 800, 1000, 1200, 1400, 1600, 2000]:
+    pp = max(q for q in g11 if q <= p)
+    print("  greedy k=11 r(%d) = %d" % (pp, g11[pp]))
+
+# ---------- 3. cost model ----------
+EG = math.exp(0.5772156649)
+def model(k, P, r, R, lnN, c_prp_s, c_sieve_s=3.5e-8):
+    """Expected total cost (seconds) of a CP10-style search.
+    Assumptions: independent Cramer probabilities; Pr[form prime | no factor <= R]
+    = e^gamma ln R / ln N; sieve survivors fraction S = prod_{P<p<=R}(1-k/p);
+    r uncovered positions each prime with prob q0 = e^gamma ln P / ln N;
+    PRP tests ~ (#survivors) (early abort); sieve cost c_sieve per N per form."""
+    q = EG * math.log(R) / lnN
+    q0 = EG * math.log(P) / lnN
+    R1 = min(R, 2 * 10 ** 6)
+    lnS = sum(math.log1p(-k / p) for p in primerange(P + 1, R1 + 1))
+    if R > R1:   # Mertens tail: prod_{R1<p<=R}(1-k/p) ~ (ln R1 / ln R)^k
+        lnS += k * math.log(math.log(R1) / math.log(R))
+    S = math.exp(lnS)
+    n_total = math.exp(q0 * r) / (S * q ** k)   # N's to scan
+    prp = n_total * S * (1 / (1 - q))            # survivors, early-abort chain
+    cost = prp * c_prp_s + n_total * k * c_sieve_s
+    return n_total, prp, cost
+
+# calibration on CP10: their own numbers 3000 trillion N's, R = 2750773, 93 digits
+n_total, prp, _ = model(10, 193, len(unc), 2750773, 93 * math.log(10), 2e-4)
+print("CP10 calibration: model N_total = %.2e (project estimate 3.0e15), PRP tests = %.2e" % (n_total, prp))
+
+print("\nk=11 cost model (greedy r(P), c_prp = 2 ms at ~700 digits, 0.5 ms at 200 digits scaled ~ (digits/700)^2 * 2ms):")
+print("P, digits, r, R, N_total, PRP, CPU-years")
+best = None
+for P in [400, 600, 800, 1000, 1200, 1400, 1600, 2000, 2500, 3000]:
+    pp = max(q for q in g11 if q <= P)
+    r = g11[pp]
+    lnN = theta(pp) + math.log(1e20)
+    digits = lnN / math.log(10)
+    c_prp = 2e-3 * (digits / 700) ** 2
+    for R in [3e6, 1e9, 1e12, 1e15]:
+        n_total, prp, cost = model(11, pp, r, int(R), lnN, c_prp)
+        yrs = cost / 3.156e7
+        print("%5d %5.0f %6d %8.0e %9.2e %9.2e %9.2e" % (pp, digits, r, R, n_total, prp, yrs))
+        if best is None or yrs < best[0]:
+            best = (yrs, pp, R, prp)
+print("cheapest in scan: %.2e CPU-years at P=%d, R=%.0e, PRP=%.2e" % best)

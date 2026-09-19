@@ -1,0 +1,95 @@
+"""
+Experiment B: upper bounds on
+   kappa(d) := min covol(Lambda) over full-rank lattices Lambda in V_d={sum x=0} with Lambda ∩ (-1,1)^d = {0}
+(the critical determinant of the central diagonal cube section P_d = [-1,1]^d ∩ V_d).
+By the erdosproblems.com/1 sketch,  f(ld) <= kappa(d)/sqrt(d) + o(1),  where f(n)=min max A / 2^{n-1}.
+
+Rational admissible lattices of the form
+   L = { x in Z^d : sum x_i = 0,  w.x = 0 mod m },   Lambda = L/Q,
+have covol(Lambda) = m sqrt(d) / Q^{d-1}, and Lambda avoids (-1,1)^d  iff
+   (sum x, w.x mod m) is injective on [0,Q-1]^d.
+So kappa(d) <= m_min(Q,d) sqrt(d) / Q^{d-1}.  We compute m_min(Q,d) by exhaustive backtracking
+(WLOG w_1 = 0 < w_2 < ... < w_d by translation/permutation invariance).
+
+Reference values: Minkowski lower bound kappa(d) >= s_d := vol(P_d)/2^{d-1} (central section of unit cube,
+s_d -> sqrt(6/pi) = 1.382); DFX lower bound f(n) >= C(n,n/2)/2^{n-1} ~ 2 sqrt(2/(pi n)) would force
+kappa(d) >= 2 sqrt(2/pi) = 1.596 asymptotically IF the sketch's f(ld) <= kappa(d)/sqrt d holds.
+"""
+from math import sqrt, comb, factorial, pi
+import sys
+
+def central_section(d):
+    # s_d = sqrt(d) * density at 0 of sum of d Unif[-1/2,1/2]  = sqrt(d) * (1/(d-1)!) * sum_k (-1)^k C(d,k) (d/2-k)^{d-1}
+    tot = 0.0
+    for k in range(0, d+1):
+        t = d/2 - k
+        if t > 0: tot += (-1)**k * comb(d, k) * t**(d-1)
+    return sqrt(d) * tot / factorial(d-1)
+
+def pigeon_lower(Q, d):
+    # number of x in [0,Q-1]^d with the most popular coordinate sum -> m >= that
+    from collections import Counter
+    cnt = {0: 1}
+    for _ in range(d):
+        new = {}
+        for s, c in cnt.items():
+            for k in range(Q): new[s+k] = new.get(s+k, 0) + c
+        cnt = new
+    return max(cnt.values())
+
+def feasible(Q, d, m, want_w=False):
+    """Does there exist w in (Z/m)^d, w_1=0<w_2<...<w_d, with (sum x, w.x mod m) injective on [0,Q-1]^d?"""
+    # state: dict sum -> set of residues (for the pairs achieved so far)
+    init = {k: {0} for k in range(0)}  # placeholder
+    # start with w_1 = 0: pairs (k, 0) for k in [0,Q-1]
+    pairs = {k: {0} for k in range(Q)}
+    w = [0]
+    sys.setrecursionlimit(10000)
+    def extend(pairs, wi):
+        new = {}
+        for s, rs in pairs.items():
+            for k in range(Q):
+                tgt = new.setdefault(s+k, set())
+                for r in rs:
+                    v = (r + k*wi) % m
+                    if v in tgt: return None
+                    tgt.add(v)
+        return new
+    def rec(pairs, last, depth):
+        if depth == d: return True
+        for wi in range(last+1, m - (d-1-depth)):
+            np_ = extend(pairs, wi)
+            if np_ is not None:
+                w.append(wi)
+                if rec(np_, wi, depth+1): return True
+                w.pop()
+        return False
+    ok = rec(pairs, 0, 1)
+    return (ok, list(w)) if want_w else ok
+
+def m_min(Q, d, mmax=None):
+    lo = pigeon_lower(Q, d)
+    m = lo
+    while True:
+        ok, w = feasible(Q, d, m, want_w=True)
+        if ok: return m, w, lo
+        m += 1
+        if mmax and m > mmax: return None, None, lo
+
+if __name__ == "__main__":
+    print("d, s_d (Minkowski lower bound on kappa):")
+    for d in [3,4,5,6,7,8,10,12,16,20,30]:
+        print(f"  d={d:2d}  s_d={central_section(d):.4f}")
+    print(f"  limit sqrt(6/pi)={sqrt(6/pi):.4f};  DFX-implied asymptotic bound 2*sqrt(2/pi)={2*sqrt(2/pi):.4f}")
+    cases = [(2,3),(3,3),(4,3),(6,3),(8,3),
+             (2,4),(3,4),(4,4),(5,4),
+             (2,5),(3,5),(4,5),
+             (2,6),(3,6),
+             (2,7),(2,8)]
+    if len(sys.argv) > 1:
+        cases = [tuple(map(int, a.split(','))) for a in sys.argv[1:]]
+    print("\nQ, d, m_min, pigeonhole lower bd, witness w, kappa upper bound = m sqrt(d)/Q^(d-1)")
+    for Q, d in cases:
+        m, w, lo = m_min(Q, d)
+        kap = m*sqrt(d)/Q**(d-1)
+        print(f"  Q={Q} d={d}: m_min={m} (pigeon>={lo}) w={w}  kappa(d) <= {kap:.4f}   -> f(l*{d}) <~ kappa/sqrt(d) = {kap/sqrt(d):.4f}", flush=True)

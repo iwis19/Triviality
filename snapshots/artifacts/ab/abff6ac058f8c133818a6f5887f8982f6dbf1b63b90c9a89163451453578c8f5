@@ -1,0 +1,41 @@
+// Enumerate all union-closed families on [n] (n<=5), count, and report those
+// failing T5 (no x with an inclusion-respecting injection F_{not x} -> F_x)
+// and those failing T2 (no x, S in F_x with A -> A|S injective on F_{not x}).
+#include "uc.h"
+static int N;
+static int inc[MAXS], ninc;
+static unsigned char inF[MAXS];
+static long total=0, failT5=0, failT2=0, failFrankl=0;
+static FILE *outT5, *outT2;
+static void leaf(void){
+  if(ninc==0) return;                 // empty family
+  if(ninc==1 && inc[0]==0) return;    // {emptyset}
+  total++;
+  fam_t F; F.n=N; F.cnt=0; memset(F.in,0,sizeof(F.in));
+  for(int i=0;i<ninc;i++){F.in[inc[i]]=1; F.sets[F.cnt++]=inc[i];}
+  if(2*maxfreq(&F) < F.cnt) failFrankl++;
+  int ok5=0, ok2=0;
+  for(int x=0;x<N;x++){ if(t5_holds_at(&F,x)) ok5=1; if(t2_holds_at(&F,x)) ok2=1; }
+  if(!ok5){ failT5++; fam_print(&F,outT5); fprintf(outT5," | maxfreq %d/%d\n", maxfreq(&F), F.cnt); }
+  if(!ok2){ failT2++; fam_print(&F,outT2); fprintf(outT2,"\n"); }
+}
+static void rec(int s){
+  if(s<0){ leaf(); return; }
+  // exclude s
+  rec(s-1);
+  // include s if closure condition holds: for all included t, s|t already included
+  int ok=1;
+  for(int i=0;i<ninc;i++) if(!inF[inc[i]|s]){ ok=0; break; }
+  if(ok){ inF[s]=1; inc[ninc++]=s; rec(s-1); ninc--; inF[s]=0; }
+}
+int main(int argc,char**argv){
+  N = argc>1? atoi(argv[1]) : 5;
+  char fn[64]; sprintf(fn,"failT5_n%d.txt",N); outT5=fopen(fn,"w");
+  sprintf(fn,"failT2_n%d.txt",N); outT2=fopen(fn,"w");
+  memset(inF,0,sizeof(inF)); ninc=0;
+  rec((1<<N)-1);
+  printf("n=%d union-closed families (excluding {} and {emptyset}): %ld\n",N,total);
+  printf("Frankl failures: %ld\nT5 failures (no x): %ld\nT2 failures (no x,S): %ld\n",failFrankl,failT5,failT2);
+  fclose(outT5); fclose(outT2);
+  return 0;
+}

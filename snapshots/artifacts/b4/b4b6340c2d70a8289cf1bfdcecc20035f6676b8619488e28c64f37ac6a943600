@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+"""Spot-check of claim d4330638 (idea f040cbd7): over Z/QZ, Q=7^k,
+A3=S3∩[0,3^L), A5=S5∩[0,5^m), A7=S7∩[0,7^k) with 3^L,5^m<=Q.
+exact = |A3∩A5∩A7|,  main = |A3||A5||A7|/Q^2,
+E = Q^-2 * sum_{(a,b)!=(0,0)} |Â3(a)||Â5(b)||Â7(a+b)|  (computed by FFT convolution),
+plus L1 exponents log_Q(||Â_p||_1/|A_p|) and the Cauchy–Schwarz lower bound
+||Â||_1 >= Q (so log_Q(||Â_p||_1/|A_p|) >= 1 - log_Q|A_p|).
+Also evaluates Bloom–Croot Lemma 6 exponent log_g(10g/t) at (g,t)=(3,2),(5,3),(7,4).
+"""
+import numpy as np, math, sys
+
+def digit_set(p, dmax, R):
+    # all n < p^R with digits <= dmax
+    vals = np.array([0], dtype=np.int64)
+    for i in range(R):
+        vals = (vals[:, None] + (np.arange(dmax + 1, dtype=np.int64) * p ** i)[None, :]).ravel()
+    return np.sort(vals)
+
+def indicator(A, Q):
+    f = np.zeros(Q); f[A] = 1.0; return f
+
+for k in range(3, 8):
+    Q = 7 ** k
+    L = int(math.floor(math.log(Q) / math.log(3) + 1e-9))
+    m = int(math.floor(math.log(Q) / math.log(5) + 1e-9))
+    while 3 ** L > Q: L -= 1
+    while 5 ** m > Q: m -= 1
+    A3 = digit_set(3, 1, L); A5 = digit_set(5, 2, m); A7 = digit_set(7, 3, k)
+    exact = len(np.intersect1d(np.intersect1d(A3, A5), A7))
+    main = len(A3) * len(A5) * len(A7) / Q ** 2
+    F3 = np.abs(np.fft.fft(indicator(A3, Q)))
+    F5 = np.abs(np.fft.fft(indicator(A5, Q)))
+    F7 = np.abs(np.fft.fft(indicator(A7, Q)))
+    # conv(c) = sum_a |F3(a)| |F5(c-a)|  -> total = sum_c |F7(c)| conv(c)
+    conv = np.real(np.fft.ifft(np.fft.fft(F3) * np.fft.fft(F5)))
+    total = np.sum(F7 * conv) / Q ** 2
+    E = total - main
+    l1 = [math.log(F.sum() / F[0]) / math.log(Q) for F in (F3, F5, F7)]
+    lb = [1 - math.log(F[0]) / math.log(Q) for F in (F3, F5, F7)]
+    print(f"k={k} Q={Q} L={L} m={m} |A3|={len(A3)} |A5|={len(A5)} |A7|={len(A7)} exact={exact} main={main:.4f} "
+          f"E={E:.4g} log_Q(E/main)={math.log(E/main)/math.log(Q):.3f} "
+          f"L1exp(3,5,7)={[round(x,3) for x in l1]} CS-lower-bound={[round(x,3) for x in lb]}")
+
+print("Bloom–Croot Lemma 6 'in particular' exponent log_g(10g/t):",
+      {f"g={g},t={t}": round(math.log(10 * g / t) / math.log(g), 3) for g, t in ((3, 2), (5, 3), (7, 4))},
+      "(nontrivial only if < 1)")
+print("Lemma 6 first bound factor (10/t)^min(R,K):", {t: 10 / t for t in (2, 3, 4)}, "(nontrivial only if < 1)")
+
+# ---- observed output ----
+# k=3 Q=343 L=5 m=3 |A3|=32 |A5|=27 |A7|=64 exact=3 main=0.4700 E=48.9 log_Q(E/main)=0.796 L1exp(3,5,7)=[0.626, 0.628, 0.524] CS-lower-bound=[0.406, 0.435, 0.288]
+# k=4 Q=2401 L=7 m=4 |A3|=128 |A5|=81 |A7|=256 exact=3 main=0.4604 E=191.8 log_Q(E/main)=0.775 L1exp(3,5,7)=[0.608, 0.628, 0.523] CS-lower-bound=[0.377, 0.435, 0.288]
+# k=5 Q=16807 L=8 m=6 |A3|=256 |A5|=729 |A7|=1024 exact=9 main=0.6765 E=836.9 log_Q(E/main)=0.732 L1exp(3,5,7)=[0.642, 0.555, 0.522] CS-lower-bound=[0.43, 0.323, 0.288]
+# k=6 Q=117649 L=10 m=7 |A3|=1024 |A5|=2187 |A7|=4096 exact=13 main=0.6627 E=3239 log_Q(E/main)=0.728 L1exp(3,5,7)=[0.627, 0.567, 0.522] CS-lower-bound=[0.406, 0.341, 0.288]
+# k=7 Q=823543 L=12 m=8 |A3|=4096 |A5|=6561 |A7|=16384 exact=13 main=0.6492 E=1.253e+04 log_Q(E/main)=0.724 L1exp(3,5,7)=[0.617, 0.576, 0.522] CS-lower-bound=[0.389, 0.355, 0.288]
+# Bloom–Croot Lemma 6 'in particular' exponent log_g(10g/t): {'g=3,t=2': 2.465, 'g=5,t=3': 1.748, 'g=7,t=4': 1.471} (nontrivial only if < 1)
+# Lemma 6 first bound factor (10/t)^min(R,K): {2: 5.0, 3: 3.33, 4: 2.5} (nontrivial only if < 1)

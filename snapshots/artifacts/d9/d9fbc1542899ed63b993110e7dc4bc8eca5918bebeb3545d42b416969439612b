@@ -1,0 +1,11 @@
+import random, subprocess, statistics as st, sys
+random.seed(2026)
+def cnt(N,t,u,v):
+    r=subprocess.run(['./isect',str(N),'3','3','1',str(t),'5','2',str(u),'7','3',str(v),'--count-only'],capture_output=True,text=True,timeout=60)
+    return int(r.stderr.split('count=')[1].split()[0])
+print("N  count(0,0,0)  [random shifts t,u,v<N/2: mean, sd, frac_nonzero, max]  heuristic N^alpha")
+for e in (10,15,20,25,30,35):
+    N=10**e; c0=cnt(N,0,0,0)
+    cs=[cnt(N,random.randrange(N//2),random.randrange(N//2),random.randrange(N//2)) for _ in range(300)]
+    print(f"10^{e}  {c0}   mean={st.mean(cs):.2f} sd={st.pstdev(cs):.2f} frac_nonzero={sum(1 for c in cs if c>0)/len(cs):.3f} max={max(cs)}   {N**0.02595:.2f}")
+    sys.stdout.flush()

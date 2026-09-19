@@ -1,0 +1,95 @@
+"""Critic checks for idea 3d8f6a3b (structured search for a 41-point kissing configuration in R^5).
+
+1. Min angle of Sloane's putatively optimal 40- and 41-point codes on S^4.
+2. Deepest hole of the D5 kissing configuration (claim 4a0cbe11), by dense random
+   sampling + local maximisation of the min angle.
+3. Rigorous-style check of the '24-cell equator' layered family (I1 in output):
+   with equator = 24-cell, cap heights c must satisfy c^2 >= 1/2 (covering radius
+   of the 24-cell is 45 deg), which forces cap codes to have inner products <= 0,
+   hence <= 8 points per cap, hence <= 40 points.
+4. Single-orbit obstruction (ASSUMPTION: the orbit is a single G-orbit of a point with
+   TRIVIAL stabiliser, which is what 'acting on a scanned generic point' means; for
+   non-generic points orbit sizes are |G|/|G_x| and this argument does not apply).
+   Then |G| = 41 so G = C_41. Every real representation of C_41 (odd order, so no -1
+   eigenvalue) in dimension 5 is a sum of <= 2 rotation blocks plus a trivial block, so
+   the orbit lies in a hyperplane x_5 = z, i.e. on a 3-sphere; a 41-point code with
+   angle >= 60 deg there would give kappa(4) >= 41, contradicting kappa(4) = 24 (Musin 2008).
+   The flat-torus area bound printed below is a second, cruder heuristic and needs the
+   extra assumption that radius-1/2 discs embed in the torus (2*pi*min(r1,r2) > 1).
+"""
+import numpy as np
+from scipy.optimize import minimize
+import itertools
+
+rng = np.random.default_rng(0)
+
+
+def load_sloane(path, n=5):
+    v = np.loadtxt(path)
+    return v.reshape(-1, n)
+
+
+def min_angle_deg(X):
+    X = X / np.linalg.norm(X, axis=1, keepdims=True)
+    G = X @ X.T
+    np.fill_diagonal(G, -1)
+    return np.degrees(np.arccos(np.clip(G.max(), -1, 1)))
+
+
+for N in (40, 41):
+    X = load_sloane(f"/home/ubuntu/sloane_5_{N}.txt")
+    print(f"Sloane pack.5.{N}: {X.shape[0]} points, min angle {min_angle_deg(X):.4f} deg")
+
+# D5 roots
+D5 = []
+for i, j in itertools.combinations(range(5), 2):
+    for si in (1, -1):
+        for sj in (1, -1):
+            v = np.zeros(5); v[i] = si; v[j] = sj
+            D5.append(v / np.sqrt(2))
+D5 = np.array(D5)
+assert D5.shape == (40, 5)
+print("D5 min angle:", min_angle_deg(D5))
+
+
+def hole_angle(p):
+    p = p / np.linalg.norm(p)
+    return np.degrees(np.arccos(np.clip((D5 @ p).max(), -1, 1)))
+
+
+def neg_hole(p):
+    p = p / np.linalg.norm(p)
+    return (D5 @ p).max()  # minimise the max inner product
+
+
+best = -1
+for _ in range(2000):
+    p0 = rng.normal(size=5)
+    r = minimize(neg_hole, p0, method="Nelder-Mead", options={"xatol": 1e-10, "fatol": 1e-12, "maxiter": 4000})
+    a = hole_angle(r.x)
+    if a > best:
+        best = a; bestp = r.x / np.linalg.norm(r.x)
+print(f"D5 deepest hole (2000 Nelder-Mead starts): {best:.4f} deg at {np.round(bestp, 4)}; "
+      f"predicted arccos(2/sqrt(10)) = {np.degrees(np.arccos(2/np.sqrt(10))):.4f}")
+
+# 3. 24-cell covering radius
+C24 = D5[np.abs(D5[:, 4]) < 1e-12][:, :4]  # D4 roots = 24-cell on S^3
+assert C24.shape == (24, 4)
+best = -1
+for _ in range(2000):
+    p0 = rng.normal(size=4)
+    f = lambda p: (C24 @ (p / np.linalg.norm(p))).max()
+    r = minimize(f, p0, method="Nelder-Mead", options={"xatol": 1e-10, "fatol": 1e-12, "maxiter": 4000})
+    a = np.degrees(np.arccos(np.clip(r.fun, -1, 1)))
+    best = max(best, a)
+print(f"24-cell covering radius (numerical): {best:.4f} deg (exact 45 deg => cos = 1/sqrt2)")
+# consequence: for a cap direction u at height c, need sqrt(1-c^2)*max_v<u,v> <= 1/2 for all equator v;
+# min_u max_v <u,v> = cos 45 = 1/sqrt2, so sqrt(1-c^2) <= 1/sqrt2, c^2 >= 1/2, so cap cosines
+# (1/2 - c^2)/(1-c^2) <= 0 => at most 8 points per cap (2n bound on S^3) => <= 24+8+8 = 40.
+
+# 4. torus-orbit heuristic for C_41 acting on a generic point of S^4 (see docstring; the clean
+#    argument is the hyperplane-section + kappa(4)=24 one, which needs no computation)
+# orbit lies on {(r1 cos a, r1 sin a, r2 cos b, r2 sin b, z)}: flat torus of area 4 pi^2 r1 r2 with r1^2+r2^2 = 1-z^2 <= 1.
+# Points at angular distance >= 60 deg on S^4 have chordal distance >= 1; on the flat torus (intrinsic metric >= chordal)
+# discs of radius 1/2 are disjoint: 41*pi/4 <= 4 pi^2 r1 r2 <= 2 pi^2 (since r1 r2 <= 1/2).
+print("torus obstruction: 41*pi/4 =", 41*np.pi/4, " vs max torus area 2*pi^2 =", 2*np.pi**2)

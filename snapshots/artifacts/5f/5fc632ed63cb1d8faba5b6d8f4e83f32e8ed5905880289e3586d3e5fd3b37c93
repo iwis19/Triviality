@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""Batch SOS certificate test over enumerated sets.
+For each set v (from enum json), compute lambda_min(C_D(v)) at eps=1/(n+1) for D=1..Dmax
+with the speed-multiples basis F_D = {0} U {m v_i : 1<=m<=D}; record minimal certifying D.
+Certificate: lambda_min(C_D) < 1 - tol  ==>  ML(v) >= 1/(n+1)  (rigorous implication, see lrc_sos.py).
+Usage: python3 lrc_sos_batch.py enum.json Dmax
+"""
+import sys, json, math, itertools
+import numpy as np
+from fractions import Fraction
+from collections import Counter, defaultdict
+
+def C_matrix_fast(v, F, eps):
+    F = np.array(F, dtype=np.int64)
+    diff = F[:, None] - F[None, :]
+    C = np.zeros(diff.shape)
+    ad = np.abs(diff)
+    for vi in v:
+        mask = (ad % vi == 0)
+        m = np.where(mask, ad // vi, 1)
+        vals = np.where(m == 0, 2 * eps, np.sin(2 * np.pi * m * eps) / (np.pi * np.maximum(m, 1)))
+        C += np.where(mask, vals, 0.0)
+    return C
+
+def basis_multiples(v, D):
+    F = {0}
+    for vi in v:
+        for m in range(1, D + 1):
+            F.add(m * vi)
+    return sorted(F)
+
+def basis_additive(v, D):
+    """Frequencies <m,v> with m in Z_{>=0}^n, |m|_1 <= D: Gram basis = monomials of total degree <= D
+    in the runner coordinates x_i = e(v_i t); nu(t) = P(v_1 t, ..., v_n t) with P an SOS trig polynomial on T^n."""
+    F = {0}
+    for k in range(1, D + 1):
+        for comb in itertools.combinations_with_replacement(v, k):
+            F.add(sum(comb))
+    return sorted(F)
+
+BASIS = basis_multiples
+
+def lam_min(v, D, eps):
+    return float(np.linalg.eigvalsh(C_matrix_fast(v, BASIS(v, D), eps))[0])
+
+if __name__ == "__main__":
+    d = json.load(open(sys.argv[1])); Dmax = int(sys.argv[2])
+    if len(sys.argv) > 3 and sys.argv[3] == "additive":
+        BASIS = basis_additive
+    tag = "additive" if BASIS is basis_additive else "multiples"
+    print("basis:", tag)
+    n = d["n"]; eps = 1 / (n + 1); tol = 1e-9
+    target = Fraction(1, n + 1)
+    Dmin_count = Counter(); fail = []; by_ml = defaultdict(list)
+    rows = []
+    for r in d["sets"]:
+        v = r["v"]; ml = Fraction(*r["ml"])
+        Dm = None; lams = []
+        for D in range(1, Dmax + 1):
+            lam = lam_min(v, D, eps); lams.append(lam)
+            if lam < 1 - tol:
+                Dm = D; break
+        Dmin_count[Dm] += 1
+        rows.append({"v": v, "ml": r["ml"], "Dmin": Dm, "lams": [round(x, 6) for x in lams]})
+        if Dm is None:
+            fail.append((v, str(ml), [round(x, 5) for x in lams]))
+        by_ml[ml].append(Dm)
+    print(f"n={n} B={d['B']} sets={len(rows)} eps=1/{n+1}  Dmin distribution (None = not certified up to D={Dmax}): {dict(Dmin_count)}")
+    print("uncertified sets (v, ML, lambda_min for D=1..Dmax):")
+    for f in fail:
+        print("  ", f)
+    print("Dmin by ML value (smallest ML values):")
+    for ml in sorted(by_ml)[:12]:
+        c = Counter(by_ml[ml])
+        print(f"  ML={ml}: {dict(c)}")
+    json.dump(rows, open(sys.argv[1].replace(".json", f"_sos_{tag}_D{Dmax}.json"), "w"))

@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+"""Critic check of claim C7 (idea 7820498c): w(p) = -log(1 - min(K, ord_p(2))/p) for odd primes p <= K+1.
+Split sum_{p<=K+1} w(p) into the primitive-root part (= sum_{p in S(K)} log p) and the rest, and compare the
+rest with K/log K. Also record theta(K) = 1 - log2 M_S(K)/K (the wheel exponent) and the fraction of primes
+<= K+1 with 2 a primitive root (Artin density check, A = 0.3739558...).
+"""
+import math, sys
+
+def primes_upto(N):
+    s = bytearray([1]) * (N + 1)
+    s[0:2] = b"\x00\x00"
+    for i in range(2, int(N ** 0.5) + 1):
+        if s[i]:
+            s[i*i::i] = bytearray(len(s[i*i::i]))
+    return [i for i in range(N + 1) if s[i]]
+
+def order2(p, spf):
+    n = p - 1
+    fac = set()
+    m = n
+    while m > 1:
+        q = spf[m]
+        fac.add(q)
+        while m % q == 0:
+            m //= q
+    o = n
+    for q in fac:
+        while o % q == 0 and pow(2, o // q, p) == 1:
+            o //= q
+    return o
+
+def main(KMAX):
+    N = KMAX + 1
+    spf = list(range(N + 1))
+    for i in range(2, int(N ** 0.5) + 1):
+        if spf[i] == i:
+            for j in range(i * i, N + 1, i):
+                if spf[j] == j:
+                    spf[j] = i
+    ps = primes_upto(N)
+    ords = {p: order2(p, spf) for p in ps if p > 2}
+    A = 0.3739558136192022
+    checkpoints = [10**2, 10**3, 10**4, 10**5, 2*10**5, 5*10**5, 10**6]
+    print("K, |S(K)|, |S|/pi(K+1), sumS log p / K, rest / (K/log K), max rest w(p), theta(K)=1-log2 M_S/K, 1-A/log2")
+    for K in checkpoints:
+        if K > KMAX:
+            break
+        sS = 0.0; rest = 0.0; nS = 0; npr = 0; mx = 0.0
+        for p in ps:
+            if p > K + 1 or p == 2:
+                continue
+            npr += 1
+            o = ords[p]
+            om = min(K, o)
+            w = -math.log(1 - om / p)
+            if o == p - 1:
+                sS += math.log(p); nS += 1
+                assert abs(w - math.log(p)) < 1e-9
+            else:
+                rest += w; mx = max(mx, w)
+                assert w <= math.log(2) + 1e-12, (p, o, w)
+        theta = 1 - sS / (K * math.log(2))
+        print(f"{K}, {nS}, {nS/npr:.4f}, {sS/K:.4f}, {rest/(K/math.log(K)):.4f}, {mx:.4f}, {theta:.4f}, {1-A/math.log(2):.4f}")
+
+if __name__ == "__main__":
+    main(int(sys.argv[1]))

@@ -1,0 +1,55 @@
+import Mathlib
+import MathLab.Basic
+
+/-!
+The union-closure of the edge set of the 5-cycle `0-1-2-3-4-0` on `Fin 5`
+(16 sets) admits, for no vertex `x`, an inclusion-respecting injection
+`F_{¬x} → F_x`.  Witness interval: `e = {x+2, x+3}` (= V \ N[x]), with 4 members
+of `F ∩ up(e)` avoiding `x` and 3 containing `x`.
+-/
+
+/-- Union-closure of the edges of the 5-cycle on `Fin 5`. -/
+def cycle5 : Finset (Finset (Fin 5)) :=
+  {{0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 0},
+   {0, 1, 2}, {1, 2, 3}, {2, 3, 4}, {3, 4, 0}, {4, 0, 1},
+   {0, 1, 2, 3}, {1, 2, 3, 4}, {2, 3, 4, 0}, {3, 4, 0, 1}, {4, 0, 1, 2},
+   {0, 1, 2, 3, 4}}
+
+theorem cycle5_card : cycle5.card = 16 := by decide
+
+theorem cycle5_unionClosed : ∀ A ∈ cycle5, ∀ B ∈ cycle5, A ∪ B ∈ cycle5 := by decide
+
+theorem cycle5_interval_witness (x : Fin 5) :
+    (cycle5.filter (fun A => ({x + 2, x + 3} : Finset (Fin 5)) ⊆ A ∧ x ∈ A)).card <
+    (cycle5.filter (fun A => ({x + 2, x + 3} : Finset (Fin 5)) ⊆ A ∧ x ∉ A)).card := by
+  revert x; decide
+
+theorem no_superset_injection_of_interval' {n : ℕ} (F : Finset (Finset (Fin n))) (x : Fin n)
+    (e : Finset (Fin n))
+    (h : (F.filter (fun A => e ⊆ A ∧ x ∈ A)).card < (F.filter (fun A => e ⊆ A ∧ x ∉ A)).card) :
+    ¬ ∃ f : Finset (Fin n) → Finset (Fin n),
+      (∀ A ∈ F, x ∉ A → f A ∈ F ∧ x ∈ f A ∧ A ⊆ f A) ∧
+      Set.InjOn f (↑(F.filter (fun A => x ∉ A)) : Set (Finset (Fin n))) := by
+  rintro ⟨f, hf, hinj⟩
+  have hle : (F.filter (fun A => e ⊆ A ∧ x ∉ A)).card ≤
+      (F.filter (fun A => e ⊆ A ∧ x ∈ A)).card := by
+    apply Finset.card_le_card_of_injOn f
+    · intro A hA
+      simp only [Finset.coe_filter, Set.mem_setOf_eq] at hA
+      obtain ⟨hAF, heA, hxA⟩ := hA
+      obtain ⟨hfF, hxf, hsub⟩ := hf A hAF hxA
+      simp only [Finset.coe_filter, Set.mem_setOf_eq]
+      exact ⟨hfF, heA.trans hsub, hxf⟩
+    · intro A hA B hB hAB
+      simp only [Finset.coe_filter, Set.mem_setOf_eq] at hA hB
+      exact hinj (by simp only [Finset.coe_filter, Set.mem_setOf_eq]; exact ⟨hA.1, hA.2.2⟩)
+        (by simp only [Finset.coe_filter, Set.mem_setOf_eq]; exact ⟨hB.1, hB.2.2⟩) hAB
+  omega
+
+theorem cycle5_no_superset_injection (x : Fin 5) :
+    ¬ ∃ f : Finset (Fin 5) → Finset (Fin 5),
+      (∀ A ∈ cycle5, x ∉ A → f A ∈ cycle5 ∧ x ∈ f A ∧ A ⊆ f A) ∧
+      Set.InjOn f (↑(cycle5.filter (fun A => x ∉ A)) : Set (Finset (Fin 5))) :=
+  no_superset_injection_of_interval' cycle5 x _ (cycle5_interval_witness x)
+
+theorem cycle5_maxFreq : ∀ x : Fin 5, (cycle5.filter (fun A => x ∈ A)).card = 10 := by decide

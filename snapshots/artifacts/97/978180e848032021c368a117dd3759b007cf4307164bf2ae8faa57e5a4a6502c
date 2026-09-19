@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+"""
+Pilot computations for Hadwiger-Nelson hypothesis generation.
+
+Field K = Q(sqrt(-3), sqrt(-11)); elements are 4-tuples (a,b,c,d) meaning
+    a + b*s3 + c*s11 + d*s33,   s3^2=-3, s11^2=-11, s33 = s3*s11 (so s33^2 = 33).
+Complex conjugation: s3 -> -s3, s11 -> -s11, s33 -> s33.  |z|^2 = z * conj(z).
+The "Moser ring" R = Z[w1, w3], w1 = (1+s3)/2 = exp(i pi/3), w3 = (5+s11)/6 = exp(i arccos(5/6)).
+
+Experiment A (idea I1 pilot): build the unit-distance graph on all sums of <=2 unit
+vectors from {w1^a w3^b : 0<=a<6, -1<=b<=1}, compute its chromatic number with a SAT
+solver, and search for pairs (u,v) whose colours are forced equal / forced distinct
+in every k-colouring (k=4,5).
+
+Experiment B (idea I2 pilot): for m coprime to 6, A_m = (Z/m)[s3,s11] is a finite ring
+onto which R maps.  N_m = {z in A_m : z*conj(z) = 1} is a superset of the image of every
+unit-modulus element of R.  If the Cayley graph Cay(A_m, N_m) is k-colourable then the
+whole unit-distance graph on R is k-colourable (pull back the colouring).  We test k=5,6.
+"""
+import itertools, sys, time
+from fractions import Fraction as Fr
+from pysat.solvers import Cadical153
+
+# ---------- exact arithmetic over Q ----------
+def mul(x, y):
+    a1,b1,c1,d1 = x; a2,b2,c2,d2 = y
+    # basis products: s3*s3=-3, s11*s11=-11, s3*s11=s33, s33*s33=33, s3*s33=-3*s11, s11*s33=-11*s3
+    a = a1*a2 - 3*b1*b2 - 11*c1*c2 + 33*d1*d2
+    b = a1*b2 + b1*a2 - 11*(c1*d2 + d1*c2)
+    c = a1*c2 + c1*a2 - 3*(b1*d2 + d1*b2)
+    d = a1*d2 + d1*a2 + b1*c2 + c1*b2
+    return (a,b,c,d)
+def add(x,y): return tuple(p+q for p,q in zip(x,y))
+def neg(x): return tuple(-p for p in x)
+def conj(x): a,b,c,d = x; return (a,-b,-c,d)
+def norm2(x): return mul(x, conj(x))
+ONE = (Fr(1),Fr(0),Fr(0),Fr(0)); ZERO = (Fr(0),)*4
+w1 = (Fr(1,2),Fr(1,2),Fr(0),Fr(0))
+w3 = (Fr(5,6),Fr(0),Fr(1,6),Fr(0))
+w3i = conj(w3)
+assert norm2(w1)==ONE and norm2(w3)==ONE
+def power(x,n):
+    r = ONE
+    base = x if n>=0 else conj(x)
+    for _ in range(abs(n)): r = mul(r, base)
+    return r
+
+def k_colourable(n, edges, k, extra=None, fix=None):
+    """SAT test. vars x[v][c] = v*k+c+1. extra: list of extra CNF clauses (with the same encoding)."""
+    s = Cadical153()
+    var = lambda v,c: v*k+c+1
+    for v in range(n):
+        s.add_clause([var(v,c) for c in range(k)])
+    for u,v in edges:
+        for c in range(k):
+            s.add_clause([-var(u,c), -var(v,c)])
+    if fix:
+        for v,c in fix: s.add_clause([var(v,c)])
+    if extra:
+        for cl in extra: s.add_clause(cl)
+    res = s.solve()
+    model = s.get_model() if res else None
+    s.delete()
+    if model:
+        col = {}
+        for v in range(n):
+            for c in range(k):
+                if model[var(v,c)-1] > 0: col[v]=c; break
+        return True, col
+    return False, None
+
+def experiment_A():
+    print("=== Experiment A: unit-distance graph on 2-fold sums of Moser-ring unit vectors ===")
+    units = [mul(power(w1,a), power(w3,b)) for a in range(6) for b in (-1,0,1)]
+    units = list({u for u in units})
+    pts = {ZERO}
+    for u in units: pts.add(u)
+    for u in units:
+        for v in units: pts.add(add(u,v))
+    pts = sorted(pts)
+    idx = {p:i for i,p in enumerate(pts)}
+    n = len(pts)
+    edges = []
+    for i in range(n):
+        for j in range(i+1,n):
+            if norm2(add(pts[i], neg(pts[j]))) == ONE:
+                edges.append((i,j))
+    # how many edges use a unit vector outside the 18 generators? (accidental unit distances)
+    ugen = set(units) | {neg(u) for u in units}
+    acc = sum(1 for i,j in edges if add(pts[i],neg(pts[j])) not in ugen)
+    print(f"vertices={n} edges={len(edges)} edges_not_from_18_generators={acc}")
+    for k in (3,4,5):
+        ok,_ = k_colourable(n, edges, k, fix=[(idx[ZERO],0)])
+        print(f"  {k}-colourable: {ok}")
+    # forced pairs under k-colourings
+    adj = {i:set() for i in range(n)}
+    for i,j in edges: adj[i].add(j); adj[j].add(i)
+    for k in (4,5):
+        t0=time.time()
+        forced_eq = 0; forced_ne = 0; tested = 0
+        var = lambda v,c: v*k+c+1
+        pairs = [(i,j) for i in range(n) for j in range(i+1,n) if j not in adj[i]]
+        # limit runtime: sample pairs involving the origin plus a random subset
+        import random; random.seed(1)
+        sample = [(idx[ZERO],j) for j in range(n) if j!=idx[ZERO] and j not in adj[idx[ZERO]]]
+        sample += random.sample(pairs, min(400, len(pairs)))
+        for (i,j) in sample:
+            tested += 1
+            # forced equal: k-colouring with c(i)!=c(j) impossible
+            extra_ne = [[-var(i,c), -var(j,c)] for c in range(k)]  # i and j differ
+            ok_ne,_ = k_colourable(n, edges, k, extra=extra_ne, fix=[(i,0)])
+            if not ok_ne: forced_eq += 1
+            # forced distinct: k-colouring with c(i)==c(j) impossible
+            extra_eq = []
+            for c in range(k):
+                extra_eq.append([-var(i,c), var(j,c)]); extra_eq.append([var(i,c), -var(j,c)])
+            ok_eq,_ = k_colourable(n, edges, k, extra=extra_eq, fix=[(i,0)])
+            if not ok_eq: forced_ne += 1
+        print(f"  k={k}: tested {tested} non-adjacent pairs; forced-equal={forced_eq}, forced-distinct={forced_ne}  ({time.time()-t0:.1f}s)")
+
+# ---------- finite quotient rings A_m = (Z/m)[s3,s11] ----------
+def experiment_B(ms=(5,7), ks=(5,6)):
+    print("=== Experiment B: Cayley graphs Cay(A_m, N_m), A_m=(Z/m)[s3,s11], N_m = norm-1 elements ===")
+    for m in ms:
+        assert m % 2 and m % 3
+        elems = list(itertools.product(range(m), repeat=4))
+        eid = {e:i for i,e in enumerate(elems)}
+        def mulm(x,y):
+            return tuple(v % m for v in mul(x,y))
+        def conjm(x): a,b,c,d = x; return (a, (-b)%m, (-c)%m, d)
+        one = (1,0,0,0)
+        N = [z for z in elems if mulm(z, conjm(z)) == one]
+        # image of w1, w3 in A_m and the subgroup they generate (for comparison)
+        inv2 = pow(2,-1,m); inv6 = pow(6,-1,m)
+        W1 = (inv2 % m, inv2 % m, 0, 0); W3 = ((5*inv6)%m, 0, inv6 % m, 0)
+        assert mulm(W1,conjm(W1))==one and mulm(W3,conjm(W3))==one
+        gen = {one}; frontier=[one]
+        while frontier:
+            z = frontier.pop()
+            for g in (W1, W3, conjm(W3)):
+                y = mulm(z,g)
+                if y not in gen: gen.add(y); frontier.append(y)
+        print(f"m={m}: |A_m|={len(elems)}, |N_m|={len(N)}, |<w1,w3> mod m|={len(gen)}, contains -1: {(m-1,0,0,0) in gen}")
+        edges = set()
+        for z in elems:
+            zi = eid[z]
+            for s in N:
+                y = tuple((p+q)%m for p,q in zip(z,s))
+                yi = eid[y]
+                if yi != zi: edges.add((min(zi,yi), max(zi,yi)))
+        edges = sorted(edges)
+        print(f"   Cayley graph: n={len(elems)} edges={len(edges)} degree={len(N)}")
+        for k in ks:
+            t0=time.time()
+            ok,col = k_colourable(len(elems), edges, k, fix=[(eid[(0,0,0,0)],0)])
+            print(f"   {k}-colourable: {ok}   ({time.time()-t0:.1f}s)")
+            if ok:
+                # sanity re-check the colouring
+                assert all(col[u]!=col[v] for u,v in edges)
+                print(f"   colour class sizes: {[sum(1 for v in col if col[v]==c) for c in range(k)]}")
+                break
+        # also: the subgraph generated only by <w1,w3> (needed if N_m over-approximates)
+        edges2 = set()
+        for z in elems:
+            zi = eid[z]
+            for s in gen:
+                y = tuple((p+q)%m for p,q in zip(z,s)); yi = eid[y]
+                if yi != zi: edges2.add((min(zi,yi), max(zi,yi)))
+        for k in ks:
+            ok,_ = k_colourable(len(elems), sorted(edges2), k, fix=[(0,0)])
+            print(f"   subgraph Cay(A_m,<w1,w3>): {k}-colourable: {ok}")
+            if ok: break
+
+if __name__ == "__main__":
+    which = sys.argv[1] if len(sys.argv)>1 else "AB"
+    if "A" in which: experiment_A()
+    if "B" in which: experiment_B()

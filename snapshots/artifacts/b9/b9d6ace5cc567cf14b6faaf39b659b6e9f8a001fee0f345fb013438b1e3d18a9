@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+"""Experiment 3: calibrate the Hardy-Littlewood-type model of exp2 on relaxed/analogous families
+where solutions are plentiful enough to compare counts:
+
+ (A) base b=2, drop the top t constraints: n in (2^K, 2^{K+1}] with n-2^k prime for all 1<=k<=K-t.
+ (B) base b=3: n in (3^K, 3^{K+1}] with n-3^k prime for all 1<=k<=K (OEIS A067527-type).
+
+For each family we print, per block K, the actual count and the model prediction
+   E = (block length) * S * avg_n prod_k 1/log(n - b^k),
+   S = prod_p (1 - nu_p/p) (1 - 1/p)^{-m},  nu_p = #{b^k mod p : 1<=k<=m}  (m = number of constraints).
+"""
+import math, sys
+import numpy as np
+from sympy import primerange, n_order
+
+LOG2LIM = int(sys.argv[1]) if len(sys.argv) > 1 else 30
+LIMIT = 1 << LOG2LIM
+PMAX = 100000
+
+is_prime = np.ones(LIMIT + 1, dtype=bool)
+is_prime[:2] = False
+for p in range(2, int(LIMIT ** 0.5) + 1):
+    if is_prime[p]:
+        is_prime[p * p::p] = False
+
+primes = list(primerange(2, PMAX))
+
+def nu(b, p, m):
+    # number of distinct residues b^k mod p, 1<=k<=m
+    if b % p == 0:
+        return 1
+    return min(m, n_order(b, p))
+
+def log_S(b, m):
+    s = 0.0
+    for p in primes:
+        s += math.log(1 - nu(b, p, m) / p) - m * math.log(1 - 1 / p)
+    s += -m * (m - 1) / 2 / (PMAX * math.log(PMAX))
+    return s
+
+def log_size(b, lo, hi, m, samples=2000):
+    vs = []
+    for i in range(samples):
+        n = lo + (i + 0.5) / samples * (hi - lo)
+        v = 0.0
+        for k in range(1, m + 1):
+            x = n - b ** k
+            v -= math.log(math.log(x)) if x > 1.5 else math.log(math.log(1.5))
+        vs.append(v)
+    mx = max(vs)
+    return mx + math.log(sum(math.exp(v - mx) for v in vs) / samples)
+
+def count_block(b, lo, hi, m):
+    # count n in (lo, hi] with n - b^k prime for k=1..m
+    cnt = np.ones(hi - lo, dtype=bool)
+    for k in range(1, m + 1):
+        s = b ** k
+        cnt &= is_prime[lo + 1 - s: hi + 1 - s]
+    return int(cnt.sum())
+
+print("(A) base 2, top-t constraints dropped.  columns: K  t=1 actual/model   t=2 actual/model   t=3 actual/model")
+totA = {1: [0, 0.0], 2: [0, 0.0], 3: [0, 0.0]}
+for K in range(4, LOG2LIM):
+    lo, hi = 1 << K, 1 << (K + 1)
+    row = f"{K:2d}"
+    for t in (1, 2, 3):
+        m = K - t
+        act = count_block(2, lo, hi, m)
+        mod = math.exp(math.log(hi - lo) + log_S(2, m) + log_size(2, lo, hi, m))
+        totA[t][0] += act; totA[t][1] += mod
+        row += f"   {act:6d} / {mod:9.2f}"
+    print(row)
+print("totals (K>=4):", {t: (v[0], round(v[1], 2)) for t, v in totA.items()})
+
+print("\n(B) base 3, all constraints.  columns: K  actual  model  (block (3^K, 3^{K+1}])")
+totB = [0, 0.0]
+K = 1
+while 3 ** (K + 1) <= LIMIT:
+    lo, hi = 3 ** K, 3 ** (K + 1)
+    act = count_block(3, lo, hi, K)
+    mod = math.exp(math.log(hi - lo) + log_S(3, K) + log_size(3, lo, hi, K))
+    totB[0] += act; totB[1] += mod
+    print(f"{K:2d}  {act:6d}  {mod:9.3f}")
+    K += 1
+print("totals:", totB)
+# list base-3 solutions explicitly (small)
+sols = []
+K = 1
+while 3 ** (K + 1) <= LIMIT:
+    lo, hi = 3 ** K, 3 ** (K + 1)
+    cnt = np.ones(hi - lo, dtype=bool)
+    for k in range(1, K + 1):
+        s = 3 ** k
+        cnt &= is_prime[lo + 1 - s: hi + 1 - s]
+    sols += (lo + 1 + np.nonzero(cnt)[0]).tolist()
+    K += 1
+print("base-3 solutions n (3 < n <= 3^K max):", sols[:60], "... total", len(sols))
+
+
+# ===== OUTPUT =====
+# (A) base 2, top-t constraints dropped.  columns: K  t=1 actual/model   t=2 actual/model   t=3 actual/model
+#  4        1 /      1.94        1 /      2.36        4 /      5.24
+#  5        1 /      1.04        1 /      1.78        3 /      2.98
+#  6        2 /      0.84        2 /      0.92        3 /      2.04
+#  7        0 /      0.54        0 /      0.72        0 /      0.99
+#  8        1 /      0.28        1 /      0.46        1 /      0.74
+#  9        0 /      0.11        0 /      0.23        0 /      0.46
+# 10        0 /      0.04        0 /      0.09        0 /      0.22
+# 11        0 /      0.01        0 /      0.03        1 /      0.09
+# 12        0 /      0.00        0 /      0.01        0 /      0.03
+# 13        0 /      0.00        0 /      0.00        0 /      0.01
+# 14        0 /      0.00        0 /      0.00        0 /      0.00
+# 15        0 /      0.00        0 /      0.00        0 /      0.00
+# 16        0 /      0.00        0 /      0.00        0 /      0.00
+# 17        0 /      0.00        0 /      0.00        0 /      0.00
+# 18        0 /      0.00        0 /      0.00        0 /      0.00
+# 19        0 /      0.00        0 /      0.00        0 /      0.00
+# 20        0 /      0.00        0 /      0.00        0 /      0.00
+# 21        0 /      0.00        0 /      0.00        0 /      0.00
+# 22        0 /      0.00        0 /      0.00        0 /      0.00
+# 23        0 /      0.00        0 /      0.00        0 /      0.00
+# 24        0 /      0.00        0 /      0.00        0 /      0.00
+# 25        0 /      0.00        0 /      0.00        0 /      0.00
+# 26        0 /      0.00        0 /      0.00        0 /      0.00
+# 27        0 /      0.00        0 /      0.00        0 /      0.00
+# 28        0 /      0.00        0 /      0.00        0 /      0.00
+# 29        0 /      0.00        0 /      0.00        0 /      0.00
+# totals (K>=4): {1: (5, 4.79), 2: (5, 6.61), 3: (12, 12.79)}
+# 
+# (B) base 3, all constraints.  columns: K  actual  model  (block (3^K, 3^{K+1}])
+#  1       3      7.797
+#  2       5     14.697
+#  3       6     10.628
+#  4       2      4.065
+#  5       2      2.157
+#  6       2      0.838
+#  7       0      0.554
+#  8       0      0.313
+#  9       0      0.157
+# 10       0      0.068
+# 11       0      0.026
+# 12       0      0.009
+# 13       0      0.003
+# 14       0      0.001
+# 15       0      0.000
+# 16       0      0.000
+# 17       0      0.000
+# totals: [20, 41.31448469641929]
+# base-3 solutions n (3 < n <= 3^K max): [5, 6, 8, 14, 16, 20, 22, 26, 32, 40, 46, 50, 56, 70, 110, 140, 260, 470, 1190, 1330] ... total 20
+# 
+# real	0m31.735s
+# user	0m31.788s
+# sys	0m0.725s

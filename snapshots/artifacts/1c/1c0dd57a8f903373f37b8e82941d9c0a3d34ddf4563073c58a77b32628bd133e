@@ -1,0 +1,268 @@
+# Forced-colour-class SAT test on Heule's 5-chromatic graphs
+
+Source graphs: github.com/marijnheule/CNP-SAT (edge/*.edge, vtx/*.vtx), commit bb41495. Solver: pysat CaDiCaL 1.5.3.
+Sanity: 510.edge has no 4-colouring (CaDiCaL UNSAT, 5.5 s, with origin=colour0 and one neighbour=colour1 symmetry breaking); all edges numerically unit (tol 1e-9).
+
+## forced_class.py
+```python
+#!/usr/bin/env python3
+"""Forced-colour-class test (Polymath16 thread-4 style criterion) on Heule's
+5-chromatic unit-distance graphs (marijnheule/CNP-SAT, edge/*.edge, vtx/*.vtx).
+
+For a graph G with vertex 1 = origin (checked), colours 0..4:
+  premise P(S, o): every neighbour of the origin avoids the colour set S;
+                   optionally origin has colour o.
+  For each vertex v (not origin, not a neighbour) test whether
+    F(G) & P & (v not in S)      is UNSAT  -> v forced INTO S
+    F(G) & P & (v in S)          is UNSAT  -> v forced OUT of S
+Reports forced vertices with |v| and the angle theta=2*asin(1/(2|v|)).
+"""
+import sys, re, math, json, time
+from pysat.solvers import Cadical153
+from pysat.formula import CNF
+
+K = 5
+
+def read_edge(fn):
+    n = m = None; E = []
+    for line in open(fn):
+        t = line.split()
+        if not t: continue
+        if t[0] == 'p': n, m = int(t[2]), int(t[3])
+        elif t[0] == 'e': E.append((int(t[1]), int(t[2])))
+    assert len(E) == m
+    return n, E
+
+def read_vtx(fn):
+    pts = []
+    for line in open(fn):
+        s = line.strip()
+        if not s: continue
+        s = s.strip('{}')
+        s = re.sub(r'Sqrt\[([^\]]*)\]', r'math.sqrt(\1)', s)
+        x, y = s.split(',')
+        pts.append((eval(x, {'math': math}), eval(y, {'math': math})))
+    return pts
+
+def var(v, c):  # v 1-based, c 0..K-1
+    return (v - 1) * K + c + 1
+
+def base_cnf(n, E):
+    cl = []
+    for v in range(1, n + 1):
+        cl.append([var(v, c) for c in range(K)])
+        for a in range(K):
+            for b in range(a + 1, K):
+                cl.append([-var(v, a), -var(v, b)])
+    for (u, v) in E:
+        for c in range(K):
+            cl.append([-var(u, c), -var(v, c)])
+    return cl
+
+def run(name, S, origin_colour, root='/home/ubuntu/hn/CNP-SAT'):
+    n, E = read_edge(f'{root}/edge/{name}.edge')
+    pts = read_vtx(f'{root}/vtx/{name}.vtx')
+    assert len(pts) == n and abs(pts[0][0]) < 1e-12 and abs(pts[0][1]) < 1e-12, 'vertex 1 must be origin'
+    # sanity: every edge has unit length (numerically)
+    bad = [(u, v) for (u, v) in E if abs(math.dist(pts[u-1], pts[v-1]) - 1) > 1e-9]
+    assert not bad, bad[:5]
+    nbrs = sorted({v for (u, v) in E if u == 1} | {u for (u, v) in E if v == 1})
+    cl = base_cnf(n, E)
+    for w in nbrs:
+        for c in S:
+            cl.append([-var(w, c)])
+    if origin_colour is not None:
+        cl.append([var(1, origin_colour)])
+    res = {'graph': name, 'n': n, 'm': len(E), 'deg_origin': len(nbrs), 'S': S,
+           'origin_colour': origin_colour, 'forced_in': [], 'forced_out': []}
+    t0 = time.time()
+    with Cadical153(bootstrap_with=cl) as s:
+        sat = s.solve()
+        res['premise_satisfiable'] = sat
+        if not sat:
+            return res
+        others = [v for v in range(2, n + 1) if v not in nbrs]
+        notS = [c for c in range(K) if c not in S]
+        for v in others:
+            # forced into S: assume v takes some colour outside S -> need UNSAT for all such
+            fin = all(not s.solve(assumptions=[var(v, c)]) for c in notS)
+            fout = all(not s.solve(assumptions=[var(v, c)]) for c in S)
+            r = math.hypot(*pts[v-1])
+            if fin or fout:
+                th = 2 * math.asin(1 / (2 * r)) if r >= 0.5 else None
+                res['forced_in' if fin else 'forced_out'].append(
+                    {'v': v, 'xy': pts[v-1], 'r': r, 'theta_over_pi': (th / math.pi) if th else None})
+    res['time_s'] = round(time.time() - t0, 1)
+    return res
+
+if __name__ == '__main__':
+    out = []
+    graphs = sys.argv[1:] or ['510', '517', '529', '553']
+    for g in graphs:
+        for S, o in [([0, 1], None), ([0, 1], 0), ([0], 0), ([0], None)]:
+            r = run(g, S, o)
+            print(json.dumps(r), flush=True)
+            out.append(r)
+    json.dump(out, open('/home/ubuntu/hn/results.json', 'w'), indent=1)
+
+```
+
+## Raw results (per-vertex test)
+```
+{"graph": "510", "n": 510, "m": 2504, "deg_origin": 36, "S": [0, 1], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.1}
+{"graph": "510", "n": 510, "m": 2504, "deg_origin": 36, "S": [0, 1], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.1}
+{"graph": "510", "n": 510, "m": 2504, "deg_origin": 36, "S": [0], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "510", "n": 510, "m": 2504, "deg_origin": 36, "S": [0], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "517", "n": 517, "m": 2579, "deg_origin": 36, "S": [0, 1], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "517", "n": 517, "m": 2579, "deg_origin": 36, "S": [0, 1], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "517", "n": 517, "m": 2579, "deg_origin": 36, "S": [0], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "517", "n": 517, "m": 2579, "deg_origin": 36, "S": [0], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "529", "n": 529, "m": 2670, "deg_origin": 36, "S": [0, 1], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "529", "n": 529, "m": 2670, "deg_origin": 36, "S": [0, 1], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "529", "n": 529, "m": 2670, "deg_origin": 36, "S": [0], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "529", "n": 529, "m": 2670, "deg_origin": 36, "S": [0], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "553", "n": 553, "m": 2722, "deg_origin": 38, "S": [0, 1], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "553", "n": 553, "m": 2722, "deg_origin": 38, "S": [0, 1], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "553", "n": 553, "m": 2722, "deg_origin": 38, "S": [0], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "553", "n": 553, "m": 2722, "deg_origin": 38, "S": [0], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "610", "n": 610, "m": 3000, "deg_origin": 43, "S": [0, 1], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "610", "n": 610, "m": 3000, "deg_origin": 43, "S": [0, 1], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "610", "n": 610, "m": 3000, "deg_origin": 43, "S": [0], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "610", "n": 610, "m": 3000, "deg_origin": 43, "S": [0], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "633", "n": 633, "m": 3166, "deg_origin": 46, "S": [0, 1], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "633", "n": 633, "m": 3166, "deg_origin": 46, "S": [0, 1], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "633", "n": 633, "m": 3166, "deg_origin": 46, "S": [0], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "633", "n": 633, "m": 3166, "deg_origin": 46, "S": [0], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.2}
+{"graph": "803", "n": 803, "m": 4144, "deg_origin": 28, "S": [0, 1], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.4}
+{"graph": "803", "n": 803, "m": 4144, "deg_origin": 28, "S": [0, 1], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.4}
+{"graph": "803", "n": 803, "m": 4144, "deg_origin": 28, "S": [0], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.4}
+{"graph": "803", "n": 803, "m": 4144, "deg_origin": 28, "S": [0], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.4}
+{"graph": "826", "n": 826, "m": 4273, "deg_origin": 25, "S": [0, 1], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.4}
+{"graph": "826", "n": 826, "m": 4273, "deg_origin": 25, "S": [0, 1], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.4}
+{"graph": "826", "n": 826, "m": 4273, "deg_origin": 25, "S": [0], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.4}
+{"graph": "826", "n": 826, "m": 4273, "deg_origin": 25, "S": [0], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.4}
+{"graph": "874", "n": 874, "m": 4461, "deg_origin": 30, "S": [0, 1], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.4}
+{"graph": "874", "n": 874, "m": 4461, "deg_origin": 30, "S": [0, 1], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.4}
+{"graph": "874", "n": 874, "m": 4461, "deg_origin": 30, "S": [0], "origin_colour": 0, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.4}
+{"graph": "874", "n": 874, "m": 4461, "deg_origin": 30, "S": [0], "origin_colour": null, "forced_in": [], "forced_out": [], "premise_satisfiable": true, "time_s": 0.4}
+
+```
+
+## forced_rot.py (rotated unions + radius-class forcing)
+```python
+#!/usr/bin/env python3
+"""Rotated-union amplification of the forced-colour-class test.
+H = G ∪ R_phi1 G ∪ ... (rotations about the origin); the premise
+'N(origin) avoids S' applies to all copies (a.e. rotation). Edges of H are
+all numerically-unit pairs (tol 1e-9), so accidental cross-copy edges count.
+Also reports 'radius-class forcing': for each radius r, whether every
+5-colouring puts >=1 vertex of H at radius r into S.
+"""
+import sys, math, json, time, random
+sys.path.insert(0, '/home/ubuntu/hn')
+from forced_class import read_edge, read_vtx, K, Cadical153
+
+def build(name, angles, origin_idx=1, root='/home/ubuntu/hn/CNP-SAT'):
+    n, E = read_edge(f'{root}/edge/{name}.edge')
+    pts = read_vtx(f'{root}/vtx/{name}.vtx')
+    o = pts[origin_idx-1]; assert abs(o[0]) < 1e-12 and abs(o[1]) < 1e-12
+    P = []
+    for a in [0.0] + list(angles):
+        c, s = math.cos(a), math.sin(a)
+        for (x, y) in pts:
+            P.append((c*x - s*y, s*x + c*y))
+    # dedupe
+    key = lambda p: (round(p[0], 7), round(p[1], 7))
+    idx = {}; V = []
+    for p in P:
+        k = key(p)
+        if k not in idx: idx[k] = len(V); V.append(p)
+    # unit edges via grid hashing
+    cell = {}
+    for i, p in enumerate(V):
+        cell.setdefault((math.floor(p[0]), math.floor(p[1])), []).append(i)
+    edges = set()
+    for i, p in enumerate(V):
+        cx, cy = math.floor(p[0]), math.floor(p[1])
+        for dx in (-2, -1, 0, 1, 2):
+            for dy in (-2, -1, 0, 1, 2):
+                for j in cell.get((cx+dx, cy+dy), []):
+                    if j > i and abs(math.dist(p, V[j]) - 1) < 1e-9:
+                        edges.add((i, j))
+    return V, sorted(edges), idx[key((0.0, 0.0))]
+
+def test(name, angles, S=(0, 1), origin_idx=1):
+    V, E, o = build(name, angles, origin_idx)
+    n = len(V); var = lambda v, c: v*K + c + 1
+    cl = []
+    for v in range(n):
+        cl.append([var(v, c) for c in range(K)])
+        for a in range(K):
+            for b in range(a+1, K): cl.append([-var(v, a), -var(v, b)])
+    for u, v in E:
+        for c in range(K): cl.append([-var(u, c), -var(v, c)])
+    nb = {v for u, v in E if u == o} | {u for u, v in E if v == o}
+    for w in nb:
+        for c in S: cl.append([-var(w, c)])
+    res = {'graph': name, 'angles': angles, 'n': n, 'm': len(E), 'deg_origin': len(nb), 'S': list(S)}
+    t0 = time.time()
+    notS = [c for c in range(K) if c not in S]
+    with Cadical153(bootstrap_with=cl) as s:
+        res['premise_satisfiable'] = s.solve()
+        if not res['premise_satisfiable']: return res
+        forced_in = []; forced_out = []
+        for v in range(n):
+            if v == o or v in nb: continue
+            if all(not s.solve(assumptions=[var(v, c)]) for c in notS): forced_in.append(v)
+            if all(not s.solve(assumptions=[var(v, c)]) for c in S): forced_out.append(v)
+        res['forced_in'] = [(V[v], math.hypot(*V[v])) for v in forced_in]
+        res['forced_out'] = [(V[v], math.hypot(*V[v])) for v in forced_out]
+        # radius-class forcing: is there a colouring with ALL vertices at radius r outside S?
+        radii = {}
+        for v in range(n):
+            if v == o or v in nb: continue
+            radii.setdefault(round(math.hypot(*V[v]), 6), []).append(v)
+        rc = []
+        for r, vs in sorted(radii.items()):
+            # assumptions: each v in vs takes colour not in S -> encode via fresh selector? use clauses per v with assumptions on selector
+            # simpler: add temporary clauses using an activation literal
+            act = n*K + 1 + len(rc)
+            for v in vs: s.add_clause([-act] + [var(v, c) for c in notS])
+            ok = s.solve(assumptions=[act])
+            if not ok: rc.append((r, len(vs)))
+        res['radius_classes_forced_into_S'] = rc
+        res['num_radius_classes'] = len(radii)
+    res['time_s'] = round(time.time() - t0, 1)
+    return res
+
+if __name__ == '__main__':
+    random.seed(1)
+    out = []
+    for name, oi in [('510', 1), ('517', 1), ('L403', 1), ('S199', 1), ('T721', 3)]:
+        for angles in [[], [random.uniform(0, 2*math.pi)], [random.uniform(0, 2*math.pi) for _ in range(2)]]:
+            r = test(name, angles, origin_idx=oi)
+            print(json.dumps(r), flush=True); out.append(r)
+    # structured rotations that create cross edges: rotate by angle mapping a unit vector to another
+    json.dump(out, open('/home/ubuntu/hn/results_rot.json', 'w'), indent=1)
+
+```
+
+## Raw results
+```
+{"graph": "510", "angles": [], "n": 510, "m": 2504, "deg_origin": 36, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[0.736595, 26], [1.567618, 25], [2.0, 24]], "num_radius_classes": 43, "time_s": 0.2}
+{"graph": "510", "angles": [0.8442354444173306], "n": 1019, "m": 5008, "deg_origin": 72, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[0.736595, 52], [1.567618, 50], [2.0, 48]], "num_radius_classes": 43, "time_s": 0.6}
+{"graph": "510", "angles": [5.324583204732311, 4.798937463950548], "n": 1528, "m": 7512, "deg_origin": 108, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[0.736595, 78], [1.567618, 75], [2.0, 72]], "num_radius_classes": 43, "time_s": 1.4}
+{"graph": "517", "angles": [], "n": 517, "m": 2579, "deg_origin": 36, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[0.736595, 26], [1.567618, 25], [2.0, 24]], "num_radius_classes": 37, "time_s": 0.2}
+{"graph": "517", "angles": [1.602645954842546], "n": 1033, "m": 5158, "deg_origin": 72, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[0.736595, 52], [1.567618, 50], [2.0, 48]], "num_radius_classes": 37, "time_s": 0.7}
+{"graph": "517", "angles": [3.112910459877322, 2.8242356539891067], "n": 1549, "m": 7737, "deg_origin": 108, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[0.736595, 78], [1.567618, 75], [2.0, 72]], "num_radius_classes": 37, "time_s": 1.5}
+{"graph": "L403", "angles": [], "n": 403, "m": 2112, "deg_origin": 24, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[0.736595, 18], [1.567618, 18]], "num_radius_classes": 38, "time_s": 0.3}
+{"graph": "L403", "angles": [4.094079392473133], "n": 805, "m": 4224, "deg_origin": 48, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[0.736595, 36], [1.567618, 36]], "num_radius_classes": 38, "time_s": 0.6}
+{"graph": "L403", "angles": [4.955694971284102, 0.5897371765578201], "n": 1207, "m": 6336, "deg_origin": 72, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[0.736595, 54], [1.567618, 54]], "num_radius_classes": 38, "time_s": 1.2}
+{"graph": "S199", "angles": [], "n": 199, "m": 888, "deg_origin": 18, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[1.154701, 6], [1.732051, 12]], "num_radius_classes": 18, "time_s": 0.0}
+{"graph": "S199", "angles": [0.17811244797868833], "n": 397, "m": 1776, "deg_origin": 36, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[1.154701, 12], [1.732051, 24]], "num_radius_classes": 18, "time_s": 0.1}
+{"graph": "S199", "angles": [5.251267021202746, 2.7191556824922216], "n": 595, "m": 2664, "deg_origin": 54, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[1.154701, 18], [1.732051, 36]], "num_radius_classes": 18, "time_s": 0.1}
+{"graph": "T721", "angles": [], "n": 721, "m": 3948, "deg_origin": 54, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[0.679702, 36], [1.640946, 42]], "num_radius_classes": 34, "time_s": 5.0}
+{"graph": "T721", "angles": [4.789547014055384], "n": 1441, "m": 7896, "deg_origin": 108, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[0.679702, 72], [1.640946, 84]], "num_radius_classes": 34, "time_s": 10.5}
+{"graph": "T721", "angles": [0.013232723471835035, 2.7984502736910715], "n": 2161, "m": 11844, "deg_origin": 162, "S": [0, 1], "premise_satisfiable": true, "forced_in": [], "forced_out": [], "radius_classes_forced_into_S": [[0.679702, 108], [1.640946, 126]], "num_radius_classes": 34, "time_s": 23.0}
+
+```

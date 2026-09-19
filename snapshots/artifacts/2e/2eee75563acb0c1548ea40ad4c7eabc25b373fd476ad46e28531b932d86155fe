@@ -1,0 +1,162 @@
+"""Critic experiments for idea d9e32cdf (exceptional-set rigidity / propagation).
+
+E-A  Residual autocorrelation.  r(N) = #{(p,q): p+q=N} (ordered) for even N in (X/2, X],
+     HL_int(N) = S(N) * int_2^{N-2} dt/(log t log(N-t)),  S(N)=2 C_2 prod_{p|N,p>2}(p-1)/(p-2),
+     delta(N) = r(N)/HL_int(N) - 1.  corr(delta(N), delta(N+2k)), k<=500, versus the
+     'shared-prime / twin-prime' prediction  rho(2k) ~ S_2(2k) / (2 S(N) log N).
+E-B  Conditional tail: mean delta(N+2k) given delta(N) in bottom 0.1%.
+E-C  Perturbation: A_N = P minus {p : N-p in P}.  r_{A_N}(N) = 0 by construction.  Count even
+     M in [N,2N] with r_{A_N}(M) <= 1/2 HL_int(M) (and min ratio r_{A_N}(M)/r_P(M)).
+"""
+import sys, json, math
+import numpy as np
+from numpy.fft import rfft, irfft
+
+X = int(sys.argv[1]) if len(sys.argv) > 1 else 10**6
+C2 = 0.6601618158468695739278121100145557784326233602847334133194484233354056423
+OUT = {}
+
+def sieve(n):
+    s = np.ones(n + 1, dtype=bool); s[:2] = False
+    for i in range(2, int(n**0.5) + 1):
+        if s[i]: s[i*i::i] = False
+    return s
+
+def conv_counts(ind, L):
+    """ordered pair counts r(N) = sum_{a+b=N} ind[a] ind[b] for N < L (ind zero-padded)."""
+    n = 1
+    while n < 2 * L: n *= 2
+    f = np.zeros(n); f[:len(ind)] = ind
+    F = rfft(f)
+    r = irfft(F * F, n)[:L]
+    return np.rint(r).astype(np.int64)
+
+def singular_series(Nmax):
+    """S(N) for all N<=Nmax (even N used): 2 C2 prod_{p|N, p>2} (p-1)/(p-2)."""
+    S = np.full(Nmax + 1, 2 * C2)
+    isp = sieve(Nmax)
+    for p in np.nonzero(isp)[0]:
+        if p == 2: continue
+        S[p::p] *= (p - 1.0) / (p - 2.0)
+    return S
+
+def hl_integral(Ns, m=800):
+    """I(N) = int_2^{N-2} dt/(log t log(N-t)) = 2 int_2^{N/2} ..., Simpson in v=log t."""
+    Ns = Ns.astype(np.float64)
+    out = np.empty(len(Ns))
+    w = np.ones(m + 1); w[1:-1:2] = 4; w[2:-1:2] = 2
+    for i in range(0, len(Ns), 20000):
+        N = Ns[i:i+20000, None]
+        a = math.log(2.0); b = np.log(N / 2.0)
+        h = (b - a) / m
+        v = a + h * np.arange(m + 1)[None, :]
+        t = np.exp(v)
+        f = t / (v * np.log(N - t))
+        out[i:i+20000] = 2 * (h[:, 0] / 3) * (f * w).sum(axis=1)
+    return out
+
+# ---------------- E-A / E-B ----------------
+isp = sieve(X)
+r = conv_counts(isp.astype(np.float64), X + 1)
+S = singular_series(X)
+Ns = np.arange(X // 2 + 2, X + 1, 2)       # even N in (X/2, X]
+I = hl_integral(Ns)
+HL = S[Ns] * I
+rN = r[Ns]
+delta = rN / HL - 1.0
+n = len(Ns)
+OUT["E_A"] = dict(X=X, n_even=int(n), mean_delta=float(delta.mean()), sd_delta=float(delta.std()),
+                  min_delta=float(delta.min()), max_delta=float(delta.max()),
+                  N_at_min=int(Ns[delta.argmin()]), r_at_min=int(rN[delta.argmin()]),
+                  # heuristic: var(r) ~ 2 r  =>  sd(delta) ~ sqrt(2/HL)
+                  mean_sqrt_2_over_HL=float(np.sqrt(2.0 / HL).mean()),
+                  z_min=float(((rN - HL) / np.sqrt(2 * HL)).min()),
+                  sd_z=float(((rN - HL) / np.sqrt(2 * HL)).std()))
+# residue-class bias of the main term: mean delta by gcd(N, 30030)
+g = np.gcd(Ns, 30030)
+d = delta.copy()
+for c in np.unique(g):
+    m = g == c
+    d[m] -= delta[m].mean()
+OUT["E_A"].update(mean_delta_3_divides_N=float(delta[Ns % 3 == 0].mean()),
+                  mean_delta_3_notdiv_N=float(delta[Ns % 3 != 0].mean()),
+                  mean_delta_5_divides_N=float(delta[Ns % 5 == 0].mean()),
+                  mean_delta_5_notdiv_N=float(delta[Ns % 5 != 0].mean()),
+                  sd_delta_after_class_debias=float(d.std()),
+                  sd_z_after_class_debias=float((d * HL / np.sqrt(2 * HL)).std()))
+K = 500
+ac_raw = np.empty(K + 1); ac = np.empty(K + 1)
+d0 = delta - delta.mean()
+for k in range(K + 1):
+    ac_raw[k] = (d0[:n-k] * d0[k:]).mean() / d0.var()
+    ac[k] = (d[:n-k] * d[k:]).mean() / d.var()
+OUT["E_A"]["raw_corr_first6_before_debias"] = [float(x) for x in ac_raw[1:7]]
+OUT["E_A"]["raw_mean_corr_3_divides_k"] = float(ac_raw[3:K+1:3].mean())
+OUT["E_A"]["raw_mean_corr_3_notdiv_k"] = float(np.mean([ac_raw[k] for k in range(1, K+1) if k % 3]))
+# prediction  rho(2k) ~ S_2(2k)/(2 Sbar log N)  with S_2(2k)=2C2 prod_{p|k,p>2}(p-1)/(p-2) (twin-type)
+Sk = singular_series(2 * K + 2)
+logN = math.log(0.75 * X)
+Sbar = float(S[Ns].mean())
+pred = np.array([np.nan] + [Sk[2*k] / (2 * Sbar * logN) for k in range(1, K + 1)])
+se = 1 / math.sqrt(n)
+OUT["E_A"].update(se_corr=se, lag_k=list(range(1, 21)),
+                  corr_first20=[float(x) for x in ac[1:21]], pred_first20=[float(x) for x in pred[1:21]],
+                  mean_corr_k_1_500=float(ac[1:].mean()), mean_pred_k_1_500=float(np.nanmean(pred[1:])),
+                  mean_corr_k_101_500=float(ac[101:].mean()),
+                  frac_lags_above_3se=float((ac[1:] > 3 * se).mean()),
+                  # arithmetic modulation: k multiple of 3 vs not
+                  mean_corr_3_divides_k=float(ac[3:K+1:3].mean()),
+                  mean_corr_3_notdiv_k=float(np.mean([ac[k] for k in range(1, K+1) if k % 3])),
+                  ratio_corr_over_pred_mean=float(np.nanmean(ac[1:] / pred[1:])))
+# fit corr(k) = c * S_2(2k)  by least squares over k=1..500
+c_fit = float((ac[1:] * Sk[2:2*K+1:2]).sum() / (Sk[2:2*K+1:2]**2).sum())
+OUT["E_A"]["fit_corr_eq_c_times_S2"] = dict(c=c_fit, c_pred=1 / (2 * Sbar * logN),
+                                            resid_sd=float((ac[1:] - c_fit * Sk[2:2*K+1:2]).std()))
+
+# E-B conditional tail
+q = np.quantile(delta, 0.001)
+tail = np.nonzero(delta <= q)[0]
+tail = tail[tail + K < n]
+cond = {k: float(delta[tail + k].mean()) for k in (1, 2, 3, 5, 10, 50, 100, 500)}
+OUT["E_B"] = dict(quantile_0001=float(q), n_tail=int(len(tail)), mean_delta_tail=float(delta[tail].mean()),
+                  cond_mean_delta_N_plus_2k=cond,
+                  predicted_from_corr={k: float(ac[k] * delta[tail].mean()) for k in (1, 2, 3, 5, 10, 50, 100, 500)},
+                  bulk_mean=float(delta.mean()))
+
+# ---------------- E-C perturbation ----------------
+N0 = X
+isp2 = sieve(2 * N0)
+P = isp2.astype(np.float64)
+R = np.zeros(2 * N0 + 1, dtype=bool)
+ps = np.nonzero(isp2[:N0 + 1])[0]
+ps = ps[ps <= N0 - 2]
+R[ps[isp2[N0 - ps]]] = True          # R = {p <= N : N-p prime}
+A = P.copy(); A[R] = 0.0
+rP = conv_counts(P, 2 * N0 + 1)
+rA = conv_counts(A, 2 * N0 + 1)
+Ms = np.arange(N0, 2 * N0 + 1, 2)
+S2 = singular_series(2 * N0)
+HLM = S2[Ms] * hl_integral(Ms)
+ratio = rA[Ms] / np.maximum(rP[Ms], 1)
+h = Ms - N0
+S2h = S2[np.maximum(h, 2)]                       # twin-type singular series of the shift h=M-N
+near = rA[Ms] <= 0.5 * HLM
+# shared-prime deficit model: rA(M)/rP(M) ~ 1 - 2*S2(h)/(S(M) log N) (+ small correction)
+model = 1 - 2 * S2h / (S2[Ms] * math.log(N0))
+OUT["E_C_shift_model"] = dict(mean_S2h_all=float(S2h[1:].mean()), mean_S2h_near=float(S2h[near].mean()) if near.any() else None,
+                              min_S2h_near=float(S2h[near].min()) if near.any() else None,
+                              n_near_with_S2h_below_2=int((near & (S2h < 2.0)).sum()),
+                              corr_ratio_vs_model=float(np.corrcoef(ratio[1:], model[1:])[0, 1]),
+                              mean_ratio_by_S2h_bin={f"{lo}-{hi}": float(ratio[(S2h >= lo) & (S2h < hi)].mean())
+                                                     for lo, hi in [(1.3, 1.5), (1.5, 2), (2, 3), (3, 4), (4, 10)]},
+                              model_mean_by_S2h_bin={f"{lo}-{hi}": float(model[(S2h >= lo) & (S2h < hi)].mean())
+                                                     for lo, hi in [(1.3, 1.5), (1.5, 2), (2, 3), (3, 4), (4, 10)]})
+OUT["E_C"] = dict(N=N0, r_P_N=int(rP[N0]), r_A_N=int(rA[N0]), size_R=int(R.sum()), pi_N=int(isp2[:N0+1].sum()),
+                  n_even_M=int(len(Ms)),
+                  count_M_rA_le_half_HL=int((rA[Ms] <= 0.5 * HLM).sum()),
+                  count_M_rP_le_half_HL=int((rP[Ms] <= 0.5 * HLM).sum()),
+                  min_rA_over_HL=float((rA[Ms] / HLM).min()), min_rP_over_HL=float((rP[Ms] / HLM).min()),
+                  min_rA_over_rP=float(ratio.min()), mean_rA_over_rP=float(ratio.mean()),
+                  predicted_mean_deficit_1_over_logN=1 / math.log(N0),
+                  M_at_min_ratio=int(Ms[ratio.argmin()]))
+print(json.dumps(OUT, indent=1))

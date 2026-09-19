@@ -1,0 +1,40 @@
+"""Check claim 615bf03: with N_0 defined by N^{1/2} = (C/(2C_2)) log^{A+2} N,
+is 2C_2 N/log^2 N - C N^{1/2} log^A N >= 1 for all N >= N_0 ?"""
+import math
+from scipy.optimize import brentq
+
+C2 = 0.6601618158468695739278121100145557784326233602847334133194484233354056423  # twin prime constant
+
+def g(N, C, A):
+    return 2*C2*N/math.log(N)**2 - C*math.sqrt(N)*math.log(N)**A
+
+def N0(C, A):
+    # solve sqrt(N) = (C/(2C2)) log^{A+2} N, on the branch where sqrt(N)/log^{A+2}N is increasing (N > e^{2(A+2)})
+    f = lambda N: math.sqrt(N) - (C/(2*C2))*math.log(N)**(A+2)
+    lo = math.exp(2*(A+2))
+    hi = 1e40
+    if f(lo) > 0:  # equation only solvable on the decreasing branch (small N); take the largest root
+        return brentq(f, 2.0, lo, xtol=1e-6, maxiter=500)
+    return brentq(f, lo, hi, xtol=1e-6, maxiter=500)
+
+for C, A in [(1, 1), (1, 0), (1, 2), (2, 1), (1.53, 0), (3, 1)]:
+    n0 = N0(C, A)
+    print(f"C={C} A={A}: N_0 = {n0:.6e}, g(N_0) = {g(n0, C, A):.3e}", end="")
+    # smallest N >= N_0 where g >= 1
+    f1 = lambda N: g(N, C, A) - 1
+    n1 = brentq(f1, n0, 10*n0)
+    print(f"   g(N)>=1 only from N_1 = {n1:.6e} (N_1/N_0 - 1 = {n1/n0-1:.2e})")
+
+print("claimed N_0 for C=1,A=1 is 2.4e7; g there =", g(2.4e7, 1, 1))
+# is sqrt(N)/log^{A+2} N monotone increasing on [N_0, inf)? derivative sign: 1/2 - (A+2)/log N > 0 iff N > e^{2(A+2)}
+print("monotone threshold e^{2(A+2)} for A=1:", math.exp(6))
+
+# ---- output ----
+# C=1 A=1: N_0 = 1.009290e+07, g(N_0) = -2.910e-11   g(N)>=1 only from N_1 = 1.009353e+07 (N_1/N_0 - 1 = 6.22e-05)
+# C=1 A=0: N_0 = 1.823043e+03, g(N_0) = 3.780e-12   g(N)>=1 only from N_1 = 2.002586e+03 (N_1/N_0 - 1 = 9.85e-02)
+# C=1 A=2: N_0 = 9.588070e+10, g(N_0) = 0.000e+00   g(N)>=1 only from N_1 = 9.588070e+10 (N_1/N_0 - 1 = 1.48e-08)
+# C=2 A=1: N_0 = 8.500658e+07, g(N_0) = 5.821e-11   g(N)>=1 only from N_1 = 8.500734e+07 (N_1/N_0 - 1 = 8.85e-06)
+# C=1.53 A=0: N_0 = 9.411049e+03, g(N_0) = -5.684e-14   g(N)>=1 only from N_1 = 9.635396e+03 (N_1/N_0 - 1 = 2.38e-02)
+# C=3 A=1: N_0 = 2.793309e+08, g(N_0) = 1.164e-10   g(N)>=1 only from N_1 = 2.793318e+08 (N_1/N_0 - 1 = 2.97e-06)
+# claimed N_0 for C=1,A=1 is 2.4e7; g there = 26478.193544559646
+# monotone threshold e^{2(A+2)} for A=1: 403.4287934927351

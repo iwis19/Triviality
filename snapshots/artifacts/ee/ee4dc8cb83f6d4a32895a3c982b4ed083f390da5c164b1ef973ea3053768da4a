@@ -1,0 +1,71 @@
+#!/usr/bin/env python3
+"""Generate Lean 4 / Mathlib file with the small-prime necessary conditions for Erdős #1142."""
+header = r'''import Mathlib
+
+/-- The property in Erdős #1142: `n - 2^k` is prime for every `k ≥ 1` with `2^k < n`. -/
+def Erdos1142Prop (n : ℕ) : Prop := ∀ k : ℕ, 1 ≤ k → 2 ^ k < n → Nat.Prime (n - 2 ^ k)
+
+lemma not_prime_of_dvd_of_lt {p m : ℕ} (hp : p.Prime) (hdvd : p ∣ m) (hlt : p < m) :
+    ¬ m.Prime := by
+  intro hm
+  rcases (Nat.dvd_prime hm).1 hdvd with h | h
+  · exact hp.one_lt.ne' h
+  · exact hlt.ne h
+
+/-- If some `n - 2^k` (with `2^k + p < n`) is divisible by the prime `p`, then `n` fails the
+property. -/
+lemma erdos1142_aux {n p k : ℕ} (hp : p.Prime) (h : Erdos1142Prop n) (hk : 1 ≤ k)
+    (hlt : 2 ^ k + p < n) (hdvd : p ∣ n - 2 ^ k) : False :=
+  not_prime_of_dvd_of_lt hp hdvd (by omega) (h k hk (by omega))
+'''
+
+def block(p, names):
+    # k(r) : minimal k>=1 with 2^k ≡ r (mod p)
+    kof = {}
+    for k in range(1, p):
+        r = pow(2, k, p)
+        kof.setdefault(r, k)
+    assert len(kof) == p - 1, f"2 is not a primitive root mod {p}"
+    bound = 2 ** (p - 1) + p
+    lines = []
+    lines.append(f"/-- Every `n > 2^{{{p-1}}} + {p} = {bound}` with the Erdős #1142 property is divisible by `{p}`\n(2 is a primitive root mod {p}). -/")
+    lines.append(f"theorem {names} (n : ℕ) (hn : {bound} < n) (h : Erdos1142Prop n) : {p} ∣ n := by")
+    lines.append(f"  by_contra hp")
+    disj = " ∨ ".join(f"n % {p} = {r}" for r in range(1, p))
+    lines.append(f"  have hmod : {disj} := by omega")
+    pat = " | ".join(f"h{r}" for r in range(1, p))
+    lines.append(f"  rcases hmod with {pat}")
+    for r in range(1, p):
+        k = kof[r]
+        lines.append(f"  · exact erdos1142_aux (p := {p}) (k := {k}) (by norm_num) h (by norm_num)\n      (by change {2**k} + {p} < n; omega) (by change {p} ∣ n - {2**k}; omega)")
+    return "\n".join(lines) + "\n"
+
+out = header
+for p, nm in [(3, "three_dvd_of_erdos1142"), (5, "five_dvd_of_erdos1142"), (11, "eleven_dvd_of_erdos1142"), (13, "thirteen_dvd_of_erdos1142")]:
+    out += "\n" + block(p, nm)
+
+out += r'''
+/-- Combined: any `n > 4109` with the property is a multiple of `3 * 5 * 11 * 13 = 2145`. -/
+theorem dvd_2145_of_erdos1142 (n : ℕ) (hn : 4109 < n) (h : Erdos1142Prop n) : 2145 ∣ n := by
+  have h3 := three_dvd_of_erdos1142 n (by omega) h
+  have h5 := five_dvd_of_erdos1142 n (by omega) h
+  have h11 := eleven_dvd_of_erdos1142 n (by omega) h
+  have h13 := thirteen_dvd_of_erdos1142 n (by omega) h
+  omega
+'''
+open("/home/ubuntu/erdos1142/Erdos1142Sieve.lean", "w").write(out)
+print(out)
+
+
+# ===== leancheck.py =====
+#!/usr/bin/env python3
+import json, os, sys, urllib.request
+src = open(sys.argv[1]).read()
+decl = sys.argv[2]
+body = json.dumps({"source": src, "declaration": decl}).encode()
+req = urllib.request.Request("https://thanksgiving-intended-design-analog.trycloudflare.com/worker/attempts/80ac5f8a3f19447ab7ae4c0721f37e50/lean-check", data=body, headers={"X-Worker-Token": os.environ["LAB_WORKER_TOKEN"], "Content-Type": "application/json"})
+try:
+    r = urllib.request.urlopen(req, timeout=1500)
+    print(r.status); print(r.read().decode()[:8000])
+except urllib.error.HTTPError as e:
+    print(e.code, e.read().decode()[:8000])

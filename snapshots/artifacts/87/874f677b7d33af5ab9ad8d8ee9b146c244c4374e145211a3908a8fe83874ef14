@@ -1,0 +1,38 @@
+// Enumerate all union-closed families on [N] (N<=5) as bitmasks over the 2^N subsets.
+// Sets are processed in decreasing order of size so that all strict supersets of S
+// are decided before S; including S then requires S|T present for every included T.
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#define N 5
+#define M (1<<N)
+static int order[M];
+static uint32_t cur = 0;
+static FILE *out;
+static long long cnt = 0;
+static int cmp(const void *a, const void *b) {
+    int x = *(const int*)a, y = *(const int*)b;
+    int px = __builtin_popcount(x), py = __builtin_popcount(y);
+    if (px != py) return py - px;
+    return x - y;
+}
+static void rec(int k) {
+    if (k == M) { fwrite(&cur, 4, 1, out); cnt++; return; }
+    int S = order[k];
+    // exclude
+    rec(k + 1);
+    // include: check closure with all previously included sets
+    uint32_t c = cur;
+    int ok = 1;
+    for (int T = 0; T < M && ok; T++) if (c >> T & 1) { if (!(c >> (S | T) & 1)) ok = 0; }
+    if (ok) { cur |= 1u << S; rec(k + 1); cur &= ~(1u << S); }
+}
+int main(int argc, char **argv) {
+    for (int i = 0; i < M; i++) order[i] = i;
+    qsort(order, M, sizeof(int), cmp);
+    out = fopen(argc > 1 ? argv[1] : "uc5.bin", "wb");
+    rec(0);
+    fclose(out);
+    printf("%lld families (including the empty family)\n", cnt);
+    return 0;
+}

@@ -1,0 +1,68 @@
+"""Verify C5-40b (claim c9ccf809): kissing property, spectrum, isometry group order, deepest hole.
+Also D5 for comparison. Exact arithmetic via integer scaling: multiply by 2*sqrt2 -> integer vectors of norm^2 8.
+"""
+import itertools, numpy as np
+from fractions import Fraction
+from collections import Counter
+from scipy.optimize import minimize
+
+def c540b_int():
+    pts = []
+    for i, j in itertools.combinations(range(4), 2):
+        for si in (1, -1):
+            for sj in (1, -1):
+                v = [0]*5; v[i] = 2*si; v[j] = 2*sj; pts.append(tuple(v))   # 24-cell * 2sqrt2
+    for i in range(4):
+        for s in (1, -1):
+            v = [0]*5; v[i] = 2*s; v[4] = 2; pts.append(tuple(v))          # top cap
+    for signs in itertools.product((1, -1), repeat=4):
+        if signs.count(-1) % 2 == 0:
+            pts.append(tuple(list(signs) + [-2]))                             # bottom cap
+    return pts
+
+def d5_int():
+    pts = []
+    for i, j in itertools.combinations(range(5), 2):
+        for si in (1, -1):
+            for sj in (1, -1):
+                v = [0]*5; v[i] = si; v[j] = sj; pts.append(tuple(v))
+    return pts
+
+def analyse(name, pts, norm2):
+    n = len(pts)
+    gram = [[sum(a*b for a, b in zip(pts[i], pts[j])) for j in range(n)] for i in range(n)]
+    assert all(gram[i][i] == norm2 for i in range(n)), "norms"
+    spec = Counter(Fraction(gram[i][j], norm2) for i in range(n) for j in range(i+1, n))
+    print(name, "N =", n, "max cos =", max(spec), "spectrum:", dict(sorted(spec.items())))
+    # isometry group = automorphisms of Gram matrix (points span R^5), via backtracking
+    rows = [tuple(gram[i]) for i in range(n)]
+    def extend(perm, used):
+        k = len(perm)
+        if k == n:
+            return 1
+        cnt = 0
+        for c in range(n):
+            if c in used: continue
+            if gram[c][c] != gram[k][k]: continue
+            if all(gram[perm[a]][c] == gram[a][k] for a in range(k)):
+                perm.append(c); used.add(c)
+                cnt += extend(perm, used)
+                perm.pop(); used.discard(c)
+        return cnt
+    order = extend([], set())
+    print(name, "isometry group order (Gram automorphisms) =", order)
+    # deepest hole: minimise max_i <p, x_i> over unit p (Nelder-Mead, many starts)
+    X = np.array(pts, dtype=float)/np.sqrt(norm2)
+    rng = np.random.default_rng(0)
+    def f(q):
+        q = q/np.linalg.norm(q); return np.max(X @ q)
+    best = None
+    for _ in range(3000):
+        r = minimize(f, rng.normal(size=5), method="Nelder-Mead", options={"xatol":1e-12,"fatol":1e-14,"maxiter":4000})
+        if best is None or r.fun < best.fun: best = r
+    p = best.x/np.linalg.norm(best.x)
+    print(name, "deepest hole cos =", best.fun, "angle deg =", np.degrees(np.arccos(best.fun)), "2/sqrt10 =", 2/np.sqrt(10), "dir =", np.round(p, 5))
+    return pts
+
+analyse("C5-40b", c540b_int(), 8)
+analyse("D5", d5_int(), 2)

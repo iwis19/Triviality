@@ -1,0 +1,91 @@
+"""Recursive fibre-peeling lower bound for u(L) (idea I3/I5).
+
+Let u(L) = min #uncovered residues of Z/L over assignments of one class to each
+divisor d>1 of L.  Peeling a prime power p^a || L, L = p^a M, gives (derivation in
+the structured output; the fibre argument is the one used by Hough-Nielsen/BBMST):
+
+   u(p^a M) >= (p^a - (p^a-1)/(p-1)) * u(M)  -  (sigma(M) - M) * (p^a-1)/(p-1)
+
+and u(q^a) = q^a - (q^a-1)/(q-1) exactly (nested chain).  ell(L) below is the best
+lower bound obtained by choosing the peeled prime optimally at each step.  ell(L)>=1
+certifies that no distinct covering has lcm exactly L (all moduli dividing L).
+"""
+import sys
+from functools import lru_cache
+from sat_cover import divisors, sigma
+
+
+def factor(n):
+    return divisors(n)[1]
+
+
+@lru_cache(maxsize=None)
+def ell(L):
+    if L == 1:
+        return 1  # Z/1 has one residue and no admissible modulus
+    fac = factor(L)
+    if len(fac) == 1:
+        (q, a), = fac.items()
+        return q ** a - (q ** a - 1) // (q - 1)
+    best = 0
+    for p, a in fac.items():
+        M = L // p ** a
+        g = (p ** a - 1) // (p - 1)  # number of fibres a chain of powers of p can kill
+        b = (p ** a - g) * ell(M) - (sigma(M) - M) * g
+        best = max(best, b)
+    return max(best, 0)
+
+
+def ell_trace(L):
+    fac = factor(L)
+    out = []
+    for p, a in fac.items():
+        M = L // p ** a
+        g = (p ** a - 1) // (p - 1)
+        out.append((p, a, M, ell(M), (p ** a - g) * ell(M) - (sigma(M) - M) * g))
+    return out
+
+
+def pigeonhole_cert(L):
+    """Second certificate.  Peel a prime p || L (exponent 1), M = L/p.  Modulus p kills one
+    fibre; the tau(M)-1 helper moduli p*d (d|M, d>1) are shared by the other p-1 fibres, so
+    some fibre receives k <= floor((tau(M)-1)/(p-1)) helpers, which cover at most the k
+    largest class sizes M/d.  If that is < ell(M) <= |U|, the fibre stays uncovered."""
+    fac = factor(L)
+    for p, a in fac.items():
+        if a != 1:
+            continue
+        M = L // p
+        dM = [d for d in divisors(M)[0] if d > 1]
+        k = (len(dM)) // (p - 1)
+        cap = sum(sorted((M // d for d in dM), reverse=True)[:k])
+        if cap < ell(M):
+            return (p, M, k, cap, ell(M))
+    return None
+
+
+if __name__ == '__main__':
+    if sys.argv[1] == 'scan':
+        N = int(sys.argv[2])
+        fails = []
+        cnt = 0
+        cert2 = 0
+        for L in range(3, N + 1, 2):
+            if sigma(L) < 2 * L:
+                continue  # not abundant: u(L)>=1 by the density (folklore) bound
+            cnt += 1
+            if ell(L) < 1:
+                if pigeonhole_cert(L):
+                    cert2 += 1
+                else:
+                    fails.append(L)
+        print('odd abundant L <= %d: %d;  certified by pigeonhole only: %d;  uncertified: %d' % (N, cnt, cert2, len(fails)))
+        print('first uncertified:', fails[:40])
+    elif sys.argv[1] == 'pig':
+        for L in map(int, sys.argv[2:]):
+            print(L, factor(L), 'ell=%d' % ell(L), 'pigeonhole cert:', pigeonhole_cert(L))
+    else:
+        for L in map(int, sys.argv[1:]):
+            print('L=%d %s sigma/L=%.4f ell(L)=%d' % (L, factor(L), sigma(L) / L, ell(L)))
+            for p, a, M, eM, b in ell_trace(L):
+                print('   peel %d^%d: M=%d ell(M)=%d -> %d' % (p, a, M, eM, b))

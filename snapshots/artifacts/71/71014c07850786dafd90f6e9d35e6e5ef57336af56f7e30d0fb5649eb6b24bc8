@@ -1,0 +1,70 @@
+"""Graph-generated union-closed families F(G) = union-closure of edge set of G (vertex sets of
+subgraphs without isolated vertices).  Own reasoning: T5 fails at x whenever
+  e := V \\ N[x] is nonempty, every vertex of e has a neighbour in e, and every neighbour of x has a neighbour in e.
+Proof: F ∩ up(e) = {e ∪ S : S ⊆ N(x)} ∪ {e ∪ S ∪ {x} : ∅ ≠ S ⊆ N(x)} has 2^d sets without x and 2^d - 1 with x,
+so Hall's condition fails for G_e = {A ∈ F_{not x} : A ⊇ e}.
+We check (i) the criterion always implies T5-failure at x (sanity), and (ii) how often 'criterion for all x'
+coincides with 'T5 fails for all x' over all graphs on 5 and 6 vertices without isolated vertices.
+"""
+import itertools
+
+def closure(gens):
+    F = set(gens); frontier = list(F)
+    while frontier:
+        new = []
+        for a in frontier:
+            for b in list(F):
+                u = a | b
+                if u not in F:
+                    F.add(u); new.append(u)
+        frontier = new
+    return F
+
+def t5_at(F, n, x):
+    L = [A for A in F if not A >> x & 1]; R = [B for B in F if B >> x & 1]
+    if len(L) > len(R): return False
+    match = {}
+    def aug(a, seen):
+        for b in R:
+            if a & ~b or b in seen: continue
+            seen.add(b)
+            if b not in match or aug(match[b], seen):
+                match[b] = a; return True
+        return False
+    return all(aug(a, set()) for a in L)
+
+def criterion_at(adj, n, x):
+    Nx = adj[x]; closed = Nx | {x}
+    e = set(range(n)) - closed
+    if not e: return False
+    if any(not (adj[v] & e) for v in e): return False
+    if any(not (adj[y] & e) for y in Nx): return False
+    return True
+
+def run(n):
+    pairs = [(i, j) for i in range(n) for j in range(i + 1, n)]
+    stats = dict(graphs=0, t5fail_all=0, crit_all=0, both=0, crit_not_t5=0, t5_not_crit=0, bad=0)
+    examples = []
+    for mask in range(1, 1 << len(pairs)):
+        E = [pairs[k] for k in range(len(pairs)) if mask >> k & 1]
+        adj = {v: set() for v in range(n)}
+        for i, j in E: adj[i].add(j); adj[j].add(i)
+        if any(not adj[v] for v in range(n)): continue  # require no isolated vertices (else universe shrinks)
+        F = closure([(1 << i) | (1 << j) for i, j in E])
+        stats['graphs'] += 1
+        t5 = [t5_at(F, n, x) for x in range(n)]
+        cr = [criterion_at(adj, n, x) for x in range(n)]
+        for x in range(n):
+            if cr[x] and t5[x]: stats['bad'] += 1
+        fail_all = not any(t5); crit_all = all(cr)
+        stats['t5fail_all'] += fail_all; stats['crit_all'] += crit_all
+        stats['both'] += fail_all and crit_all
+        if crit_all and not fail_all: stats['crit_not_t5'] += 1
+        if fail_all and not crit_all:
+            stats['t5_not_crit'] += 1
+            if len(examples) < 5: examples.append(E)
+    print(n, stats)
+    for E in examples: print("  T5-fails-for-all-x but criterion not for all x:", E)
+
+if __name__ == '__main__':
+    run(5); run(6)

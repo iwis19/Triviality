@@ -179,6 +179,20 @@ and the API clients (public calls carry no credentials; the private key travels 
 `X-API-Key`).
 SQLite is the default database; set `MATHLAB_DATABASE_URL` to a PostgreSQL URL for deployment.
 
+### Restoring a research snapshot
+
+`snapshots/` holds dated copies of the live SQLite database plus the `artifacts/` tree
+(Lean sources, checker logs, experiment outputs) from real runs. To resume from one:
+
+```bash
+cp snapshots/mathlab-2026-09-19.db backend/mathlab.db
+cp -r snapshots/artifacts backend/artifacts
+```
+
+Collaborator keys are stored hashed, so the owner key comes from `MATHLAB_OWNER_API_KEY` as
+usual; attempts still marked running belong to sessions of the account that launched them
+and are reconciled or timed out by the scheduler on the next tick.
+
 ## API surface
 
 | Prefix | Auth | Purpose |

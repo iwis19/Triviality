@@ -1,0 +1,121 @@
+"""Exact experiments on the lonely runner conjecture (LRC).
+
+Normalization: one runner has speed 0; the other n = k-1 runners have distinct
+positive integer speeds v_1<...<v_n.  gap(v) = sup_t min_i ||v_i t||, where
+||x|| = distance to nearest integer.  LRC(k): gap(v) >= 1/(n+1) = 1/k.
+
+Facts used (own reasoning, elementary): f(t)=min_i ||v_i t|| is piecewise
+linear with breakpoints where some ||v_i t|| has a kink (t = m/(2 v_i)) or two
+pieces cross (v_i t = +- v_j t mod 1, i.e. t = m/(v_i -+ v_j)); hence the sup is
+attained at a rational t = m/d with d in {2v_i, v_i+v_j, |v_i-v_j|}.
+All arithmetic is exact (integers / Fractions).
+"""
+from fractions import Fraction
+from itertools import combinations
+from math import gcd
+import sys, json
+
+def gap(v):
+    dens = set()
+    for a in v:
+        dens.add(2*a)
+    for a, b in combinations(v, 2):
+        dens.add(a+b); dens.add(abs(a-b))
+    dens.discard(0)
+    best = Fraction(0)
+    best_t = Fraction(0)
+    for d in dens:
+        for m in range(d):
+            g = min(min(r, d-r) for r in ((a*m) % d for a in v))
+            fr = Fraction(g, d)
+            if fr > best:
+                best, best_t = fr, Fraction(m, d)
+    return best, best_t
+
+def min_cert_denominator(v, qmax):
+    """smallest q such that some t=a/q has min_i ||v_i t|| >= 1/(n+1)."""
+    n = len(v)
+    for q in range(1, qmax+1):
+        for a in range(q):
+            if all(min(r, q-r)*(n+1) >= q for r in ((x*a) % q for x in v)):
+                return q, Fraction(a, q)
+    return None, None
+
+def near_set(a, delta):
+    """B_a = {t in [0,1): ||a t|| < delta} as list of (lo,hi) Fractions."""
+    out = []
+    for m in range(a):
+        lo, hi = Fraction(m, a) - delta/a, Fraction(m, a) + delta/a
+        out.append((lo, hi))
+    # wrap: m=0 interval goes negative; shift into [0,1)
+    res = []
+    for lo, hi in out:
+        if lo < 0:
+            res.append((lo+1, Fraction(1))); res.append((Fraction(0), hi))
+        else:
+            res.append((lo, hi))
+    return res
+
+def meas_intersection(I, J):
+    tot = Fraction(0)
+    for lo, hi in I:
+        for lo2, hi2 in J:
+            l, h = max(lo, lo2), min(hi, hi2)
+            if h > l: tot += h - l
+    return tot
+
+def hunter_certifies(v, delta):
+    """Hunter's bound: mu(U B_i) <= sum mu(B_i) - max_T sum_{ij in T} mu(B_i cap B_j).
+    Certifies existence of lonely t (gap>=delta) if the bound is < 1."""
+    n = len(v)
+    B = [near_set(a, delta) for a in v]
+    W = {}
+    for i, j in combinations(range(n), 2):
+        W[(i, j)] = meas_intersection(B[i], B[j])
+    # maximum spanning tree (Kruskal)
+    parent = list(range(n))
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]; x = parent[x]
+        return x
+    total = Fraction(0)
+    for (i, j), w in sorted(W.items(), key=lambda kv: -kv[1]):
+        ri, rj = find(i), find(j)
+        if ri != rj:
+            parent[ri] = rj; total += w
+    bound = n*2*delta - total
+    return bound < 1, bound
+
+if __name__ == "__main__":
+    n = int(sys.argv[1]); vmax = int(sys.argv[2])
+    delta = Fraction(1, n+1)
+    stats = {"n": n, "vmax": vmax, "count": 0, "min_gap": None, "tight_sets": [],
+             "second_smallest_gap": None, "second_gap_sets": [],
+             "max_min_cert_denominator": 0, "worst_cert_sets": [],
+             "hunter_certified": 0, "hunter_examples_fail": []}
+    gaps = {}
+    for v in combinations(range(1, vmax+1), n):
+        if gcd(*v) != 1:  # scaling-invariant: skip non-primitive sets
+            continue
+        stats["count"] += 1
+        g, t = gap(v)
+        gaps.setdefault(g, []).append(v)
+        q, tq = min_cert_denominator(v, 2*vmax+2)
+        if q is None:
+            stats.setdefault("COUNTEREXAMPLE_CANDIDATES", []).append(v)
+        elif q > stats["max_min_cert_denominator"]:
+            stats["max_min_cert_denominator"] = q; stats["worst_cert_sets"] = [v]
+        elif q == stats["max_min_cert_denominator"]:
+            stats["worst_cert_sets"].append(v)
+        ok, bnd = hunter_certifies(v, delta)
+        if ok: stats["hunter_certified"] += 1
+        elif len(stats["hunter_examples_fail"]) < 3:
+            stats["hunter_examples_fail"].append((v, str(bnd)))
+    srt = sorted(gaps)
+    stats["min_gap"] = str(srt[0]); stats["tight_sets"] = gaps[srt[0]]
+    if len(srt) > 1:
+        stats["second_smallest_gap"] = str(srt[1]); stats["second_gap_sets"] = gaps[srt[1]][:10]
+        stats["kravitz_jump"] = str(srt[1] - srt[0])
+    stats["gap_spectrum_smallest5"] = [(str(g), len(gaps[g])) for g in srt[:5]]
+    stats["worst_cert_sets"] = stats["worst_cert_sets"][:10]
+    print(json.dumps(stats, default=str, indent=1))

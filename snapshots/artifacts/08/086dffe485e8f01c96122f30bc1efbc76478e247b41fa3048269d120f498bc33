@@ -1,0 +1,92 @@
+"""
+Sawin's Question 9 (arXiv:2211.11504): for mu on 2^[n] with all frequencies < 1/2 and H(mu) > 0, do
+there exist A, B ~ mu (not nec. independent) with H(A u B) > H(A)?
+
+Own reasoning (unverified against literature): f(pi) = H(law of A u B) is concave in the coupling pi,
+and the identity coupling pi_0 (B = A) gives f(pi_0) = H(mu). Hence sup_pi f(pi) > H(mu) iff some
+directional derivative at pi_0 is positive, i.e. iff
+        max_{pi in Pi(mu,mu)}  E_pi[ -log mu(A u B) ]  >  H(mu)                      (LP)
+(with -log mu(u) = +inf when mu(u) = 0, so the question is only non-trivial when supp(mu) is
+union-closed).  For mu uniform on a union-closed F the LP value equals log|F| = H(mu): Q9 is then
+EXACTLY Frankl for F.  For non-uniform mu it is a strictly stronger statement, testable by an LP.
+
+This script samples random mu with union-closed support and all frequencies < 1/2 (n <= 4) and
+records the LP margin  max_pi E[-log mu(A u B)] - H(mu).  A margin <= 0 would refute Q9.
+"""
+import numpy as np, itertools, sys
+from scipy.optimize import linprog
+
+rng = np.random.default_rng(int(sys.argv[2]) if len(sys.argv) > 2 else 0)
+
+
+def union_closure(sets):
+    S = set(sets)
+    changed = True
+    while changed:
+        changed = False
+        for a in list(S):
+            for b in list(S):
+                if (a | b) not in S:
+                    S.add(a | b); changed = True
+    return sorted(S)
+
+
+def freqs(F, mu, n):
+    return [sum(mu[i] for i, a in enumerate(F) if a >> x & 1) for x in range(n)]
+
+
+def lp_margin(F, mu):
+    m = len(F)
+    idx = {a: i for i, a in enumerate(F)}
+    nl = -np.log2(mu)
+    # cost c(a,b) = -log mu(a u b); maximise => minimise -c
+    C = np.array([[nl[idx[F[i] | F[j]]] for j in range(m)] for i in range(m)])
+    A_eq = np.zeros((2 * m, m * m)); b_eq = np.concatenate([mu, mu])
+    for i in range(m):
+        A_eq[i, i * m:(i + 1) * m] = 1          # row marginal
+        A_eq[m + i, i::m] = 1                   # column marginal
+    res = linprog(-C.ravel(), A_eq=A_eq, b_eq=b_eq, bounds=(0, None), method="highs")
+    assert res.status == 0, res.message
+    H = float((mu * nl).sum())
+    return -res.fun - H, H
+
+
+def random_instance(n):
+    # random generating family -> union closure -> random weights, rejection-sample freq < 1/2
+    k = rng.integers(1, 2 ** n)
+    gens = rng.choice(2 ** n, size=k, replace=False).tolist()
+    F = union_closure(gens)
+    if len(F) < 2:
+        return None
+    for _ in range(200):
+        w = rng.dirichlet(np.full(len(F), rng.choice([0.2, 0.5, 1.0, 3.0])))
+        w = np.maximum(w, 1e-3); w /= w.sum()
+        if max(freqs(F, w, n)) < 0.5 and float(-(w * np.log2(w)).sum()) >= 0.5:
+            return F, w
+    return None
+
+
+if __name__ == "__main__":
+    n = int(sys.argv[1]) if len(sys.argv) > 1 else 3
+    trials = int(sys.argv[3]) if len(sys.argv) > 3 else 3000
+    best = (np.inf, None)
+    tested = 0
+    for _ in range(trials):
+        inst = random_instance(n)
+        if inst is None:
+            continue
+        F, w = inst
+        margin, H = lp_margin(F, w)
+        tested += 1
+        if margin / H < best[0]:
+            best = (margin / H, (F, np.round(w, 4).tolist(), np.round(freqs(F, w, n), 3), H))
+    # structured: p-biased product measures and two-component mixtures thereof (Sawin Prop. 6 style)
+    Fall = list(range(2 ** n))
+    for p in [0.3, 0.38, 0.45, 0.49]:
+        w = np.array([p ** bin(a).count('1') * (1 - p) ** (n - bin(a).count('1')) for a in Fall])
+        margin, H = lp_margin(Fall, w)
+        print(f"  product p={p}: margin/H = {margin / H:.5f}")
+    print(f"n={n}: tested {tested} random measures with union-closed support, max freq < 1/2, H >= 0.5")
+    print(f"  smallest relative LP margin (max_pi E[-log mu(AuB)] - H(mu)) / H(mu) = {best[0]:.6f}")
+    F, w, fr, H = best[1]
+    print(f"  attained at F={[bin(a)[2:].zfill(n) for a in F]}, mu={w}, freqs={fr.tolist()}, H={H:.4f}")

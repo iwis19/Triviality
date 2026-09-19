@@ -1,0 +1,30 @@
+"""Idea I4 (Schinzel polynomial route): the system  f(x) = -x^{r_m}  (mod Phi_m(x)) for all
+moduli m of a covering has a solution f in Z[x] iff each pair is compatible in
+Z[x]/(Phi_m, Phi_n).  Apostol (1970): Res(Phi_m,Phi_n) = p^{phi(m)} if n/m = p^k (m<n),
+and 1 otherwise, so only prime-power-ratio pairs impose a condition.  We test, for
+m | n with n/m a prime power, for which (r_m, r_n) the pair is compatible, i.e. whether
+x^{r_n} - x^{r_m} lies in the ideal (Phi_m, Phi_n) of Z[x].  Test: reduce mod Phi_n and
+check divisibility by Phi_m(zeta_n) in Z[zeta_n] (power basis, so integrality of
+coefficients is the criterion)."""
+from sympy import symbols, cyclotomic_poly, Poly, QQ, ZZ, gcdex, div, resultant, totient
+x = symbols('x')
+
+
+def compatible(m, n, rm, rn):
+    Pm = Poly(cyclotomic_poly(m, x), x, domain=QQ)
+    Pn = Poly(cyclotomic_poly(n, x), x, domain=QQ)
+    s, t, g = gcdex(Pm, Pn)  # s*Pm + t*Pn = g (=1 up to scalar)
+    assert g.degree() == 0
+    inv = (s * (1 / g.LC())).rem(Pn)  # inverse of Pm mod Pn
+    target = Poly(x ** rn - x ** rm, x, domain=QQ).rem(Pn)
+    q = (target * inv).rem(Pn)
+    return all(c.denominator == 1 for c in q.all_coeffs())
+
+
+if __name__ == '__main__':
+    for (m, n) in [(3, 9), (9, 27), (5, 15), (3, 15), (7, 21), (3, 21), (5, 25), (15, 45), (9, 45), (5, 45), (3, 45), (7, 35), (5, 35)]:
+        r = resultant(cyclotomic_poly(m, x), cyclotomic_poly(n, x))
+        pairs = [(rm, rn) for rm in range(m) for rn in range(n) if compatible(m, n, rm, rn)]
+        nested = [(rm, rn) for rm in range(m) for rn in range(n) if rn % m == rm]
+        print('m=%d n=%d n/m=%d Res=%d phi(m)=%d  compatible pairs=%d  all pairs=%d  compatible==nested(r_n = r_m mod m): %s'
+              % (m, n, n // m, r, totient(m), len(pairs), m * n, set(pairs) == set(nested)))

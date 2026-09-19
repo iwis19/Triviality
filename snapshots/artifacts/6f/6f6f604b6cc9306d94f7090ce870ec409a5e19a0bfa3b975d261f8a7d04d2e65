@@ -1,0 +1,117 @@
+"""Goldbach hypothesis-generator experiments (pure Python, no deps).
+
+E1: r(N) = #{(p,q): p<=q, p+q=N} for even N <= LIMIT; compare with the
+    Hardy-Littlewood prediction  HL(N) = 2*C2 * prod_{p|N, p>2} (p-1)/(p-2) * N / log(N)^2
+    (this is the ordered-pair prediction; we halve it to compare with unordered r(N)).
+E2: Chen-type counts: #{p<N : N-p in P_2} versus #{p<N: N-p prime}, where P_2 = product of at most two primes.
+E3: Exponential sum S(alpha) = sum_{p<=N} log p e(p alpha) at minor-arc points alpha = a/q + 1/(qQ),
+    compared with sqrt(N)*log N (square-root heuristic) and N/log(N)^2 (what a pointwise
+    minor-arc bound would need to beat for the binary problem).
+"""
+import math, cmath, sys, random
+
+LIMIT = int(sys.argv[1]) if len(sys.argv) > 1 else 200_000
+
+def sieve(n):
+    s = bytearray([1]) * (n + 1)
+    s[0] = s[1] = 0
+    for i in range(2, int(n ** 0.5) + 1):
+        if s[i]:
+            s[i*i::i] = bytearray(len(range(i*i, n+1, i)))
+    return s
+
+def omega_table(n):
+    """number of prime factors with multiplicity (Omega) for 0..n"""
+    Om = [0] * (n + 1)
+    for p in range(2, n + 1):
+        if Om[p] == 0:  # p is prime
+            pk = p
+            while pk <= n:
+                for m in range(pk, n + 1, pk):
+                    Om[m] += 1
+                pk *= p
+    return Om
+
+isp = sieve(LIMIT)
+primes = [i for i in range(2, LIMIT + 1) if isp[i]]
+C2 = 0.6601618158468696  # twin prime constant
+
+def hl(N):
+    prod = 1.0
+    m = N
+    while m % 2 == 0:
+        m //= 2
+    p = 3
+    while p * p <= m:
+        if m % p == 0:
+            prod *= (p - 1) / (p - 2)
+            while m % p == 0:
+                m //= p
+        p += 2
+    if m > 1:
+        prod *= (m - 1) / (m - 2)
+    return 2 * C2 * prod * N / math.log(N) ** 2
+
+# ---- E1 ----
+print("=== E1: representation counts vs Hardy-Littlewood ===")
+worst = (10.0, None)
+zero = []
+odd_primes = [p for p in primes if p > 2]
+for N in range(4, LIMIT + 1, 2):
+    r = 0
+    if N == 4:
+        r = 1
+    else:
+        for p in odd_primes:
+            if 2 * p > N:
+                break
+            if isp[N - p]:
+                r += 1
+    if r == 0:
+        zero.append(N)
+    if N >= 1000:
+        ratio = r / (hl(N) / 2)  # unordered vs halved ordered prediction
+        if ratio < worst[0]:
+            worst = (ratio, N, r)
+print("even N in [4,%d] with r(N)=0:" % LIMIT, zero)
+print("min over N>=1000 of r(N)/(HL(N)/2): ratio=%.4f at N=%d, r=%d" % worst)
+
+# ---- E2 ----
+print("=== E2: Chen-type P_2 representations ===")
+Om = omega_table(LIMIT)
+for N in [10**4, 10**4 + 2, 5 * 10**4, 10**5, 2 * 10**5]:
+    if N > LIMIT:
+        continue
+    r1 = r2 = 0
+    for p in primes:
+        if p >= N:
+            break
+        m = N - p
+        if m < 2:
+            continue
+        if Om[m] == 1:
+            r1 += 1
+        elif Om[m] == 2:
+            r2 += 1
+    print("N=%d  #{p: N-p prime}=%d  #{p: N-p=P_2 exactly two factors}=%d  ratio P2/P1=%.3f  (heuristic ~ log log N=%.3f)"
+          % (N, r1, r2, r2 / r1, math.log(math.log(N))))
+
+# ---- E3 ----
+print("=== E3: minor-arc exponential sums ===")
+N = LIMIT
+plog = [(p, math.log(p)) for p in primes]
+Q = int(math.sqrt(N))
+random.seed(1)
+def S(alpha):
+    tot = 0j
+    for p, lp in plog:
+        tot += lp * cmath.exp(2j * math.pi * p * alpha)
+    return tot
+print("N=%d sqrt(N)logN=%.1f  N/log^2N=%.1f  N=%d" % (N, math.sqrt(N) * math.log(N), N / math.log(N) ** 2, N))
+for q in [Q // 2, Q, 2 * Q, 5 * Q]:
+    a = random.choice([x for x in range(1, q) if math.gcd(x, q) == 1])
+    alpha = a / q + 1.0 / (q * Q)
+    s = abs(S(alpha))
+    print("q=%d a=%d |S|=%.1f  |S|/(sqrt(N)logN)=%.2f  |S|/(N/log^2 N)=%.3f" % (q, a, s, s / (math.sqrt(N) * math.log(N)), s / (N / math.log(N) ** 2)))
+# major arc sanity: alpha = 1/2 gives ~ -N (all odd primes), alpha=1/3 gives ~ -N/2
+print("major-arc sanity |S(1/2)|/N=%.3f  |S(1/3)|/(N/2)=%.3f" % (abs(S(0.5)) / N, abs(S(1 / 3)) / (N / 2)))

@@ -1,0 +1,25 @@
+"""Delsarte LP bound for spherical codes on S^4 whose inner products are restricted to
+a given set T (subset of [-1,1/2]).  Used to probe idea I4: how much of the
+'root-system-like' inner-product structure must a 41-point kissing code abandon?"""
+import numpy as np
+from scipy.optimize import linprog
+from delsarte_lp import gegen_norm
+
+def lp_bound_on_set(n, ts, deg):
+    A = np.array([[gegen_norm(k, n, t) for k in range(1, deg + 1)] for t in ts])
+    res = linprog(c=np.ones(deg), A_ub=A, b_ub=-np.ones(len(ts)), bounds=[(0, None)] * deg, method="highs")
+    return 1.0 + res.fun if res.status == 0 else float("nan")
+
+n, deg = 5, 30
+cases = {
+  "exact root-system set {-1,-1/2,0,1/2}": np.array([-1, -0.5, 0, 0.5]),
+  "eps=0.02 nbhds of {-1,-1/2,0,1/2}": np.concatenate([[-1.0], np.linspace(-0.52,-0.48,41), np.linspace(-0.02,0.02,41), np.linspace(0.48,0.5,21)]),
+  "eps=0.05 nbhds": np.concatenate([[-1.0], np.linspace(-0.55,-0.45,101), np.linspace(-0.05,0.05,101), np.linspace(0.45,0.5,51)]),
+  "eps=0.10 nbhds": np.concatenate([np.linspace(-1,-0.9,51), np.linspace(-0.6,-0.4,201), np.linspace(-0.1,0.1,201), np.linspace(0.4,0.5,101)]),
+  "full [-1,1/2]": np.linspace(-1, 0.5, 4001),
+  "[-1,1/2] minus (-0.45,-0.05)": np.concatenate([np.linspace(-1,-0.45,1500), np.linspace(-0.05,0.5,1500)]),
+  "[-1,1/2] minus (0.05,0.45)": np.concatenate([np.linspace(-1,0.05,2800), np.linspace(0.45,0.5,200)]),
+  "[-1,1/2] minus (-0.95,-0.55)": np.concatenate([np.linspace(-1,-0.95,200), np.linspace(-0.55,0.5,2800)]),
+}
+for name, ts in cases.items():
+    print(f"{name:45s}: LP bound = {lp_bound_on_set(n, ts, deg):.4f}")

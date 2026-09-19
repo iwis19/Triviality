@@ -1,0 +1,109 @@
+import Mathlib
+
+/-- The property in Erdős #1142: `n - 2^k` is prime for every `k ≥ 1` with `2^k < n`. -/
+def Erdos1142Prop (n : ℕ) : Prop := ∀ k : ℕ, 1 ≤ k → 2 ^ k < n → Nat.Prime (n - 2 ^ k)
+
+lemma not_prime_of_dvd_of_lt {p m : ℕ} (hp : p.Prime) (hdvd : p ∣ m) (hlt : p < m) :
+    ¬ m.Prime := by
+  intro hm
+  rcases (Nat.dvd_prime hm).1 hdvd with h | h
+  · exact hp.one_lt.ne' h
+  · exact hlt.ne h
+
+/-- If some `n - 2^k` (with `2^k + p < n`) is divisible by the prime `p`, then `n` fails the
+property. -/
+lemma erdos1142_aux {n p k : ℕ} (hp : p.Prime) (h : Erdos1142Prop n) (hk : 1 ≤ k)
+    (hlt : 2 ^ k + p < n) (hdvd : p ∣ n - 2 ^ k) : False :=
+  not_prime_of_dvd_of_lt hp hdvd (by omega) (h k hk (by omega))
+
+/-- Every `n > 2^{2} + 3 = 7` with the Erdős #1142 property is divisible by `3`
+(2 is a primitive root mod 3). -/
+theorem three_dvd_of_erdos1142 (n : ℕ) (hn : 7 < n) (h : Erdos1142Prop n) : 3 ∣ n := by
+  by_contra hp
+  have hmod : n % 3 = 1 ∨ n % 3 = 2 := by omega
+  rcases hmod with h1 | h2
+  · exact erdos1142_aux (p := 3) (k := 2) (by norm_num) h (by norm_num)
+      (by change 4 + 3 < n; omega) (by change 3 ∣ n - 4; omega)
+  · exact erdos1142_aux (p := 3) (k := 1) (by norm_num) h (by norm_num)
+      (by change 2 + 3 < n; omega) (by change 3 ∣ n - 2; omega)
+
+/-- Every `n > 2^{4} + 5 = 21` with the Erdős #1142 property is divisible by `5`
+(2 is a primitive root mod 5). -/
+theorem five_dvd_of_erdos1142 (n : ℕ) (hn : 21 < n) (h : Erdos1142Prop n) : 5 ∣ n := by
+  by_contra hp
+  have hmod : n % 5 = 1 ∨ n % 5 = 2 ∨ n % 5 = 3 ∨ n % 5 = 4 := by omega
+  rcases hmod with h1 | h2 | h3 | h4
+  · exact erdos1142_aux (p := 5) (k := 4) (by norm_num) h (by norm_num)
+      (by change 16 + 5 < n; omega) (by change 5 ∣ n - 16; omega)
+  · exact erdos1142_aux (p := 5) (k := 1) (by norm_num) h (by norm_num)
+      (by change 2 + 5 < n; omega) (by change 5 ∣ n - 2; omega)
+  · exact erdos1142_aux (p := 5) (k := 3) (by norm_num) h (by norm_num)
+      (by change 8 + 5 < n; omega) (by change 5 ∣ n - 8; omega)
+  · exact erdos1142_aux (p := 5) (k := 2) (by norm_num) h (by norm_num)
+      (by change 4 + 5 < n; omega) (by change 5 ∣ n - 4; omega)
+
+/-- Every `n > 2^{10} + 11 = 1035` with the Erdős #1142 property is divisible by `11`
+(2 is a primitive root mod 11). -/
+theorem eleven_dvd_of_erdos1142 (n : ℕ) (hn : 1035 < n) (h : Erdos1142Prop n) : 11 ∣ n := by
+  by_contra hp
+  have hmod : n % 11 = 1 ∨ n % 11 = 2 ∨ n % 11 = 3 ∨ n % 11 = 4 ∨ n % 11 = 5 ∨ n % 11 = 6 ∨ n % 11 = 7 ∨ n % 11 = 8 ∨ n % 11 = 9 ∨ n % 11 = 10 := by omega
+  rcases hmod with h1 | h2 | h3 | h4 | h5 | h6 | h7 | h8 | h9 | h10
+  · exact erdos1142_aux (p := 11) (k := 10) (by norm_num) h (by norm_num)
+      (by change 1024 + 11 < n; omega) (by change 11 ∣ n - 1024; omega)
+  · exact erdos1142_aux (p := 11) (k := 1) (by norm_num) h (by norm_num)
+      (by change 2 + 11 < n; omega) (by change 11 ∣ n - 2; omega)
+  · exact erdos1142_aux (p := 11) (k := 8) (by norm_num) h (by norm_num)
+      (by change 256 + 11 < n; omega) (by change 11 ∣ n - 256; omega)
+  · exact erdos1142_aux (p := 11) (k := 2) (by norm_num) h (by norm_num)
+      (by change 4 + 11 < n; omega) (by change 11 ∣ n - 4; omega)
+  · exact erdos1142_aux (p := 11) (k := 4) (by norm_num) h (by norm_num)
+      (by change 16 + 11 < n; omega) (by change 11 ∣ n - 16; omega)
+  · exact erdos1142_aux (p := 11) (k := 9) (by norm_num) h (by norm_num)
+      (by change 512 + 11 < n; omega) (by change 11 ∣ n - 512; omega)
+  · exact erdos1142_aux (p := 11) (k := 7) (by norm_num) h (by norm_num)
+      (by change 128 + 11 < n; omega) (by change 11 ∣ n - 128; omega)
+  · exact erdos1142_aux (p := 11) (k := 3) (by norm_num) h (by norm_num)
+      (by change 8 + 11 < n; omega) (by change 11 ∣ n - 8; omega)
+  · exact erdos1142_aux (p := 11) (k := 6) (by norm_num) h (by norm_num)
+      (by change 64 + 11 < n; omega) (by change 11 ∣ n - 64; omega)
+  · exact erdos1142_aux (p := 11) (k := 5) (by norm_num) h (by norm_num)
+      (by change 32 + 11 < n; omega) (by change 11 ∣ n - 32; omega)
+
+/-- Every `n > 2^{12} + 13 = 4109` with the Erdős #1142 property is divisible by `13`
+(2 is a primitive root mod 13). -/
+theorem thirteen_dvd_of_erdos1142 (n : ℕ) (hn : 4109 < n) (h : Erdos1142Prop n) : 13 ∣ n := by
+  by_contra hp
+  have hmod : n % 13 = 1 ∨ n % 13 = 2 ∨ n % 13 = 3 ∨ n % 13 = 4 ∨ n % 13 = 5 ∨ n % 13 = 6 ∨ n % 13 = 7 ∨ n % 13 = 8 ∨ n % 13 = 9 ∨ n % 13 = 10 ∨ n % 13 = 11 ∨ n % 13 = 12 := by omega
+  rcases hmod with h1 | h2 | h3 | h4 | h5 | h6 | h7 | h8 | h9 | h10 | h11 | h12
+  · exact erdos1142_aux (p := 13) (k := 12) (by norm_num) h (by norm_num)
+      (by change 4096 + 13 < n; omega) (by change 13 ∣ n - 4096; omega)
+  · exact erdos1142_aux (p := 13) (k := 1) (by norm_num) h (by norm_num)
+      (by change 2 + 13 < n; omega) (by change 13 ∣ n - 2; omega)
+  · exact erdos1142_aux (p := 13) (k := 4) (by norm_num) h (by norm_num)
+      (by change 16 + 13 < n; omega) (by change 13 ∣ n - 16; omega)
+  · exact erdos1142_aux (p := 13) (k := 2) (by norm_num) h (by norm_num)
+      (by change 4 + 13 < n; omega) (by change 13 ∣ n - 4; omega)
+  · exact erdos1142_aux (p := 13) (k := 9) (by norm_num) h (by norm_num)
+      (by change 512 + 13 < n; omega) (by change 13 ∣ n - 512; omega)
+  · exact erdos1142_aux (p := 13) (k := 5) (by norm_num) h (by norm_num)
+      (by change 32 + 13 < n; omega) (by change 13 ∣ n - 32; omega)
+  · exact erdos1142_aux (p := 13) (k := 11) (by norm_num) h (by norm_num)
+      (by change 2048 + 13 < n; omega) (by change 13 ∣ n - 2048; omega)
+  · exact erdos1142_aux (p := 13) (k := 3) (by norm_num) h (by norm_num)
+      (by change 8 + 13 < n; omega) (by change 13 ∣ n - 8; omega)
+  · exact erdos1142_aux (p := 13) (k := 8) (by norm_num) h (by norm_num)
+      (by change 256 + 13 < n; omega) (by change 13 ∣ n - 256; omega)
+  · exact erdos1142_aux (p := 13) (k := 10) (by norm_num) h (by norm_num)
+      (by change 1024 + 13 < n; omega) (by change 13 ∣ n - 1024; omega)
+  · exact erdos1142_aux (p := 13) (k := 7) (by norm_num) h (by norm_num)
+      (by change 128 + 13 < n; omega) (by change 13 ∣ n - 128; omega)
+  · exact erdos1142_aux (p := 13) (k := 6) (by norm_num) h (by norm_num)
+      (by change 64 + 13 < n; omega) (by change 13 ∣ n - 64; omega)
+
+/-- Combined: any `n > 4109` with the property is a multiple of `3 * 5 * 11 * 13 = 2145`. -/
+theorem dvd_2145_of_erdos1142 (n : ℕ) (hn : 4109 < n) (h : Erdos1142Prop n) : 2145 ∣ n := by
+  have h3 := three_dvd_of_erdos1142 n (by omega) h
+  have h5 := five_dvd_of_erdos1142 n (by omega) h
+  have h11 := eleven_dvd_of_erdos1142 n (by omega) h
+  have h13 := thirteen_dvd_of_erdos1142 n (by omega) h
+  omega

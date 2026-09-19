@@ -1,0 +1,47 @@
+// Enumerate all union-closed families F of subsets of [n] (n<=5), including the empty family.
+// Output: binary file of uint32 masks; bit s set iff subset s (as bitmask) is in F.
+// Method: decide subsets in order of non-increasing cardinality; when deciding S, every
+// S|T with T already included and S|T != S has larger cardinality so is already decided.
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+
+static int n, N;
+static int order[32];
+static uint32_t inc = 0;           // bit s: subset s included
+static int incl_list[32], ninc = 0;
+static uint64_t count = 0;
+static FILE *out;
+
+static void rec(int idx) {
+    if (idx == N) { fwrite(&inc, 4, 1, out); count++; return; }
+    int S = order[idx];
+    // option 1: exclude S
+    rec(idx + 1);
+    // option 2: include S if closure constraints allow
+    for (int i = 0; i < ninc; i++) {
+        int u = S | incl_list[i];
+        if (u != S && !((inc >> u) & 1)) return;
+    }
+    inc |= (1u << S); incl_list[ninc++] = S;
+    rec(idx + 1);
+    ninc--; inc &= ~(1u << S);
+}
+
+int cmp(const void *a, const void *b) {
+    int x = *(const int*)a, y = *(const int*)b;
+    int px = __builtin_popcount(x), py = __builtin_popcount(y);
+    if (px != py) return py - px;
+    return x - y;
+}
+
+int main(int argc, char **argv) {
+    n = atoi(argv[1]); N = 1 << n;
+    for (int i = 0; i < N; i++) order[i] = i;
+    qsort(order, N, sizeof(int), cmp);
+    out = fopen(argv[2], "wb");
+    rec(0);
+    fclose(out);
+    printf("n=%d union-closed families (incl. empty family): %llu\n", n, (unsigned long long)count);
+    return 0;
+}

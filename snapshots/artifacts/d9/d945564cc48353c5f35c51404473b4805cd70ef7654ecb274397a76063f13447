@@ -1,0 +1,23 @@
+# python3 lp_tools.py  (n=5, degree 30, grids of ~4001 pts per unit length; discretised LP => values are
+# upper bounds for the discretised domain, exact for finite domains)
+full Delsarte LP n=5, deg 30: 46.33757042015571
+finite set {-1,-1/2,0,1/2}, deg 30: 42.0
+finite set {-1,-1/2,0,1/2}, deg 60: 42.0
+eps=0.01: (a) nbhd LP = 42.3335   (b) complement LP = 44.2768
+eps=0.02: (a) nbhd LP = 42.3724   (b) complement LP = 42.4476
+eps=0.05: (a) nbhd LP = 42.6442   (b) complement LP = 38.0424
+eps=0.10: (a) nbhd LP = 43.8473   (b) complement LP = 30.7985
+eps=0.15: (a) nbhd LP = 45.7584   (b) complement LP = 25.1919
+eps=0.20: (a) nbhd LP = 46.2448   (b) complement LP = 20.0909
+S^3 LP capacities A(4, arccos((1/2-t0^2)/(1-t0^2))):
+  t0=0.55: cos=0.2832 LP=13.8833 -> floor 13
+  t0=0.6: cos=0.2188 LP=11.7643 -> floor 11
+  t0=0.65: cos=0.1342 LP=9.9644 -> floor 9
+  t0=0.7: cos=0.0196 LP=8.2403 -> floor 8
+  t0=0.75: cos=-0.1429 LP=5.8182 -> floor 5
+  t0=0.8: cos=-0.3889 LP=3.5714 -> floor 3
+  t0=0.9: cos=-1.4211 < -1 (formula leaves [-1,1]; cap of angular radius 25.8 deg holds <= 1 point of a 60-deg code trivially)
+S^3 LP at cos 1/3 (contact degree): 15.867133972941922
+# extra_checks.py
+LP domain [-0.55,0.5]: 24.350542247572537
+LP domain [-1,-.95]u[-.55,.5]: 43.09081005543834

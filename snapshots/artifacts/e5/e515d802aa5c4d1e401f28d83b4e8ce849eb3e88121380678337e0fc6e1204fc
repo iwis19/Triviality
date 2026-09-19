@@ -1,0 +1,49 @@
+"""E4: fluctuation statistics of r(N) around Hardy-Littlewood; E5: minimal Goldbach prime.
+r(N) counts unordered pairs p<=q of primes with p+q=N (odd primes only for N>4).
+"""
+import math, sys
+LIMIT = int(sys.argv[1]) if len(sys.argv) > 1 else 200_000
+def sieve(n):
+    s = bytearray([1]) * (n + 1); s[0] = s[1] = 0
+    for i in range(2, int(n ** 0.5) + 1):
+        if s[i]: s[i*i::i] = bytearray(len(range(i*i, n+1, i)))
+    return s
+isp = sieve(LIMIT)
+odd_primes = [i for i in range(3, LIMIT + 1) if isp[i]]
+C2 = 0.6601618158468696
+def hl_half(N):
+    prod = 1.0; m = N
+    while m % 2 == 0: m //= 2
+    p = 3
+    while p * p <= m:
+        if m % p == 0:
+            prod *= (p - 1) / (p - 2)
+            while m % p == 0: m //= p
+        p += 2
+    if m > 1: prod *= (m - 1) / (m - 2)
+    return C2 * prod * N / math.log(N) ** 2
+mx_sqrtN = (0, None); mx_pois = (0, None); mx_minp = (0, None)
+buckets = {}
+count = 0; sum_z = 0.0; sum_z2 = 0.0
+for N in range(10_000, LIMIT + 1, 2):
+    r = 0; minp = None
+    for p in odd_primes:
+        if 2 * p > N: break
+        if isp[N - p]:
+            r += 1
+            if minp is None: minp = p
+    if minp is not None and minp > mx_minp[0]: mx_minp = (minp, N)
+    h = hl_half(N)
+    d = r - h
+    z = d / math.sqrt(h)
+    count += 1; sum_z += z; sum_z2 += z * z
+    if abs(d) / math.sqrt(N) > mx_sqrtN[0]: mx_sqrtN = (abs(d) / math.sqrt(N), N)
+    if abs(z) > mx_pois[0]: mx_pois = (abs(z), N)
+    b = int(math.floor(z)); buckets[b] = buckets.get(b, 0) + 1
+mean = sum_z / count; var = sum_z2 / count - mean ** 2
+print("range N in [10^4, %d], %d even N" % (LIMIT, count))
+print("max |r-HL/2|/sqrt(N) = %.4f at N=%d" % mx_sqrtN)
+print("max |r-HL/2|/sqrt(HL/2) = %.3f at N=%d" % mx_pois)
+print("z=(r-HL/2)/sqrt(HL/2): mean=%.3f  std=%.3f  (Poisson-like would have std ~ 1)" % (mean, math.sqrt(var)))
+print("histogram of floor(z):", dict(sorted(buckets.items())))
+print("max minimal Goldbach prime p(N) = %d at N=%d" % mx_minp)

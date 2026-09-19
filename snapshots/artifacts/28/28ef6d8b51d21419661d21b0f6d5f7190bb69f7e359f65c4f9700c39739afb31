@@ -1,0 +1,42 @@
+# Sum-denominator lemma (informal proof sketch; own reasoning, not checked by anyone else)
+
+Setting. v_1 < ... < v_n positive integers, gcd = 1 (WLOG after Galilean shift and scaling,
+as in Bohman–Holzman–Kleitman / Tao). g_i(t) = ||v_i t|| (distance to nearest integer),
+f(t) = min_i g_i(t), ML(v) = max_{t in [0,1)} f(t). f is continuous and 1-periodic, so the max
+is attained; fix a maximizer t*.
+
+Claim. Either ML(v) = 1/2 and t = 1/2 is a maximizer, or there exist i != j and an integer a
+with t* = a/(v_i + v_j). In particular ML(v) is attained at a rational time whose reduced
+denominator divides v_i + v_j <= v_{n-1} + v_n.
+
+Sketch.
+1. Each g_i is piecewise linear with slopes +-v_i, breakpoints at g_i = 0 (t in (1/v_i)Z)
+   and g_i = 1/2 (t in (1/(2v_i)) Z \ (1/v_i) Z). Since ML(v) > 0 (v has gcd 1 and n >= 1,
+   f is not identically 0), no active g_i (g_i(t*) = f(t*)) is at a zero-breakpoint.
+2. If some active g_i has g_i(t*) = 1/2 then f(t*) = 1/2, so every runner is at distance
+   exactly 1/2 at t*: v_j t* = 1/2 mod 1 for all j. Write t* = p/q reduced. Then q | 2 v_j p,
+   so q | 2 v_j for all j; with gcd(v) = 1 this forces q | 2, so t* = 1/2. (q = 1 is impossible
+   since then all g_j(t*) = 0.)
+3. Otherwise every active g_i is linear near t* with slope s_i in {+v_i, -v_i}. Let A be the
+   active set. For t near t*, f(t) = min_{i in A} (c + s_i (t - t*)) since inactive g_j are
+   strictly larger near t*. Hence for t < t*: f(t) = c + (t - t*) max_A s_i, and for t > t*:
+   f(t) = c + (t - t*) min_A s_i. Local maximality forces max_A s_i >= 0 and min_A s_i <= 0;
+   since s_i != 0 there are i, j in A with s_i = +v_i, s_j = -v_j (i != j because a single
+   g_i has one slope at a non-breakpoint). From g_i(t*) = g_j(t*): v_i t* - b_i = b_j - v_j t*
+   for integers b_i, b_j, i.e. t* = (b_i + b_j)/(v_i + v_j).
+
+Consequences (own reasoning).
+(a) LRC(n) is equivalent to: for every gcd-1 n-tuple v there are i < j and a in Z with
+    min_l || v_l a/(v_i+v_j) || >= 1/(n+1). Only the finitely many sum-denominators matter;
+    differences v_j - v_i never need to be tested (the enumeration data agree: all 36,625
+    recorded maximizing times for near-tight sets have denominators dividing some v_i+v_j).
+(b) The a priori search space for a lonely time is O(n^2 * max v) rational points, versus the
+    O(n^2 max v) breakpoint set including differences and 2v_i; not asymptotically smaller, but
+    structurally sharper (the maximizer is a *crossing* of an ascending and a descending runner).
+(c) For the loneliness spectrum: ML(v) = p/q with q | (v_i + v_j). For Kravitz-type values
+    s/(ns+k) this says ns+k divides some pairwise sum of speeds.
+
+Status. This is a short elementary argument and is very likely folklore (piecewise-linear
+maxima occur at crossings; cf. the polyhedral viewpoint in Beck–Hoşten–Schymura, "Lonely Runner
+Polyhedra", and Goddyn–Wong). I have not located an explicit statement in the sources I checked.
+Not formalised; step 2's gcd argument and step 3's local analysis should be checked independently.

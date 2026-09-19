@@ -1,0 +1,50 @@
+"""Enumerate smallest k consecutive primes in arithmetic progression (CPAP-k) for k=3..6
+by a direct sieve, and count CPAP-k up to N for comparison with a Cramer/Hardy-Littlewood
+style heuristic.  Cross-check against OEIS A006560 (2,2,3,251,9843019,121174811,...).
+"""
+import numpy as np, sys, math, time
+
+LIMIT = int(sys.argv[1]) if len(sys.argv) > 1 else 130_000_000
+
+t0 = time.time()
+sieve = np.ones(LIMIT + 1, dtype=bool)
+sieve[:2] = False
+for p in range(2, int(LIMIT ** 0.5) + 1):
+    if sieve[p]:
+        sieve[p * p::p] = False
+primes = np.flatnonzero(sieve)
+gaps = np.diff(primes)
+print(f"primes up to {LIMIT}: {len(primes)}  ({time.time()-t0:.1f}s)")
+
+# run lengths of equal consecutive gaps
+first = {}
+counts = {}
+run = 1
+for i in range(1, len(gaps)):
+    if gaps[i] == gaps[i - 1]:
+        run += 1
+    else:
+        run = 1
+    for k in range(3, run + 2):  # a run of r equal gaps gives r+1 consecutive primes in AP
+        counts[k] = counts.get(k, 0) + 1
+        if k not in first:
+            first[k] = (int(primes[i - k + 2]), int(gaps[i]))
+for k in sorted(first):
+    p, d = first[k]
+    print(f"k={k}: smallest CPAP-{k} starts at {p}, difference {d}; count of CPAP-{k} up to {LIMIT}: {counts[k]}")
+    print("   terms:", [p + j * d for j in range(k)])
+
+# distribution of common differences for CPAP-3 and CPAP-4 (all must be multiples of 6 except 3,5,7)
+from collections import Counter
+c3 = Counter(); c4 = Counter()
+run = 1
+for i in range(1, len(gaps)):
+    if gaps[i] == gaps[i - 1]:
+        run += 1
+        c3[int(gaps[i])] += 1
+        if run >= 3:
+            c4[int(gaps[i])] += 1
+    else:
+        run = 1
+print("CPAP-3 by difference (top 12):", c3.most_common(12))
+print("CPAP-4 by difference (top 12):", c4.most_common(12))

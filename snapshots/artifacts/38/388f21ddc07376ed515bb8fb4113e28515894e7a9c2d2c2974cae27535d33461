@@ -1,0 +1,29 @@
+Pairwise rule: d = r_n - r_m mod n compatible sets
+(3,9) ratio 3: compatible d = [0, 3, 6] ; claim 'd=0 mod m' gives [0, 3, 6] ; agree=True
+(3,27) ratio 9: compatible d = [0, 3, 6, 9, 12, 15, 18, 21, 24] ; claim 'd=0 mod m' gives [0, 3, 6, 9, 12, 15, 18, 21, 24] ; agree=True
+(9,27) ratio 3: compatible d = [0, 9, 18] ; claim 'd=0 mod m' gives [0, 9, 18] ; agree=True
+(5,15) ratio 3: compatible d = [0, 5, 10] ; claim 'd=0 mod m' gives [0, 5, 10] ; agree=True
+(3,15) ratio 5: compatible d = [0, 3, 6, 9, 12] ; claim 'd=0 mod m' gives [0, 3, 6, 9, 12] ; agree=True
+(15,45) ratio 3: compatible d = [0, 15, 30] ; claim 'd=0 mod m' gives [0, 15, 30] ; agree=True
+(5,45) ratio 9: compatible d = [0, 5, 10, 15, 20, 25, 30, 35, 40] ; claim 'd=0 mod m' gives [0, 5, 10, 15, 20, 25, 30, 35, 40] ; agree=True
+(9,45) ratio 5: compatible d = [0, 9, 18, 27, 36] ; claim 'd=0 mod m' gives [0, 9, 18, 27, 36] ; agree=True
+(3,45) ratio 15: compatible d = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44] ; claim 'd=0 mod m' gives [0, 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42] ; agree=False
+(7,21) ratio 3: compatible d = [0, 7, 14] ; claim 'd=0 mod m' gives [0, 7, 14] ; agree=True
+(21,63) ratio 3: compatible d = [0, 21, 42] ; claim 'd=0 mod m' gives [0, 21, 42] ; agree=True
+(15,135) ratio 9: compatible d = [0, 15, 30, 45, 60, 75, 90, 105, 120] ; claim 'd=0 mod m' gives [0, 15, 30, 45, 60, 75, 90, 105, 120] ; agree=True
+(45,135) ratio 3: compatible d = [0, 45, 90] ; claim 'd=0 mod m' gives [0, 45, 90] ; agree=True
+(5,25) ratio 5: compatible d = [0, 5, 10, 15, 20] ; claim 'd=0 mod m' gives [0, 5, 10, 15, 20] ; agree=True
+(25,75) ratio 3: compatible d = [0, 25, 50] ; claim 'd=0 mod m' gives [0, 25, 50] ; agree=True
+(15,75) ratio 5: compatible d = [0, 15, 30, 45, 60] ; claim 'd=0 mod m' gives [0, 15, 30, 45, 60] ; agree=True
+(2,4) ratio 2: compatible d = [0, 1, 2, 3] ; claim 'd=0 mod m' gives [0, 2] ; agree=False
+(4,8) ratio 2: compatible d = [0, 2, 4, 6] ; claim 'd=0 mod m' gives [0, 4] ; agree=False
+(6,12) ratio 2: compatible d = [0, 3, 6, 9] ; claim 'd=0 mod m' gives [0, 6] ; agree=False
+(6,18) ratio 3: compatible d = [0, 6, 12] ; claim 'd=0 mod m' gives [0, 6, 12] ; agree=True
+(10,20) ratio 2: compatible d = [0, 5, 10, 15] ; claim 'd=0 mod m' gives [0, 10] ; agree=False
+
+Pairwise-compatible vs globally solvable, all residue tuples
+(3, 9, 27): pairwise-compatible tuples 27, globally solvable 27, mismatches 0
+(3, 15, 45): pairwise-compatible tuples 45, globally solvable 45, mismatches 0
+(5, 15, 45): pairwise-compatible tuples 45, globally solvable 45, mismatches 0
+(3, 9, 45): pairwise-compatible tuples 45, globally solvable 45, mismatches 0
+(3, 5, 15, 45): pairwise-compatible tuples 45, globally solvable 45, mismatches 0

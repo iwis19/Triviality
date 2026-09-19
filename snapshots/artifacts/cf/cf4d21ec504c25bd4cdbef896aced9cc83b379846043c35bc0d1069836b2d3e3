@@ -1,0 +1,17 @@
+n=4 t0=0.6058 deg=9 mu=6 (sanity vs Musin 2008 h_max~24.8):
+  it 3: master t=24.8081 f(1)=18.7833 oracle max=6.0248 (m=2) -> h_max est 24.8081
+n=5 deg=11 mu=6 (master LP value = LOWER bound on extended-LP optimum at this degree; oracle = heuristic SLSQP):
+  t0=0.55 master 46.3369  h_max est 46.3369
+  t0=0.60 master 46.3373  h_max est 46.3375
+  t0=0.65 master 46.3370  h_max est 46.3387
+  t0=0.70 master 46.3373  h_max est 46.3378
+  t0=0.75 master 46.3370  h_max est 46.3386
+  t0=0.80 master 46.3376  h_max est 46.3376 (oracle found no positive tail)
+n=5 t0=0.6 deg=11 with additional near-contact positivity f>0 allowed on [1/2-eps,1/2], contribution bounded by 15*max (uses claim 170c optimistically):
+  eps=0.01 K=15 -> 46.3154 ; eps=0.05 K=15 -> 46.2503
+Cap capacity via Musin Cor.1 (S^3 code with cosine <= (1/2 - t0^2)/(1-t0^2)), Delsarte LP on S^3:
+  t0=0.55 thr 0.2832 LP 13.88 -> m<=13 ; 0.60 thr 0.2188 LP 11.76 -> m<=11 ; 0.65 thr 0.1342 LP 9.96 -> m<=9
+  t0=0.70 thr 0.0196 LP 8.24 -> m<=8 ; 0.75 thr -0.1429 LP 5.82 -> m<=5 ; 0.80 thr -0.3889 LP 3.57 -> m<=3 ; 0.90 thr<-1 -> m<=1
+Base LPs (deg 30, 4001 grid): n=5 [-1,1/2] 46.3376 ; n=4 [-1,1/2] 25.5584 ; n=4 [-1,1/3] 15.8671 ;
+  n=5 avoid (-0.95,-0.55) 43.0908 ; avoid (-0.95,-0.6) 43.9408 ; avoid (-0.9,-0.55) 43.4422 ; T=[-0.55,1/2] 24.3505
+spherical-codes.org (numerical best known, dim 4): 12 pts cos 0.25 ; 13 pts 0.3073 ; 14 pts 0.3195 ; 15 pts 0.3510 ; 16 pts 0.3876

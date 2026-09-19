@@ -1,0 +1,27 @@
+import mpmath as mp, sys
+mp.mp.dps = 25
+atoms0 = [(-0.7735, 4.6356), (-0.7731, 0.2549), (-0.4397, 5.0892), (-0.4394, 2.2054),
+          (-0.0887, 5.8243), (-0.0884, 12.1647), (0.5, 15.1634)]
+lam = mp.mpf(3)/2
+def G(k,t): return mp.gegenbauer(k,lam,t)/mp.gegenbauer(k,lam,1)
+Gtab = {k:[G(k,mp.mpf(t)) for t,_ in atoms0] for k in range(1,301)}
+for eps in ['0','1e-6','1e-4','3e-4','1e-3','3e-3']:
+    s = 1-mp.mpf(eps)
+    ms = [mp.mpf(m)*s for _,m in atoms0]
+    mass = sum(ms)
+    vals = [(k, 1+sum(m*g for m,g in zip(ms,Gtab[k]))) for k in range(1,301)]
+    worst = min(vals, key=lambda x:x[1])
+    neg = [k for k,v in vals if v<0]
+    print(f"scale=1-{eps}: bound 1+mass={mp.nstr(1+mass,10)} worst k={worst[0]} val={mp.nstr(worst[1],6)} negatives={neg}")
+# tail behaviour: |G_k(t)| at atoms for large k
+print("max |G_k| over atoms, k=100..300:", mp.nstr(max(abs(g) for k in range(100,301) for g in Gtab[k]),6))
+
+# ---- output ----
+# python3 dual_scan.py   (mpmath, 25 digits, k = 1..300, atoms of claim 492b4184)
+scale=1-0:     bound 1+mass=46.3375     worst k=2 val=-0.000246451 negatives=[2, 5, 9]
+scale=1-1e-6:  bound 1+mass=46.33745466 worst k=2 val=-0.000245451 negatives=[2, 5, 9]
+scale=1-1e-4:  bound 1+mass=46.33296625 worst k=2 val=-0.000146426 negatives=[2, 5]
+scale=1-3e-4:  bound 1+mass=46.32389875 worst k=2 val=5.36229e-5   negatives=[]
+scale=1-1e-3:  bound 1+mass=46.2921625  worst k=2 val=0.000753795  negatives=[]
+scale=1-3e-3:  bound 1+mass=46.2014875  worst k=2 val=0.00275429   negatives=[]
+max |G_k(t)| over atoms, k=100..300: 0.00285555   (times mass 45.3 = 0.13 < 1)

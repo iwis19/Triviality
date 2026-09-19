@@ -1,0 +1,64 @@
+import Mathlib
+import MathLab.Basic
+
+/-!
+Hall characterisation of inclusion-respecting injections `F_{¬x} → F_x`.
+
+`T5(x)` (existence of an injection `f` from `{A ∈ F : x ∉ A}` into `{B ∈ F : x ∈ B}`
+with `A ⊆ f A`) holds iff for every `G ⊆ {A ∈ F : x ∉ A}` the number of sets of `F`
+containing `x` and containing some member of `G` is at least `|G|`.
+This is Hall's marriage theorem (`Finset.all_card_le_biUnion_card_iff_exists_injective`).
+-/
+
+theorem superset_injection_iff_hall {n : ℕ} (F : Finset (Finset (Fin n))) (x : Fin n) :
+    (∃ f : Finset (Fin n) → Finset (Fin n),
+      (∀ A ∈ F, x ∉ A → f A ∈ F ∧ x ∈ f A ∧ A ⊆ f A) ∧
+      Set.InjOn f (↑(F.filter (fun A => x ∉ A)) : Set (Finset (Fin n)))) ↔
+    ∀ G ⊆ F.filter (fun A => x ∉ A),
+      G.card ≤ (F.filter (fun B => x ∈ B ∧ ∃ A ∈ G, A ⊆ B)).card := by
+  classical
+  set L := F.filter (fun A => x ∉ A) with hL
+  -- neighbourhood of a single vertex
+  let t : L → Finset (Finset (Fin n)) := fun A => F.filter (fun B => x ∈ B ∧ (A : Finset (Fin n)) ⊆ B)
+  have hall := Finset.all_card_le_biUnion_card_iff_exists_injective t
+  constructor
+  · rintro ⟨f, hf, hinj⟩ G hG
+    apply Finset.card_le_card_of_injOn f
+    · intro A hA
+      have hAL : A ∈ L := hG hA
+      simp only [hL, Finset.mem_filter] at hAL
+      obtain ⟨hfF, hxf, hsub⟩ := hf A hAL.1 hAL.2
+      simp only [Finset.coe_filter, Set.mem_setOf_eq]
+      exact ⟨hfF, hxf, A, hA, hsub⟩
+    · intro A hA B hB hAB
+      exact hinj (by simpa using hG hA) (by simpa using hG hB) hAB
+  · intro hH
+    have key : ∀ s : Finset L, s.card ≤ (s.biUnion t).card := by
+      intro s
+      have := hH (s.map (Function.Embedding.subtype _)) (by
+        intro A hA
+        simp only [Finset.mem_map, Function.Embedding.coe_subtype] at hA
+        obtain ⟨⟨A', hA'⟩, _, rfl⟩ := hA
+        exact hA')
+      rw [Finset.card_map] at this
+      refine this.trans (Finset.card_le_card ?_)
+      intro B hB
+      simp only [Finset.mem_filter] at hB
+      obtain ⟨hBF, hxB, A, hA, hAB⟩ := hB
+      simp only [Finset.mem_map, Function.Embedding.coe_subtype] at hA
+      obtain ⟨A', hA's, rfl⟩ := hA
+      simp only [Finset.mem_biUnion]
+      exact ⟨A', hA's, by simp only [t, Finset.mem_filter]; exact ⟨hBF, hxB, hAB⟩⟩
+    obtain ⟨g, ginj, hg⟩ := hall.mp key
+    refine ⟨fun A => if h : A ∈ L then g ⟨A, h⟩ else A, ?_, ?_⟩
+    · intro A hAF hxA
+      have hAL : A ∈ L := by simp [hL, hAF, hxA]
+      simp only [hAL, dite_true]
+      have := hg ⟨A, hAL⟩
+      simp only [t, Finset.mem_filter] at this
+      exact ⟨this.1, this.2.1, this.2.2⟩
+    · intro A hA B hB hAB
+      simp only [Finset.mem_coe] at hA hB
+      simp only [hA, hB, dite_true] at hAB
+      have := ginj hAB
+      simpa using congrArg Subtype.val this

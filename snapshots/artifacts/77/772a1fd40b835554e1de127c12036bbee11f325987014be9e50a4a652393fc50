@@ -1,0 +1,16 @@
+=== E1: representation counts vs Hardy-Littlewood ===
+even N in [4,200000] with r(N)=0: []
+min over N>=1000 of r(N)/(HL(N)/2): ratio=0.9823 at N=2672, r=28
+=== E2: Chen-type P_2 representations ===
+N=10000  #{p: N-p prime}=254  #{p: N-p=P_2 exactly two factors}=508  ratio P2/P1=2.000  (heuristic ~ log log N=2.220)
+N=10002  #{p: N-p prime}=394  #{p: N-p=P_2 exactly two factors}=551  ratio P2/P1=1.398  (heuristic ~ log log N=2.220)
+N=50000  #{p: N-p prime}=900  #{p: N-p=P_2 exactly two factors}=1903  ratio P2/P1=2.114  (heuristic ~ log log N=2.381)
+N=100000  #{p: N-p prime}=1620  #{p: N-p=P_2 exactly two factors}=3409  ratio P2/P1=2.104  (heuristic ~ log log N=2.443)
+N=200000  #{p: N-p prime}=2834  #{p: N-p=P_2 exactly two factors}=6262  ratio P2/P1=2.210  (heuristic ~ log log N=2.502)
+=== E3: minor-arc exponential sums ===
+N=200000 sqrt(N)logN=5458.7  N/log^2N=1342.4  N=200000
+q=223 a=35 |S|=741.1  |S|/(sqrt(N)logN)=0.14  |S|/(N/log^2 N)=0.552
+q=447 a=440 |S|=1167.5  |S|/(sqrt(N)logN)=0.21  |S|/(N/log^2 N)=0.870
+q=894 a=97 |S|=1933.7  |S|/(sqrt(N)logN)=0.35  |S|/(N/log^2 N)=1.441
+q=2235 a=986 |S|=1646.0  |S|/(sqrt(N)logN)=0.30  |S|/(N/log^2 N)=1.226
+major-arc sanity |S(1/2)|/N=0.998  |S(1/3)|/(N/2)=0.998

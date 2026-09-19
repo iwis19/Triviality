@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+"""Fourier / sum-of-squares certificates for the Lonely Runner problem.
+
+Setting: n integer speeds v_1..v_n, eps = 1/(n+1) (or slightly smaller).
+B_i = { t in R/Z : ||v_i t|| < eps }  (open).  A lonely time exists iff the B_i do not cover R/Z.
+
+Certificate: a nonnegative trigonometric polynomial nu(t) = sum_{a,b} Q_{ab} e((f_a - f_b) t),
+Q symmetric PSD over a frequency list F = (f_0=0, f_1, ...), so nu >= 0 automatically and
+int nu = tr Q.  Since  int_{B_i} e(r t) dt = I_i(r) :=  2 eps        if r = 0,
+                                                       sin(2 pi m eps)/(pi m)   if |r| = m v_i,
+                                                       0                        otherwise,
+we get sum_i nu(B_i) = tr(Q C) with C_{ab} = sum_i I_i(f_a - f_b).
+If the B_i covered the circle then tr Q = nu(T) <= sum_i nu(B_i) = tr(QC).
+Hence  lambda_min(C) < 1  ==>  the B_i do not cover  ==>  ML(v) >= eps.
+(Contrapositive of the covering inequality; the certificate is Q = unit eigenvector of lambda_min.)
+
+C depends on v only through the divisibility pattern { (a,b,i,m): f_a - f_b = +- m v_i }.
+"""
+import sys, json, math, itertools
+import numpy as np
+
+def I(r, v, eps):
+    if r == 0:
+        return 2 * eps
+    r = abs(r)
+    if r % v:
+        return 0.0
+    m = r // v
+    return math.sin(2 * math.pi * m * eps) / (math.pi * m)
+
+def C_matrix(v, F, eps):
+    F = list(F)
+    C = np.zeros((len(F), len(F)))
+    for a, fa in enumerate(F):
+        for b, fb in enumerate(F):
+            C[a, b] = sum(I(fa - fb, vi, eps) for vi in v)
+    return C
+
+def basis_multiples(v, D):
+    F = {0}
+    for vi in v:
+        for m in range(1, D + 1):
+            F.add(m * vi)
+    return sorted(F)
+
+def basis_full(Dp):
+    return list(range(0, Dp + 1))
+
+def lam_min(v, F, eps):
+    C = C_matrix(v, F, eps)
+    w = np.linalg.eigvalsh(C)
+    return float(w[0])
+
+def certify(v, eps, D):
+    return lam_min(v, basis_multiples(v, D), eps)
+
+if __name__ == "__main__":
+    # quick demos
+    for v in [(1, 2), (1, 3), (1, 4), (2, 3), (3, 5), (1, 2, 3), (1, 2, 4), (2, 3, 5), (1, 2, 3, 4), (8, 3, 11, 19), (1, 2, 5, 7)]:
+        n = len(v); eps = 1 / (n + 1)
+        print(v, [round(certify(v, eps, D), 4) for D in (1, 2, 3, 4)],
+              "full-basis D'=2max:", round(lam_min(v, basis_full(2 * max(v)), eps), 4))

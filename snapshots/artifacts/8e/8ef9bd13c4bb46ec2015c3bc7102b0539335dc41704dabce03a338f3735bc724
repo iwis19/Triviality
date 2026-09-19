@@ -1,0 +1,8 @@
+# python3 dual_scan.py   (mpmath, 25 digits, k = 1..300, atoms of claim 492b4184)
+scale=1-0:     bound 1+mass=46.3375     worst k=2 val=-0.000246451 negatives=[2, 5, 9]
+scale=1-1e-6:  bound 1+mass=46.33745466 worst k=2 val=-0.000245451 negatives=[2, 5, 9]
+scale=1-1e-4:  bound 1+mass=46.33296625 worst k=2 val=-0.000146426 negatives=[2, 5]
+scale=1-3e-4:  bound 1+mass=46.32389875 worst k=2 val=5.36229e-5   negatives=[]
+scale=1-1e-3:  bound 1+mass=46.2921625  worst k=2 val=0.000753795  negatives=[]
+scale=1-3e-3:  bound 1+mass=46.2014875  worst k=2 val=0.00275429   negatives=[]
+max |G_k(t)| over atoms, k=100..300: 0.00285555   (times mass 45.3 = 0.13 < 1)

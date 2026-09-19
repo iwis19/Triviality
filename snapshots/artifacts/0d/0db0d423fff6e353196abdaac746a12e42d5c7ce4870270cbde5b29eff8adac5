@@ -1,0 +1,15 @@
+import Mathlib
+
+/-!
+Bounded instance of the approved target: Goldbach for even `n` with `2 < n ≤ 200`.
+Uses the kernel-friendly primality instance so `decide` can evaluate the bounded search.
+This is NOT the conjecture; it is a scaffold for a "finite verification + analytic tail" strategy.
+-/
+
+open Nat in
+theorem goldbach_le_200 (n : Nat) (h2 : 2 < n) (hn : n ≤ 200) (heven : n % 2 = 0) :
+    ∃ p q, Nat.Prime p ∧ Nat.Prime q ∧ p + q = n := by
+  have key : ∀ m < 201, 2 < m → m % 2 = 0 → ∃ p < m, Nat.Prime p ∧ Nat.Prime (m - p) := by
+    decide +kernel
+  obtain ⟨p, hp, hpp, hq⟩ := key n (by omega) h2 heven
+  exact ⟨p, n - p, hpp, hq, by omega⟩

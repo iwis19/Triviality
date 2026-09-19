@@ -1,0 +1,31 @@
+import MathLab.Basic
+
+/-!
+Integer certificate for the classical lower bound κ(5) ≥ 40.
+
+The 40 vectors ±e_i ± e_j (i < j) in ℤ^5 all have squared norm 2, and any two of them
+(as listed, all pairwise distinct) have inner product ≤ 1.  Dividing by √2 gives 40 unit
+vectors on S^4 with pairwise inner product ≤ 1/2, i.e. pairwise angle ≥ 60°, i.e. a
+kissing configuration of 40 unit balls around a central unit ball.  The statements below
+are the purely finite, decidable combinatorial core; the geometric interpretation
+(scaling by √2 and the translation to ball tangency) is not formalised here.
+-/
+
+def d5Vecs : List (Fin 5 → Int) :=
+  (List.finRange 5).flatMap fun i =>
+    (List.finRange 5).flatMap fun j =>
+      if i < j then
+        [1, -1].flatMap fun (a : Int) =>
+          [1, -1].map fun (b : Int) =>
+            fun k => if k = i then a else if k = j then b else 0
+      else []
+
+def dot (u v : Fin 5 → Int) : Int :=
+  (List.finRange 5).foldl (fun acc k => acc + u k * v k) 0
+
+theorem d5Vecs_length : d5Vecs.length = 40 := by decide
+
+theorem d5Vecs_norm : ∀ u ∈ d5Vecs, dot u u = 2 := by decide
+
+theorem d5Vecs_kissing : d5Vecs.Pairwise (fun u v => dot u v ≤ 1) := by decide
+
