@@ -34,6 +34,7 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
   const cameraFrame = useRef<number | null>(null);
   const initialCameraState = useRef<"idle" | "running" | "done">("idle");
   const entranceWasReady = useRef(entranceReady);
+  const layoutSettled = useRef(false);
   const [size, setSize] = useState({ width: 800, height: 600 });
 
   useEffect(() => {
@@ -116,6 +117,7 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
   useEffect(() => {
     const fg = ref.current;
     if (!fg) return;
+    layoutSettled.current = false;
     fg.d3Force("charge")?.strength(-100);
     const linkForce = fg.d3Force("link");
     linkForce?.distance((l: FGLink) => (l.layer === "atlas" ? 65 : l.layer === "lineage" ? 40 : 32));
@@ -145,17 +147,13 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
       // Move the camera and its target together, with gentle acceleration and
       // deceleration. Interrupted moves start from the current visible frame.
       if (viaPosition) {
-        const pullbackProgress = Math.min(1, t / 0.45);
-        const pullbackEase = smootherStep(pullbackProgress);
-        const zoomProgress = Math.max(0, (t - 0.55) / 0.45);
-        const zoomEase = smootherStep(zoomProgress);
         const startOffset = startPosition.clone().sub(startTarget);
         const viaOffset = viaPosition.clone().sub(target);
-        const finalOffset = position.clone().sub(target);
-        // Change only the distance from the target during the entrance.
+        // Mirror the same path in both directions, returning exactly to the
+        // initialized opening distance without an extra pause at the midpoint.
+        const progress = t <= 0.5 ? t * 2 : (1 - t) * 2;
         const distance = THREE.MathUtils.lerp(
-          THREE.MathUtils.lerp(startOffset.length(), viaOffset.length(), pullbackEase),
-          finalOffset.length(), zoomEase,
+          startOffset.length(), viaOffset.length(), smootherStep(progress),
         );
         const direction = startOffset.normalize();
         const currentTarget = startTarget;
@@ -246,7 +244,7 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
 
   const settleCamera = useCallback(() => {
     const fg = ref.current;
-    if (!fg || !entranceReady || data.nodes.length === 0 || initialCameraState.current !== "idle" || selectedId || focusNodeId) return;
+    if (!fg || !entranceReady || !layoutSettled.current || data.nodes.length === 0 || initialCameraState.current !== "idle" || selectedId || focusNodeId) return;
     initialCameraState.current = "running";
     const startPosition = fg.camera().position.clone();
     const startTarget = (fg.controls() as { target: THREE.Vector3 }).target.clone();
@@ -342,7 +340,7 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
         onBackgroundClick={() => onSelect(null)}
         cooldownTicks={reducedMotion || selectedId ? 0 : 90}
         warmupTicks={reducedMotion ? 100 : 30}
-        onEngineStop={settleCamera}
+        onEngineStop={() => { layoutSettled.current = true; settleCamera(); }}
         enableNodeDrag={false}
         showNavInfo={false}
         linkLabel=""
