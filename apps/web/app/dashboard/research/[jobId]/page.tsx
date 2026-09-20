@@ -1,46 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { ResearchMarkdown } from "@/components/research-markdown";
 import { useParams } from "next/navigation";
 import { IconArrowLeft, IconCheck, IconCode, IconFileDescription, IconLoader2 } from "@tabler/icons-react";
-import { DashboardSidebar } from "../../dashboard-sidebar";
-import { DashboardTopbar } from "../../dashboard-topbar";
 import { ResearchGraph } from "@/components/research-graph";
 import { ResearchLiteratureTabs } from "@/components/research-literature-tabs";
 import { ModelLabel } from "@/components/model-select";
 import { ResearchStatusBadge } from "@/components/research-status-badge";
 import { ResearchTokenUsage } from "@/components/research-token-usage";
-import { getResearchJob, modelCatalog, type ResearchJob } from "@/lib/research-store";
+import { modelCatalog, type ResearchJob } from "@/lib/research-store";
 
 import { latexArtifactMarkdown } from "@/lib/research-markdown";
+
+import { useResearchJob } from "@/lib/use-research-job";
 
 type ArtifactTab = "literature" | "lean" | "latex";
 
 export default function ResearchEpisodePage() {
   const params = useParams<{ jobId: string }>();
-  const [job, setJob] = useState<ResearchJob | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { job, error } = useResearchJob(params.jobId);
   const [tab, setTab] = useState<ArtifactTab>("latex");
 
-  useEffect(() => {
-    const refresh = () => getResearchJob(params.jobId).then(setJob).catch((reason: Error) => setError(reason.message));
-    void refresh();
-    const interval = window.setInterval(refresh, 650);
-    return () => window.clearInterval(interval);
-  }, [params.jobId]);
-
   if (!job) {
-    return <main className="flex min-h-screen items-center justify-center bg-[#f5f5f5] text-sm text-black/55">{error ?? "Loading research…"}</main>;
+    return <div role="status" className="px-6 py-12 text-sm text-black/55">{error ?? "Loading research…"}</div>;
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#f5f5f5] text-[#111] md:flex-row">
-      <DashboardSidebar />
-      <div className="min-w-0 flex-1">
-        <DashboardTopbar page="Research" />
-        <section className="mx-auto max-w-7xl px-6 py-8 sm:px-10 lg:px-14">
+    <section className="mx-auto max-w-7xl px-6 py-8 sm:px-10 lg:px-14">
           <Link className="mb-6 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-black/45 hover:text-black" href="/dashboard"><IconArrowLeft size={14} /> Overview</Link>
 
           <div className="border-b border-black/10 pb-10">
@@ -55,9 +43,7 @@ export default function ResearchEpisodePage() {
           <ResearchTokenUsage job={job} />
           {job.status === "running" ? <RunningEpisode /> : job.status === "failed" ? <FailedEpisode job={job} /> : <CompletedEpisode job={job} tab={tab} setTab={setTab} />}
           {(job.orchestrator === "workswarm" || job.provider === "huawei") && <><ExplorationBanks job={job} /><TeamTrace job={job} /></>}
-        </section>
-      </div>
-    </main>
+    </section>
   );
 }
 

@@ -5,6 +5,6 @@ export const trihexagonalDemo = {
   title: "Trihexagonal shell: a counterexample to the proposed bound",
   statement: "A connected 23-cell shell enclosing a connected 31-cell hole.",
   area: "Combinatorics",
-  proofUrl: "http://localhost:3001/proofs/trihexagonal-shell",
+  proofUrl: "http://localhost:3001/dashboard/research/trihexagonal-shell",
   delayMs: 3000,
 };

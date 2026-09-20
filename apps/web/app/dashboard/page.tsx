@@ -192,7 +192,7 @@ function PublishedProofRow() {
   return (
     <Link
       className="group flex items-center gap-4 border-b border-black/8 px-4 py-4 transition last:border-b-0 hover:bg-[#f7f7f8] sm:px-5"
-      href="/proofs/trihexagonal-shell"
+      href="/dashboard/research/trihexagonal-shell"
     >
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[0.055] text-black/55">
         <IconMessage size={17} />
