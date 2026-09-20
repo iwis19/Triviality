@@ -1,0 +1,49 @@
+name: triviality-backend
+services:
+  mongodb:
+    image: mongo:8.0
+    command: [mongod, --wiredTigerCacheSizeGB, "0.5"]
+    restart: unless-stopped
+    ports: ["127.0.0.1:27017:27017"]
+    volumes: [mongo:/data/db]
+  redis:
+    image: redis:7-alpine
+    command: [redis-server, --appendonly, "yes"]
+    restart: unless-stopped
+    ports: ["127.0.0.1:6379:6379"]
+    volumes: [redis:/data]
+  api:
+    image: triviality-backend:latest
+    build:
+      context: ../..
+      dockerfile: deploy/vm/Dockerfile
+    restart: unless-stopped
+    network_mode: host
+    env_file: [api.env]
+    depends_on: [redis, mongodb]
+  worker:
+    image: triviality-backend:latest
+    command: [node, apps/research-worker/dist/worker.js]
+    restart: unless-stopped
+    network_mode: host
+    env_file: [worker.env]
+    environment:
+      SWARM_PYTHON: /opt/swarm/bin/python
+    volumes:
+      - research:/app/.data/swarm-runs
+      - artifacts:/app/.data/object-storage
+    depends_on: [redis, api]
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    network_mode: host
+    env_file: [gateway.env]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+volumes:
+  mongo:
+  redis:
+  research:
+  artifacts:
+  caddy:

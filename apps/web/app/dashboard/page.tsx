@@ -10,6 +10,7 @@ import { motion } from "motion/react";
 import { publicApi } from "../explore/api";
 import { DashboardSidebar } from "./dashboard-sidebar";
 import { DashboardTopbar } from "./dashboard-topbar";
+import { ProblemDataset } from "./problem-dataset";
 import { ModelSelect } from "@/components/model-select";
 import { ResearchStatusBadge } from "@/components/research-status-badge";
 import { createResearchJob, getResearchJobs, type ResearchJob, modelCatalog, defaultRoleModels, type RoleModels } from "@/lib/research-store";
@@ -66,7 +67,10 @@ function DashboardContent() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
-    const refresh = () => getResearchJobs().then(setJobs).catch((reason: Error) => setError(reason.message));
+    const refresh = () => getResearchJobs().then((nextJobs) => {
+      setJobs(nextJobs);
+      setError(null);
+    }).catch((reason: Error) => setError(reason.message));
     refresh();
     const interval = window.setInterval(refresh, 1500);
     return () => window.clearInterval(interval);
@@ -142,7 +146,6 @@ function DashboardContent() {
             <div className="flex items-start justify-between gap-6">
               <div>
                 <h1 className="text-3xl font-semibold tracking-[-0.05em]">{areaFilter ?? "Research chats"}</h1>
-                <p className="mt-2 text-sm leading-6 text-black/50">Continue an investigation or begin a new mathematical research session.</p>
               </div>
               <button
                 type="button"
@@ -181,6 +184,7 @@ function DashboardContent() {
                 </div>
               )}
             </section>
+            <ProblemDataset />
           </div>
         </section>
         {(modalOpen || startNewResearch) && <ResearchDeployModal form={form} setForm={setForm} creating={creating} error={submitError} onClose={closeModal} onSubmit={submit} />}
@@ -200,7 +204,6 @@ function PublishedProofRow() {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{trihexagonalProof.title}</span>
-        <span className="mt-1 block truncate text-xs text-black/45">{trihexagonalProof.statement}</span>
         <span className="mt-2 block sm:hidden"><ResearchStatusBadge state="completed" /></span>
       </span>
       <span className="hidden shrink-0 text-right sm:block">
@@ -291,7 +294,6 @@ function EpisodeRow({ job }: { job: ResearchJob }) {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{job.title}</span>
-        <span className="mt-1 block truncate text-xs text-black/45">{job.statement}</span>
         <span className="mt-2 block sm:hidden"><ResearchStatusBadge job={job} /></span>
       </span>
       <span className="hidden shrink-0 text-right sm:block">

@@ -1,0 +1,14 @@
+{$RESEARCH_DOMAIN} {
+    @authorized header Authorization "Bearer {$RESEARCH_API_KEY}"
+    handle @authorized {
+        reverse_proxy 127.0.0.1:3010 {
+            # Allow brief API replacement/startup gaps without an immediate 502.
+            lb_try_duration 15s
+            lb_try_interval 250ms
+            lb_retry_match method GET HEAD
+        }
+    }
+    handle {
+        respond "Unauthorized" 401
+    }
+}

@@ -1,6 +1,6 @@
 import { trihexagonalChatHref } from "./research-chat-links";
 
-// This local demo opens the existing published proof without creating a research job.
+// This demo opens the existing published proof without creating a research job.
 export const trihexagonalDemo = {
   id: "demo:trihexagonal-shell",
   slug: "trihexagonal-shell-demo",

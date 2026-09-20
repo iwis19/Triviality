@@ -21,7 +21,16 @@ export function getMongoDatabaseName(): string {
 let clientPromise: Promise<MongoClient> | undefined;
 
 export async function getMongoClient(): Promise<MongoClient> {
-  clientPromise ??= new MongoClient(getMongoUri()).connect();
+  clientPromise ??= (async () => {
+    const client = new MongoClient(getMongoUri(), { serverSelectionTimeoutMS: 10000 });
+    try {
+      return await client.connect();
+    } catch (error) {
+      clientPromise = undefined;
+      await client.close();
+      throw error;
+    }
+  })();
   return clientPromise;
 }
 

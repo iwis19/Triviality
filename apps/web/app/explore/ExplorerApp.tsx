@@ -191,7 +191,7 @@ export default function ExplorerApp({ intro = false }: { intro?: boolean }) {
           </section>
         </aside>
         <main aria-label="Mathematical research graph">
-          <Suspense fallback={<div className="loading">Loading graph…</div>}><Graph3D nodes={visibleGraph.nodes} links={visibleGraph.links} focusNodeId={areas.find(a => a.slug === areaFilter)?.id ?? null} selectedId={selected?.id ?? null} highlightIds={searchHits} reducedMotion={reducedMotion} entranceReady={introState === "done"} onSelect={onSelect} /></Suspense>
+          {introState === "done" && <Suspense fallback={<div className="loading">Loading graph…</div>}><Graph3D nodes={visibleGraph.nodes} links={visibleGraph.links} focusNodeId={areas.find(a => a.slug === areaFilter)?.id ?? null} selectedId={selected?.id ?? null} highlightIds={searchHits} reducedMotion={reducedMotion} entranceReady onSelect={onSelect} /></Suspense>}
         </main>
         {problemSlug && <aside className="right" aria-label="Selected problem">
           <div className="detail-toolbar"><span>Problem details</span><button aria-label="Close problem details" onClick={closeProblem}><X size={18} /></button></div>

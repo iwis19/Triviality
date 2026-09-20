@@ -34,7 +34,6 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
   const cameraFrame = useRef<number | null>(null);
   const initialCameraState = useRef<"idle" | "running" | "done">("idle");
   const entranceWasReady = useRef(entranceReady);
-  const layoutSettled = useRef(false);
   const [size, setSize] = useState({ width: 800, height: 600 });
 
   useEffect(() => {
@@ -117,7 +116,6 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
   useEffect(() => {
     const fg = ref.current;
     if (!fg) return;
-    layoutSettled.current = false;
     fg.d3Force("charge")?.strength(-100);
     const linkForce = fg.d3Force("link");
     linkForce?.distance((l: FGLink) => (l.layer === "atlas" ? 65 : l.layer === "lineage" ? 40 : 32));
@@ -248,7 +246,7 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
 
   const settleCamera = useCallback(() => {
     const fg = ref.current;
-    if (!fg || !entranceReady || !layoutSettled.current || data.nodes.length === 0 || initialCameraState.current !== "idle" || selectedId || focusNodeId) return;
+    if (!fg || !entranceReady || data.nodes.length === 0 || initialCameraState.current !== "idle" || selectedId || focusNodeId) return;
     initialCameraState.current = "running";
     const startPosition = fg.camera().position.clone();
     const startTarget = (fg.controls() as { target: THREE.Vector3 }).target.clone();
@@ -344,7 +342,7 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
         onBackgroundClick={() => onSelect(null)}
         cooldownTicks={reducedMotion || selectedId ? 0 : 90}
         warmupTicks={reducedMotion ? 100 : 30}
-        onEngineStop={() => { layoutSettled.current = true; settleCamera(); }}
+        onEngineStop={settleCamera}
         enableNodeDrag={false}
         showNavInfo={false}
         linkLabel=""

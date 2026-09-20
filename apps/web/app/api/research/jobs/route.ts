@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { researchApiHeaders } from "@/lib/research-api";
 
 const researchApiUrl = process.env.RESEARCH_API_URL ?? "http://localhost:3010";
 
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
 
 async function proxy(path: string, init?: RequestInit) {
   try {
-    const response = await fetch(`${researchApiUrl}${path}`, { ...init, cache: "no-store" });
+    const response = await fetch(`${researchApiUrl}${path}`, { ...init, headers: { ...init?.headers, ...researchApiHeaders() }, cache: "no-store" });
     return new NextResponse(await response.text(), { status: response.status, headers: { "content-type": response.headers.get("content-type") ?? "application/json" } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Research API unavailable" }, { status: 503 });

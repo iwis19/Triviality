@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { researchApiHeaders } from "@/lib/research-api";
 
 const researchApiUrl = process.env.RESEARCH_API_URL ?? "http://localhost:3010";
 
@@ -10,7 +11,7 @@ export async function GET(
   const { path } = await context.params;
   const target = `${researchApiUrl}/public/${path.join("/")}${new URL(request.url).search}`;
   try {
-    const response = await fetch(target, { cache: "no-store" });
+    const response = await fetch(target, { headers: researchApiHeaders(), cache: "no-store" });
     return new NextResponse(await response.text(), {
       status: response.status,
       headers: { "content-type": response.headers.get("content-type") ?? "application/json" },

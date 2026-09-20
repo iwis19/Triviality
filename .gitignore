@@ -11,4 +11,5 @@ out/
 __pycache__/
 *.pyc
 .vercel
+deploy/vm/*.env
 .env*
