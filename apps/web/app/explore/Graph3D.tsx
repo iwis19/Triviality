@@ -137,7 +137,8 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
     stopCamera();
     const startPosition = fg.camera().position.clone();
     const startTarget = (fg.controls() as { target: THREE.Vector3 }).target.clone();
-    if (reducedMotion) { fg.cameraPosition(position, target, 0); onComplete?.(); return; }
+    // Keep the requested startup zoom; reduce incidental selection movements.
+    if (reducedMotion && !viaPosition) { fg.cameraPosition(position, target, 0); onComplete?.(); return; }
     const started = performance.now();
     const frame = (now: number) => {
       const t = Math.min(1, (now - started) / (viaPosition ? 2400 : 1100));

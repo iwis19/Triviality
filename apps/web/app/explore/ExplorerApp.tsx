@@ -43,6 +43,14 @@ export default function ExplorerApp({ intro = false }: { intro?: boolean }) {
   }, [introState]);
 
   useEffect(() => {
+    if (introState !== "fading") return;
+    // CSS animation events may be suppressed by browser motion settings.
+    // Always release the graph entrance after the 900ms fade has elapsed.
+    const timer = window.setTimeout(() => setIntroState("done"), 950);
+    return () => window.clearTimeout(timer);
+  }, [introState]);
+
+  useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     const update = () => setReducedMotion(mq.matches);
     update();
