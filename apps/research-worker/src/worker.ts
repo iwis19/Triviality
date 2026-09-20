@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { createHash, randomUUID } from "node:crypto";
 import { Redis } from "ioredis";
-import { getCollections, getMongoClient, proofDocument } from "@triviality/database";
+import { getCollections, getMongoClient, proofDocument, recordClaimVersion, publishEpisode } from "@triviality/database";
 import { config } from "./config.js";
 import { runSwarm } from "./swarm.js";
 
@@ -187,7 +187,16 @@ async function runEpisode(episodeId: string): Promise<void> {
         const proof = outcome.proof;
         formalizationId = id("formalization");
         const now = new Date();
-        await collections.formalizations.insertOne({ _id: formalizationId, episodeId, system: "Lean", systemVersion: "4 / Std",
+        // Versioned claim: an unchanged statement reuses the claim; an edited
+        // statement starts a new version that never inherits verification.
+        const claim = await recordClaimVersion(collections, {
+          statement: proof.statement || proof.theoremName,
+          leanDeclaration: proof.lean,
+          formalizationStatus: proof.verified ? "complete" : "in_progress",
+          episodeId,
+          problemId: episode.atlasProblemId ?? problem._id,
+        });
+        await collections.formalizations.insertOne({ _id: formalizationId, episodeId, claimId: claim._id, claimVersion: claim.claimVersion, system: "Lean", systemVersion: "4 / Std",
           verified: proof.verified, checker: proof.checker, axioms: proof.axioms, verificationLog: proof.log,
           theoremName: proof.theoremName, statement: proof.statement, leanSource: proof.lean,
           explanation: proof.explanation,
@@ -211,6 +220,12 @@ async function runEpisode(episodeId: string): Promise<void> {
         summary: outcome.summary, progress: 100, completedAt: now, updatedAt: now,
       } });
       await emit(episodeId, "research.job.completed", { verified: targetVerified, outcome: outcome.status });
+      try {
+        const published = await publishEpisode(collections, episodeId);
+        if (published > 0) await emit(episodeId, "research.publish.completed", { published });
+      } catch (error) {
+        console.warn(`Publication projection failed for episode ${episodeId}:`, error);
+      }
       return;
     }
 
