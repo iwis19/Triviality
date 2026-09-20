@@ -1,0 +1,26 @@
+services:
+  backend:
+    build: ./backend
+    ports: ["8000:8000"]
+    environment:
+      MATHLAB_DATABASE_URL: sqlite:////data/mathlab.db
+      MATHLAB_ARTIFACT_DIR: /data/artifacts
+      MATHLAB_OWNER_API_KEY: ${MATHLAB_OWNER_API_KEY:-change-me-owner-key}
+      MATHLAB_DEVIN_PROVIDER: ${MATHLAB_DEVIN_PROVIDER:-mock}
+      MATHLAB_DEVIN_API_KEY: ${MATHLAB_DEVIN_API_KEY:-}
+      MATHLAB_DEVIN_ORG_ID: ${MATHLAB_DEVIN_ORG_ID:-}
+      MATHLAB_DEVIN_CREATE_AS_USER_ID: ${MATHLAB_DEVIN_CREATE_AS_USER_ID:-}
+      MATHLAB_DEVIN_MAX_ACU_LIMIT: ${MATHLAB_DEVIN_MAX_ACU_LIMIT:-}
+      MATHLAB_PUBLIC_BASE_URL: ${MATHLAB_PUBLIC_BASE_URL:-http://localhost:8000}
+      MATHLAB_SCHEDULER_ENABLED: ${MATHLAB_SCHEDULER_ENABLED:-false}
+      # Lean is not installed in this image; the checker records checker_unavailable blockers.
+      MATHLAB_LEAN_PROJECT_DIR: ""
+      MATHLAB_CORS_ORIGINS: '["http://localhost:5173"]'
+    volumes:
+      - mathlab-data:/data
+  frontend:
+    build: ./frontend
+    ports: ["5173:80"]
+    depends_on: [backend]
+volumes:
+  mathlab-data:

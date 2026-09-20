@@ -1,0 +1,23 @@
+{
+  "name": "@triviality/paper-ingest",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "ingest": "tsx src/index.ts --once",
+    "start": "tsx src/index.ts",
+    "build": "tsc --outDir dist",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@triviality/database": "workspace:*",
+    "dotenv": "^16.4.7",
+    "ioredis": "^5.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "tsx": "^4.19.3",
+    "typescript": "^5"
+  }
+}

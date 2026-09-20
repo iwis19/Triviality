@@ -1,0 +1,8 @@
+{
+  "episode_id": "demo-addition-order",
+  "title": "Addition preserves order",
+  "statement": "Prove that adding the same natural number to both sides preserves an inequality. Explore a direct arithmetic proof and independently examine the assumptions and possible counterexamples.",
+  "lean_statement": "(a b c : Nat) (h : a ≤ b) : a + c ≤ b + c",
+  "proof_attempts": 2,
+  "literature": []
+}

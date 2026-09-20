@@ -1,0 +1,12 @@
+{
+  "workswarm": {
+    "repository": "https://github.com/openJiuwen-ai/jiuwenswarm",
+    "revision": "da49aa1252a62fe0273f948d2246c149b66de60c",
+    "version": "0.2.5.beta1"
+  },
+  "core": {
+    "repository": "https://github.com/openJiuwen-ai/agent-core",
+    "revision": "d0bd83352f5ef4070baf44d37e788ba692a95b37",
+    "engine": "openjiuwen/agent_teams/workflow/engine"
+  }
+}
