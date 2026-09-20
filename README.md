@@ -61,4 +61,4 @@ pnpm research:worker
 pnpm --filter web dev
 ```
 
-The web app proxies `/api/research/*` to `RESEARCH_API_URL` (default `http://localhost:3010`). A research job is not considered verified because a model says it is: when Lean is unavailable or rejects the generated file, the episode remains a candidate/blocked result and the checker detail is shown in the episode page. To enable independent verification, install Lean 4.19.0 and set `SWARM_LEAN_BIN` as described in the challenge notes.
+The web app proxies `/api/research/*` to `RESEARCH_API_URL` (default `http://localhost:3010`). A research job is not considered verified because a model says it is: when Lean is unavailable or rejects the generated file, the episode remains a candidate/blocked result and the checker detail is shown in the episode page. Install Lean 4.19.0 through elan for automatic detection, or set `SWARM_LEAN_BIN` to another installation as described in the challenge notes. A blank setting uses automatic detection; it does not disable compilation.

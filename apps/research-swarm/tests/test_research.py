@@ -23,6 +23,7 @@ checker = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checker)
 
 TARGET = "(a b c : Nat) (h : a ≤ b) : a + c ≤ b + c"
+REAL_LEAN_AVAILABLE = Path(checker.lean_executable()).is_file()
 
 
 class FixtureBackend(engine.AgentBackend):
@@ -110,7 +111,7 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result["status"], "blocked")
             self.assertEqual(second.prompts, [])
 
-    @unittest.skipUnless(os.environ.get("SWARM_LEAN_BIN") and Path(os.environ["SWARM_LEAN_BIN"]).is_file(), "Real Lean toolchain not configured")
+    @unittest.skipUnless(REAL_LEAN_AVAILABLE, "Real Lean toolchain not installed")
     async def test_real_lean_failure_repair_and_exact_target(self):
         backend = FixtureBackend(bad_first_proof=True)
         result, _ = await self.run_flow(backend)
@@ -119,7 +120,7 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Lean rejected", backend.prompts[-1])
         self.assertEqual(result["proof"]["statement"], TARGET)
 
-    @unittest.skipUnless(os.environ.get("SWARM_LEAN_BIN") and Path(os.environ["SWARM_LEAN_BIN"]).is_file(), "Real Lean toolchain not configured")
+    @unittest.skipUnless(REAL_LEAN_AVAILABLE, "Real Lean toolchain not installed")
     async def test_generated_target_is_not_claimed_as_solved(self):
         result, _ = await self.run_flow(FixtureBackend(), lean_statement="")
         self.assertEqual(result["status"], "formalized")
@@ -127,6 +128,32 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
 
 
 class VerificationTests(unittest.TestCase):
+    @unittest.skipUnless(REAL_LEAN_AVAILABLE, "Real Lean toolchain not installed")
+    def test_blank_override_compiles_with_installed_lean(self):
+        for value in ["", "   "]:
+            with self.subTest(value=value), patch.dict(os.environ, {"SWARM_LEAN_BIN": value}):
+                result = checker.check(TARGET, "by omega")
+                self.assertTrue(result["verified"], result)
+                self.assertIn("Lean checked", result["checker"])
+
+    @unittest.skipUnless(REAL_LEAN_AVAILABLE, "Real Lean toolchain not installed")
+    def test_lean_rejects_false_theorem(self):
+        result = checker.check(": False", "by trivial")
+        self.assertFalse(result["verified"])
+        self.assertEqual(result["checker"], "Lean rejected the candidate")
+        self.assertIn("error", result["log"])
+
+    def test_invalid_explicit_executable_does_not_fallback(self):
+        result = checker.check(TARGET, "by omega", executable="nonexistent-lean-for-test")
+        self.assertFalse(result["verified"])
+        self.assertIn("Lean unavailable", result["checker"])
+
+    def test_timeout_fails_closed(self):
+        with patch.object(checker.subprocess, "run", side_effect=subprocess.TimeoutExpired("lean", 30)):
+            result = checker.check(TARGET, "by omega")
+        self.assertFalse(result["verified"])
+        self.assertIn("timed out", result["checker"])
+
     def test_rejects_unsafe_and_missing_proofs(self):
         for proof in ["by sorry", "by admit", "by native_decide", "by run_tac pure ()", "by\n exact h\n#eval 1", ""]:
             with self.subTest(proof=proof):
@@ -178,7 +205,7 @@ class BridgeTests(unittest.TestCase):
             self.assertEqual(run.returncode, 0, run.stderr)
             output = json.loads(run.stdout)
             self.assertIn(output["result"]["status"], ["verified", "candidate"])
-            if os.environ.get("SWARM_LEAN_BIN"):
+            if REAL_LEAN_AVAILABLE:
                 self.assertEqual(output["result"]["status"], "verified", output["result"])
                 self.assertEqual(fixture.proofs, 2)
             self.assertTrue(any(e["kind"] == "usage" for e in output["events"]))

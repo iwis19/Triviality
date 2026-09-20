@@ -1,5 +1,4 @@
 import { readFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
 import { spawn } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,10 +6,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const python = process.env.SWARM_PYTHON || resolve(root, process.platform === "win32" ? ".venv/Scripts/python.exe" : ".venv/bin/python");
 if (process.argv[2] === "test") {
-  const localLean = resolve(root, ".data/lean/lean-4.19.0-windows/bin/lean.exe");
-  const env = { ...process.env };
-  if (!env.SWARM_LEAN_BIN && existsSync(localLean)) env.SWARM_LEAN_BIN = localLean;
-  const child = spawn(python, ["-m", "unittest", "discover", "-s", "apps/research-swarm/tests", "-v"], { cwd: root, env, stdio: "inherit", windowsHide: true });
+  const child = spawn(python, ["-m", "unittest", "discover", "-s", "apps/research-swarm/tests", "-v"], { cwd: root, env: process.env, stdio: "inherit", windowsHide: true });
   child.on("error", (error) => { console.error(error.message); process.exitCode = 1; });
   child.on("exit", (code) => { process.exitCode = code ?? 1; });
 } else {

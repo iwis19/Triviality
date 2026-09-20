@@ -100,12 +100,6 @@ class ModelBackend(engine.AgentBackend):
 
 async def execute(args, backend=None, progress=None):
     import re
-    if not os.environ.get("SWARM_LEAN_BIN"):
-        local_lean = ROOT / ".data/lean/lean-4.19.0-windows/bin/lean.exe"
-        if local_lean.is_file():
-            os.environ["SWARM_LEAN_BIN"] = str(local_lean)
-    elif not Path(os.environ["SWARM_LEAN_BIN"]).is_absolute() and "/" in os.environ["SWARM_LEAN_BIN"].replace("\\", "/"):
-        os.environ["SWARM_LEAN_BIN"] = str((ROOT / os.environ["SWARM_LEAN_BIN"]).resolve())
     catalog = json.loads((ROOT / "config/research-models.json").read_text(encoding="utf-8"))
     if args.get("role_models") is None:
         args = {**args, "role_models": {role["id"]: catalog["defaultModel"] for role in catalog["roles"]}}

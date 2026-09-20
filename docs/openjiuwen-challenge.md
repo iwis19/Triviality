@@ -90,9 +90,14 @@ all roles use the catalog default. There are no separate custom endpoint or
 research/proof model environment settings. Model transports require token
 usage; Devin instead reports ACU usage.
 
-Install **Lean 4.19.0** through elan or the official binary release. Set
-`SWARM_LEAN_BIN` to the absolute path of `lean`/`lean.exe`. Windows binaries
-placed in `.data/lean/lean-4.19.0-windows/bin/lean.exe` are detected automatically.
+Install **Lean 4.19.0** through elan or the official binary release. A blank
+`SWARM_LEAN_BIN` automatically detects the pinned elan toolchain on macOS,
+Linux, and Windows (including a custom `ELAN_HOME`), then the local Windows
+binary at `.data/lean/lean-4.19.0-windows/bin/lean.exe`, then `lean` on PATH.
+The PATH fallback pins elan to the project's toolchain even when proofs are
+compiled in temporary directories. For another installation, set
+`SWARM_LEAN_BIN` to its executable path; relative paths resolve from the worker's
+working directory. An explicit invalid path reports a verification failure.
 The demo uses `Std` and does not require the imported backend's Mathlib project.
 
 ## Standalone live demo
@@ -129,8 +134,8 @@ pnpm research:worker
 pnpm --filter web dev
 ```
 
-Open the dashboard, click **Deploy research**, assign a model to each role,
-and click **Use the research team demo**. Submit the filled goal and exact Lean target. The episode page displays
+Open the dashboard, click **New research**, assign a model to each role,
+and click **Use example**. Submit the filled goal and exact Lean target. The episode page displays
 live role activity, reports, critique revisions, repair decisions, the research
 graph and the checked proof. OpenAlex failure is recorded and degrades to
 uncited mathematical reasoning; model access and Lean have separate failure
@@ -174,8 +179,9 @@ in that host. Native token budgets/permissions remain host-owned.
 ## Verification and limitations
 
 Run `pnpm swarm:test`. Tests use **scripted model responses** with the real
-SwarmFlow engine. With `SWARM_LEAN_BIN` configured they also run the real Lean
-failure/repair cycle. They are not live model-quality evaluations. Type-check:
+SwarmFlow engine. When Lean is detected they also run the real Lean
+failure/repair cycle, blank-setting regression, and false-theorem rejection.
+They are not live model-quality evaluations. Type-check:
 
 ```powershell
 pnpm --filter @triviality/database build
