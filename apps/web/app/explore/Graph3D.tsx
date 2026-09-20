@@ -245,7 +245,14 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
     const rotatedPosition = fg.camera().position.clone().sub(target)
       .applyEuler(new THREE.Euler(THREE.MathUtils.degToRad(-22), THREE.MathUtils.degToRad(38), 0, "YXZ"))
       .add(target);
-    const position = target.clone().lerp(rotatedPosition, 0.68);
+    // Fitting a large graph can pull much farther back than the opening view.
+    // Return at least as close as we started, rather than only undoing 32% of
+    // that fitted distance and leaving the graph permanently smaller.
+    const finalDistance = Math.min(
+      startPosition.distanceTo(startTarget),
+      rotatedPosition.distanceTo(target) * 0.68,
+    );
+    const position = rotatedPosition.clone().sub(target).setLength(finalDistance).add(target);
     fg.cameraPosition(startPosition, startTarget, 0);
     moveCamera(position, target, rotatedPosition, () => { initialCameraState.current = "done"; placeDemoAtTop(); });
   }, [entranceReady, data.nodes.length, selectedId, focusNodeId, moveCamera, placeDemoAtTop]);
