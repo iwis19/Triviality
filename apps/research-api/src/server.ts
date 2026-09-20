@@ -124,6 +124,7 @@ async function serializeJob(episodeId: string) {
     provider: episode.modelProvider ?? (episode.orchestrator ? undefined : "openai"),
     budget: episode.budget ?? 0,
     tokenBudget: episode.tokenBudget,
+    demoDeadlineAt: episode.demoDeadlineAt?.toISOString(),
     explorationRounds: episode.explorationRounds ?? 4,
     stagnationThreshold: episode.stagnationThreshold ?? 2,
     branches: episode.branches ?? [],

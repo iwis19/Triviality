@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ResearchMarkdown } from "@/components/research-markdown";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { IconArrowLeft, IconCheck, IconCode, IconFileDescription, IconLoader2 } from "@tabler/icons-react";
 import { ResearchGraph } from "@/components/research-graph";
 import { ResearchLiteratureTabs } from "@/components/research-literature-tabs";
@@ -16,10 +16,21 @@ import { latexArtifactMarkdown } from "@/lib/research-markdown";
 
 import { useResearchJob } from "@/lib/use-research-job";
 
+import { trihexagonalChatHref } from "@/lib/research-chat-links";
+
 type ArtifactTab = "literature" | "lean" | "latex";
 
 export default function ResearchEpisodePage() {
   const params = useParams<{ jobId: string }>();
+  const searchParams = useSearchParams();
+  const demoUntil = searchParams.get("demoUntil");
+  useEffect(() => {
+    if (!demoUntil) return;
+    const deadline = Date.parse(demoUntil);
+    if (!Number.isFinite(deadline)) return;
+    const timer = window.setTimeout(() => window.location.replace(trihexagonalChatHref), Math.max(0, deadline - Date.now()));
+    return () => window.clearTimeout(timer);
+  }, [demoUntil]);
   const { job, error } = useResearchJob(params.jobId);
   const [tab, setTab] = useState<ArtifactTab>("latex");
 

@@ -83,6 +83,7 @@ export interface ResearchProof {
 }
 
 export interface ResearchJob {
+  demoDeadlineAt?: string;
   tokenBudget?: number;
   explorationRounds?: number;
   stagnationThreshold?: number;

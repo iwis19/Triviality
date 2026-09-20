@@ -118,7 +118,7 @@ async function runEpisode(episodeId: string): Promise<void> {
   try {
     await addGraphNode(episodeId, problem._id, "RESEARCH_PROBLEM", "Research space", `${episode.area ?? "Mathematics"} · ${episode.title}`, 50, 13, "active");
     await updateStage(episodeId, "Finding seed literature for the research space", 14);
-    const works = episode.demoDeadlineAt ? [] : await fetchLiterature(episode.title, problem.statement, episode.area ?? "Mathematics").catch(async (error) => {
+    const works = await fetchLiterature(episode.title, problem.statement, episode.area ?? "Mathematics").catch(async (error) => {
       await emit(episodeId, "research.literature.unavailable", { message: "Literature lookup unavailable; continuing with explicitly uncited mathematical reasoning" });
       return [] as LiteratureHit[];
     });
