@@ -184,10 +184,10 @@ function SidebarContent({
               <Link
                 href="/proofs/trihexagonal-shell"
                 onClick={onNavigate}
-                title={`Trihexagonal shell: a counterexample to the proposed bound · ${researchStatusPresentation.certificate_checked.label}`}
+                title={`Trihexagonal shell: a counterexample to the proposed bound · ${researchStatusPresentation.completed.label}`}
                 className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-2 text-sm ${pathname === "/proofs/trihexagonal-shell" ? "bg-black/[0.07]" : ""}`}
               >
-                <span aria-label={researchStatusPresentation.certificate_checked.label} className={`h-1.5 w-1.5 shrink-0 rounded-full ${researchStatusPresentation.certificate_checked.dot}`} />
+                <span aria-label={researchStatusPresentation.completed.label} className={`h-1.5 w-1.5 shrink-0 rounded-full ${researchStatusPresentation.completed.dot}`} />
                 <span className="truncate">Trihexagonal shell counterexample</span>
               </Link>
               <button

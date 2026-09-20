@@ -6,11 +6,9 @@ type Props = { job: Pick<ResearchJob, "status" | "proof"> } | { state: keyof typ
 export function ResearchStatusBadge(props: Props) {
   const state = "job" in props ? getResearchStatus(props.job) : props.state;
   const presentation = researchStatusPresentation[state];
-  const title = state === "certificate_checked"
-    ? "The Lean certificate builds using native_decide. This is distinct from the research runner’s stricter Lean verification."
-    : state === "completed_unverified" ? "Research finished, but no passed Lean verification is recorded." : presentation.label;
+  const title = state === "completed_unverified" ? "Research finished, but no passed Lean verification is recorded." : presentation.label;
   return <span title={title} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-normal ${presentation.badge}`}>
-    <span aria-hidden="true">{state === "completed_unverified" ? "!" : state === "completed" || state === "certificate_checked" ? "✓" : state === "failed" ? "×" : "•"}</span>
+    <span aria-hidden="true">{state === "completed_unverified" ? "!" : state === "completed" ? "✓" : state === "failed" ? "×" : "•"}</span>
     {presentation.label}
   </span>;
 }
