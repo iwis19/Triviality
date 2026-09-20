@@ -145,22 +145,20 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
       // Move the camera and its target together, with gentle acceleration and
       // deceleration. Interrupted moves start from the current visible frame.
       if (viaPosition) {
-        const rotationProgress = Math.min(1, t / 0.45);
-        const rotationEase = smootherStep(rotationProgress);
+        const pullbackProgress = Math.min(1, t / 0.45);
+        const pullbackEase = smootherStep(pullbackProgress);
         const zoomProgress = Math.max(0, (t - 0.55) / 0.45);
         const zoomEase = smootherStep(zoomProgress);
         const startOffset = startPosition.clone().sub(startTarget);
         const viaOffset = viaPosition.clone().sub(target);
         const finalOffset = position.clone().sub(target);
-        // Interpolate radius separately: a straight chord during rotation can
-        // cancel the outward zoom, even when its endpoint is farther away.
+        // Change only the distance from the target during the entrance.
         const distance = THREE.MathUtils.lerp(
-          THREE.MathUtils.lerp(startOffset.length(), viaOffset.length(), rotationEase),
+          THREE.MathUtils.lerp(startOffset.length(), viaOffset.length(), pullbackEase),
           finalOffset.length(), zoomEase,
         );
-        const direction = startOffset.normalize().lerp(viaOffset.normalize(), rotationEase)
-          .lerp(finalOffset.normalize(), zoomEase).normalize();
-        const currentTarget = startTarget.clone().lerp(target, rotationEase);
+        const direction = startOffset.normalize();
+        const currentTarget = startTarget;
         fg.cameraPosition(
           currentTarget.clone().addScaledVector(direction, distance),
           currentTarget, 0,
@@ -256,13 +254,8 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
     const startOffset = startPosition.clone().sub(target);
     // Use the opening view, not zoomToFit's render-dependent bounding box.
     // The intro always pulls back by 55%, then returns to its starting scale.
-    const finalDistance = startOffset.length();
-    const rotatedOffset = startOffset
-      .applyEuler(new THREE.Euler(THREE.MathUtils.degToRad(-22), THREE.MathUtils.degToRad(38), 0, "YXZ"))
-      .normalize();
-    const rotatedPosition = target.clone().addScaledVector(rotatedOffset, finalDistance * 1.55);
-    const position = target.clone().addScaledVector(rotatedOffset, finalDistance);
-    moveCamera(position, target, rotatedPosition, () => { initialCameraState.current = "done"; placeDemoAtTop(); });
+    const pulledBackPosition = target.clone().addScaledVector(startOffset, 1.55);
+    moveCamera(startPosition, target, pulledBackPosition, () => { initialCameraState.current = "done"; placeDemoAtTop(); });
   }, [entranceReady, data.nodes.length, selectedId, focusNodeId, moveCamera, placeDemoAtTop]);
 
   useEffect(() => {
