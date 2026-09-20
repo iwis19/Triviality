@@ -18,6 +18,9 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  --workspace-sidebar-width: 18rem;
+  --workspace-header-height: 5rem;
+  --workspace-edge-inset: 1.5rem;
   color-scheme: light;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);

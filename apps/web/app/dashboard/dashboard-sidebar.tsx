@@ -88,11 +88,11 @@ export function DashboardSidebar({ jobs: providedJobs, onDeleted }: { jobs?: Res
 
   return (
     <>
-      <aside className="sticky top-0 hidden h-dvh w-72 shrink-0 border-r border-black/8 bg-[#f7f7f8] md:block">
+      <aside className="sticky top-0 hidden h-dvh w-[var(--workspace-sidebar-width)] shrink-0 border-r border-black/8 bg-[#f7f7f8] md:block">
         {content}
       </aside>
 
-      <div className="flex h-14 items-center justify-between border-b border-black/8 bg-[#f7f7f8] px-4 md:hidden">
+      <div className="flex h-16 items-center justify-between border-b border-black/8 bg-[#f7f7f8] px-4 md:hidden">
         <TrivialityLogo />
         <button
           type="button"
@@ -143,8 +143,8 @@ function SidebarContent({
   onRemovePublishedProof: () => void;
 }) {
   return (
-    <div className="flex h-full flex-col px-3 py-3 text-[#202020]">
-      <div className="flex h-11 items-center px-2">
+    <div className="flex h-full flex-col px-3 pb-3 text-[#202020]">
+      <div className="-mx-3 flex h-[var(--workspace-header-height)] shrink-0 items-center border-b border-black/8 px-[var(--workspace-edge-inset)]">
         <TrivialityLogo />
       </div>
 
