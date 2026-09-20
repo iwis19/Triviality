@@ -1,5 +1,10 @@
 # Experiment worker: quick start
 
+The worker uses private access over SSH; public HTTPS/domain setup is not
+included. The VM service stays running, but a research backend outside the VM
+needs a private connection to it. Rerunning setup removes any earlier public
+gateway container from this worker's Compose project without deleting results.
+
 ## Upgrade your existing VM to run Lean
 
 Run these from the project on your laptop:

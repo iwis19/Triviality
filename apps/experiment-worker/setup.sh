@@ -14,9 +14,5 @@ if ! command -v docker >/dev/null 2>&1 || ! $elevate docker compose version >/de
     $elevate apt-get install -y docker.io docker-compose-v2
 fi
 $elevate systemctl enable --now docker
-set --
-if grep -q '^WORKER_DOMAIN=.' .env; then
-    set -- --profile https
-fi
-$elevate docker compose --env-file .env -p triviality-experiments -f compose.yml "$@" up --build -d --wait --wait-timeout 120
+$elevate docker compose --env-file .env -p triviality-experiments -f compose.yml up --build -d --remove-orphans --wait --wait-timeout 120
 echo 'Worker stays running after SSH disconnects and restarts with the VM.'

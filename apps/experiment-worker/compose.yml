@@ -42,33 +42,9 @@ services:
       experiments:
         condition: service_healthy
     networks: [default, isolated]
-  public-gateway:
-    profiles: [https]
-    image: caddy:2-alpine
-    environment:
-      WORKER_DOMAIN: ${WORKER_DOMAIN:-}
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile.https:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    read_only: true
-    cap_drop: [ALL]
-    cap_add: [NET_BIND_SERVICE]
-    security_opt: [no-new-privileges:true]
-    mem_limit: 128m
-    pids_limit: 32
-    restart: unless-stopped
-    depends_on:
-      experiments:
-        condition: service_healthy
-    networks: [default, isolated]
+
 networks:
   isolated:
     internal: true
 volumes:
   experiments:
-  caddy-data:
-  caddy-config:
