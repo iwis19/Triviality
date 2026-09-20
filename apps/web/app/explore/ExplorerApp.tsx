@@ -15,6 +15,17 @@ import { EVIDENCE_COLORS } from "./palette";
 import "./explore.css";
 
 const Graph3D = lazy(() => import("./Graph3D"));
+const INTRO_SEEN_KEY = "triviality:home-intro-seen";
+let introSeenInMemory = false;
+
+function shouldPlayIntro(intro: boolean): boolean {
+  if (!intro || typeof window === "undefined" || introSeenInMemory) return false;
+  try {
+    return window.sessionStorage.getItem(INTRO_SEEN_KEY) !== "1";
+  } catch {
+    return true;
+  }
+}
 
 export default function ExplorerApp({ intro = false }: { intro?: boolean }) {
   const router = useRouter();
@@ -31,22 +42,30 @@ export default function ExplorerApp({ intro = false }: { intro?: boolean }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
-  const [introState, setIntroState] = useState(intro ? "playing" : "done");
-  const finishIntro = useCallback(() => setIntroState("holding"), []);
+  const [introState, setIntroState] = useState(() => shouldPlayIntro(intro) ? "playing" : "done");
+  const finishIntro = useCallback(() => {
+    introSeenInMemory = true;
+    try {
+      window.sessionStorage.setItem(INTRO_SEEN_KEY, "1");
+    } catch {
+      // The in-memory flag still prevents repeats during client navigation.
+    }
+    setIntroState("holding");
+  }, []);
   const detail = details[problemSlug] ?? null;
   const closeProblem = useCallback(() => { setProblemSlug(""); setSelected(null); }, []);
 
   useEffect(() => {
     if (introState !== "holding") return;
-    const timer = window.setTimeout(() => setIntroState("fading"), 250);
+    const timer = window.setTimeout(() => setIntroState("fading"), 100);
     return () => window.clearTimeout(timer);
   }, [introState]);
 
   useEffect(() => {
     if (introState !== "fading") return;
     // CSS animation events may be suppressed by browser motion settings.
-    // Always release the graph entrance after the 900ms fade has elapsed.
-    const timer = window.setTimeout(() => setIntroState("done"), 950);
+    // Always release the graph entrance after the 350ms fade has elapsed.
+    const timer = window.setTimeout(() => setIntroState("done"), 400);
     return () => window.clearTimeout(timer);
   }, [introState]);
 
@@ -149,7 +168,11 @@ export default function ExplorerApp({ intro = false }: { intro?: boolean }) {
       <header className="atlas-header">
         <button className="menu-toggle" aria-label="Toggle problem browser" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><Menu size={18} /></button>
         <TrivialityLogo />
-        <div className="atlas-search"><Search size={16} aria-hidden="true" /><input id="atlas-search" aria-label="Search problems" placeholder="Search mathematical problems…" value={search} onChange={e => { setSearch(e.target.value); if (e.target.value) setMenuOpen(true); }} />{search && <button aria-label="Clear search" onClick={() => setSearch("")}><X size={14} /></button>}</div>
+        <div className="atlas-search" role="search">
+          <Search className="atlas-search-icon" size={18} strokeWidth={1.7} aria-hidden="true" />
+          <input id="atlas-search" aria-label="Search problems" placeholder="Search mathematical problems…" autoComplete="off" spellCheck={false} value={search} onChange={e => { setSearch(e.target.value); if (e.target.value) setMenuOpen(true); }} />
+          {search ? <button className="atlas-search-clear" aria-label="Clear search" onClick={() => { setSearch(""); document.getElementById("atlas-search")?.focus(); }}><X size={15} /></button> : <kbd className="atlas-search-shortcut" aria-hidden="true">/</kbd>}
+        </div>
         <Link className="workspace-link" href="/dashboard">Workspace <ArrowUpRight size={15} /></Link>
       </header>
       {error && <div className="error" role="alert">Could not load the atlas. <button onClick={() => setRefreshKey(k => k + 1)}>Try again</button></div>}

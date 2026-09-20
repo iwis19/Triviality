@@ -26,7 +26,7 @@ export function TrivialityLogo({
         <span className="absolute bottom-0 left-0 h-[2px] w-8 bg-black" />
       </span>
       {wordmark ? (
-        <span className="ml-1 text-xl font-medium tracking-[-0.06em]">
+        <span className="-ml-0.5 text-xl font-medium tracking-[-0.06em]">
           riviality
         </span>
       ) : null}

@@ -67,9 +67,11 @@ body {
   color: #111;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+@layer base {
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
 }
 
 @keyframes board-in {

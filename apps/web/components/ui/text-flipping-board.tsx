@@ -9,10 +9,10 @@ const FLAP_CHARS = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const BOARD_ROWS = 4;
 const BOARD_COLS = 18;
 
-const BASE_COL_DELAY = 30;
-const BASE_ROW_DELAY = 20;
-const BASE_STEP_MS = 55;
-const BASE_FLIP_S = 0.35;
+const BASE_COL_DELAY = 20;
+const BASE_ROW_DELAY = 15;
+const BASE_STEP_MS = 120;
+const BASE_FLIP_S = 0.08;
 const BASE_TOTAL_S =
   ((BOARD_COLS - 1) * BASE_COL_DELAY +
     (BOARD_ROWS - 1) * BASE_ROW_DELAY +
@@ -68,6 +68,7 @@ const FlapCell = React.memo(function FlapCell({
   const accentRef = useRef<AccentColor | null>(null);
   const startTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stepTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settledTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (startTimer.current) clearTimeout(startTimer.current);
@@ -86,7 +87,7 @@ const FlapCell = React.memo(function FlapCell({
     const scrambleCount =
       normalized === " "
         ? 1
-        : 25 + Math.floor(Math.random() * 15);
+        : 8;
 
     const runStep = (i: number) => {
       const isLast = i === scrambleCount;
@@ -111,6 +112,9 @@ const FlapCell = React.memo(function FlapCell({
 
       if (!isLast) {
         stepTimer.current = setTimeout(() => runStep(i + 1), stepMs);
+      } else {
+        // Completion must not depend on a motion-library frame callback.
+        settledTimer.current = setTimeout(() => onSettled(cellId, normalized), flipDuration * 1350 + 40);
       }
     };
 
@@ -119,11 +123,12 @@ const FlapCell = React.memo(function FlapCell({
     return () => {
       if (startTimer.current) clearTimeout(startTimer.current);
       if (stepTimer.current) clearTimeout(stepTimer.current);
+      if (settledTimer.current) clearTimeout(settledTimer.current);
       startTimer.current = null;
       stepTimer.current = null;
       tgtRef.current = null;
     };
-  }, [target, delay, stepMs]);
+  }, [target, delay, stepMs, flipDuration, cellId, onSettled]);
 
   const show = current === " " ? "\u00A0" : current;
   const showPrev = prev === " " ? "\u00A0" : prev;
@@ -353,7 +358,7 @@ export interface TextFlippingBoardProps {
   rows?: string[];
   text?: string;
   className?: string;
-  /** Total animation duration in seconds. Defaults to ~1.2s. */
+  /** Scramble timeline in seconds, excluding the hold and clearing sweep. */
   duration?: number;
   onComplete?: () => void;
 }
@@ -369,7 +374,8 @@ export function TextFlippingBoard({
   const colDelay = BASE_COL_DELAY * scale;
   const rowDelay = BASE_ROW_DELAY * scale;
   const stepMs = BASE_STEP_MS * scale;
-  const flipDur = Math.min(0.6, Math.max(0.15, BASE_FLIP_S * scale));
+  // Finish both halves before the next character update; no interrupted flips.
+  const flipDur = Math.min(0.25, stepMs / 1500, BASE_FLIP_S * scale);
 
   const board = useMemo(() => {
     const grid: ParsedCell[][] = Array.from({ length: BOARD_ROWS }, () =>
@@ -423,7 +429,7 @@ export function TextFlippingBoard({
     return () => { if (holdTimer.current) clearTimeout(holdTimer.current); };
   }, [letterIds]);
 
-  // Blanking flips overlap by about 100ms, sweeping from left to right.
+  // Blanking flips overlap, sweeping from left to right.
   // Wait for every final blank flap before triggering the fade.
   const cellSettled = useCallback((id: string, value: string) => {
     const state = completion.current;
@@ -437,7 +443,7 @@ export function TextFlippingBoard({
     }
     if (!state.pending.delete(id)) return;
     if (!state.pending.size) {
-      holdTimer.current = setTimeout(() => setClearingIndex(letterIds.length - 1), 350);
+      holdTimer.current = setTimeout(() => setClearingIndex(letterIds.length - 1), 240);
     }
   }, [letterIds, onComplete]);
 
@@ -456,15 +462,20 @@ export function TextFlippingBoard({
           row.map((cell, c) =>
             cell.type === "color" ? (
               <ColorCell key={`${r}-${c}`} color={cell.hex} />
+            ) : cell.value === " " ? (
+              <div key={`${r}-${c}`} className="flex aspect-3/6 flex-col overflow-hidden rounded-[2px] border border-neutral-300 md:rounded-[3px] md:border-2 dark:border-black">
+                <div className="flex-1 bg-neutral-200/80 dark:bg-neutral-900" />
+                <div className="h-2 bg-[repeating-linear-gradient(to_bottom,currentColor_0,currentColor_1px,transparent_1px,transparent_0.15rem)] mask-t-from-50% text-neutral-400 opacity-20 md:h-4 dark:text-black dark:opacity-100" />
+              </div>
             ) : (
               <FlapCell
                 key={`${r}-${c}`}
                 cellId={`${r}-${c}`}
                 onSettled={cellSettled}
                 target={clearingIndex >= 0 && letterIds.indexOf(`${r}-${c}`) <= clearingIndex ? " " : cell.value}
-                delay={clearingIndex >= 0 ? Math.max(0, letterIds.indexOf(`${r}-${c}`)) * 140 : c * colDelay + r * rowDelay}
+                delay={clearingIndex >= 0 ? Math.max(0, letterIds.indexOf(`${r}-${c}`)) * 70 : c * colDelay + r * rowDelay}
                 stepMs={stepMs}
-                flipDuration={clearingIndex >= 0 && letterIds.indexOf(`${r}-${c}`) <= clearingIndex ? 0.18 : flipDur}
+                flipDuration={clearingIndex >= 0 && letterIds.indexOf(`${r}-${c}`) <= clearingIndex ? 0.1 : flipDur}
               />
             ),
           ),
