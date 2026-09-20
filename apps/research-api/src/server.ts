@@ -124,7 +124,6 @@ async function serializeJob(episodeId: string) {
     provider: episode.modelProvider ?? (episode.orchestrator ? undefined : "openai"),
     budget: episode.budget ?? 0,
     tokenBudget: episode.tokenBudget,
-    demoDeadlineAt: episode.demoDeadlineAt?.toISOString(),
     explorationRounds: episode.explorationRounds ?? 4,
     stagnationThreshold: episode.stagnationThreshold ?? 2,
     branches: episode.branches ?? [],
@@ -216,8 +215,7 @@ app.post("/research/jobs", async (request: FastifyRequest<{ Body: CreateJobBody 
   let tokenBudget: number;
   try { tokenBudget = tokenBudgetForRequest(body.tokenBudget); }
   catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
-  if (body.demoRun !== undefined && typeof body.demoRun !== "boolean") return reply.code(400).send({ error: "demoRun must be a boolean" });
-  const demoDeadlineAt = body.demoRun ? new Date(Date.now() + 25000) : undefined;
+  if (body.demoRun) return reply.code(410).send({ error: "The temporary live demo has ended. Refresh the page to open the saved example." });
   const explorationRounds = body.explorationRounds ?? 4;
   const stagnationThreshold = body.stagnationThreshold ?? 2;
   if (!Number.isInteger(explorationRounds) || explorationRounds < 1 || explorationRounds > 20) return reply.code(400).send({ error: "explorationRounds must be an integer from 1 to 20" });
@@ -232,7 +230,7 @@ app.post("/research/jobs", async (request: FastifyRequest<{ Body: CreateJobBody 
     atlasProblemId = atlasProblem._id;
   }
   await collections.researchProjects.insertOne({ _id: projectId, name: title, description: statement, status: "ACTIVE", createdAt: now, updatedAt: now });
-  await collections.researchEpisodes.insertOne({ _id: episodeId, projectId, title, objective: statement, status: "ACTIVE", area, orchestrator: "workswarm", roleModels, mode, budget, tokenBudget, ...(demoDeadlineAt ? { demoDeadlineAt } : {}), explorationRounds, stagnationThreshold, branches: [], atlasProblemId, leanStatement: body.leanStatement?.trim() || undefined, stage: "Queued for research worker", progress: 2, createdAt: now, updatedAt: now });
+  await collections.researchEpisodes.insertOne({ _id: episodeId, projectId, title, objective: statement, status: "ACTIVE", area, orchestrator: "workswarm", roleModels, mode, budget, tokenBudget, explorationRounds, stagnationThreshold, branches: [], atlasProblemId, leanStatement: body.leanStatement?.trim() || undefined, stage: "Queued for research worker", progress: 2, createdAt: now, updatedAt: now });
   await collections.researchProblems.insertOne({ _id: problemId, episodeId, title, statement, assumptions: "", status: "ACTIVE", createdAt: now, updatedAt: now });
 
   try {
