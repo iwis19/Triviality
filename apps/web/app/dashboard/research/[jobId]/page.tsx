@@ -11,6 +11,7 @@ import { DashboardSidebar } from "../../dashboard-sidebar";
 import { DashboardTopbar } from "../../dashboard-topbar";
 import { ResearchGraph } from "@/components/research-graph";
 import { ResearchLiteratureTabs } from "@/components/research-literature-tabs";
+import { ModelLabel } from "@/components/model-select";
 import { getResearchJob, modelCatalog, type ResearchJob } from "@/lib/research-store";
 
 type ArtifactTab = "literature" | "lean" | "latex";
@@ -49,7 +50,7 @@ export default function ResearchEpisodePage() {
             <div className="w-full max-w-xs shrink-0"><div className="mb-2 flex justify-between text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40"><span>{job.stage}</span><span>{job.progress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-black/8"><div className="h-full rounded-full bg-black transition-all duration-500" style={{ width: `${job.progress}%` }} /></div></div>
           </div>
 
-          {job.roleModels && <section className="mt-6 rounded-xl border border-black/10 bg-white p-5"><h2 className="text-sm font-semibold">Models</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(job.roleModels).map(([roleId, modelId]) => <div key={roleId}><dt className="text-xs text-black/45">{modelCatalog.roles.find((role) => role.id === roleId)?.label ?? roleId.replaceAll("_", " ")}</dt><dd className="mt-1 text-sm">{modelCatalog.models.find((model) => model.id === modelId)?.label ?? modelId}</dd></div>)}</dl></section>}
+          {job.roleModels && <section className="mt-6 rounded-xl border border-black/10 bg-white p-5"><h2 className="text-sm font-semibold">Models</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(job.roleModels).map(([roleId, modelId]) => <div key={roleId}><dt className="text-xs text-black/45">{modelCatalog.roles.find((role) => role.id === roleId)?.label ?? roleId.replaceAll("_", " ")}</dt><dd className="mt-1"><ModelLabel id={modelId} fallbackLabel={modelId} /></dd></div>)}</dl></section>}
           {job.status === "running" ? <RunningEpisode /> : job.status === "failed" ? <FailedEpisode job={job} /> : <CompletedEpisode job={job} tab={tab} setTab={setTab} />}
           {(job.orchestrator === "workswarm" || job.provider === "huawei") && <><ExplorationBanks job={job} /><TeamTrace job={job} /></>}
         </section>

@@ -21,7 +21,8 @@
     "research:worker": "pnpm --filter @triviality/research-worker dev",
     "preswarm:demo": "pnpm --filter @triviality/research-worker build",
     "swarm:demo": "node --env-file-if-exists=.env scripts/swarm.mjs",
-    "swarm:test": "node --env-file-if-exists=.env scripts/swarm.mjs test"
+    "swarm:test": "node --env-file-if-exists=.env scripts/swarm.mjs test",
+    "atlas:migrate": "pnpm --filter @triviality/database migrate-mathlab"
   },
   "devDependencies": {
     "turbo": "^2.5.0"

@@ -5,6 +5,7 @@ import { Redis } from "ioredis";
 import { getCollections, getDatabase, getMongoClient, proofDocument } from "@triviality/database";
 import { catalog, validateRoleModels } from "./models.js";
 import { config } from "./config.js";
+import { registerPublicRoutes } from "./public.js";
 
 type CreateJobBody = {
   title?: string;
@@ -17,6 +18,7 @@ type CreateJobBody = {
   explorationRounds?: number;
   stagnationThreshold?: number;
   leanStatement?: string;
+  problemSlug?: string; // atlas problem this episode targets, if any
 };
 
 const app = Fastify({ logger: true });
@@ -213,8 +215,14 @@ app.post("/research/jobs", async (request: FastifyRequest<{ Body: CreateJobBody 
   if (!Number.isFinite(budget) || !Number.isInteger(budget)) return reply.code(400).send({ error: "budget must be an integer" });
   if (body.leanStatement !== undefined && (typeof body.leanStatement !== "string" || body.leanStatement.length > 6000)) return reply.code(400).send({ error: "leanStatement must be a string of at most 6000 characters" });
   const collections = await getCollections();
+  let atlasProblemId: string | undefined;
+  if (body.problemSlug) {
+    const atlasProblem = await collections.atlasProblems.findOne({ slug: body.problemSlug.trim() });
+    if (!atlasProblem) return reply.code(400).send({ error: "problemSlug does not match a catalogued problem" });
+    atlasProblemId = atlasProblem._id;
+  }
   await collections.researchProjects.insertOne({ _id: projectId, name: title, description: statement, status: "ACTIVE", createdAt: now, updatedAt: now });
-  await collections.researchEpisodes.insertOne({ _id: episodeId, projectId, title, objective: statement, status: "ACTIVE", area, orchestrator: "workswarm", roleModels, mode, budget, explorationRounds, stagnationThreshold, branches: [], leanStatement: body.leanStatement?.trim() || undefined, stage: "Queued for research worker", progress: 2, createdAt: now, updatedAt: now });
+  await collections.researchEpisodes.insertOne({ _id: episodeId, projectId, title, objective: statement, status: "ACTIVE", area, orchestrator: "workswarm", roleModels, mode, budget, explorationRounds, stagnationThreshold, branches: [], atlasProblemId, leanStatement: body.leanStatement?.trim() || undefined, stage: "Queued for research worker", progress: 2, createdAt: now, updatedAt: now });
   await collections.researchProblems.insertOne({ _id: problemId, episodeId, title, statement, assumptions: "", status: "ACTIVE", createdAt: now, updatedAt: now });
 
   try {
@@ -249,6 +257,8 @@ app.addHook("onClose", async () => {
   await redis.quit();
   await (await getMongoClient()).close();
 });
+
+registerPublicRoutes(app);
 
 await app.listen({ port: config.port, host: "0.0.0.0" });
 console.log(`Research API listening on http://localhost:${config.port}`);

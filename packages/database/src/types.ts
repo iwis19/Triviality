@@ -40,6 +40,7 @@ export interface ResearchEpisodeDocument extends BaseDocument {
   stagnationThreshold?: number;
   branches?: unknown[];
   leanStatement?: string;
+  atlasProblemId?: string; // set when the episode targets a catalogued open problem
   stage?: string;
   progress?: number;
   summary?: string;
@@ -47,7 +48,7 @@ export interface ResearchEpisodeDocument extends BaseDocument {
   completedAt?: Date;
 }
 export interface ResearchProblemDocument extends BaseDocument { episodeId: string; title: string; statement: string; assumptions?: unknown; status: ResearchStatus; }
-export interface ResearchHypothesisDocument extends BaseDocument { episodeId: string; problemId?: string; statement: string; rationale: string; assumptions?: unknown; expectedConsequences?: unknown; noveltyEstimate?: number; plausibilityEstimate?: number; formalizability?: number; status: ResearchStatus; }
+export interface ResearchHypothesisDocument extends BaseDocument { episodeId: string; problemId?: string; atlasProblemId?: string; statement: string; rationale: string; assumptions?: unknown; expectedConsequences?: unknown; noveltyEstimate?: number; plausibilityEstimate?: number; formalizability?: number; status: ResearchStatus; }
 export interface ResearchAttemptDocument extends BaseDocument { episodeId: string; hypothesisId: string; proofStrategyId?: string; strategy: string; status: AttemptStatus; input?: unknown; proofState?: string; error?: string; startedAt?: Date; completedAt?: Date; }
 export interface ResearchResultDocument extends BaseDocument { episodeId: string; hypothesisId?: string; attemptId?: string; title: string; summary: string; status: ResultStatus; evidence?: unknown; }
 export interface ResearchEventDocument extends BaseDocument { episodeId: string; type: string; payload: Record<string, unknown>; }
@@ -72,6 +73,8 @@ export interface FormalizationDocument extends BaseDocument {
   attemptId?: string;
   theoremId?: string;
   lemmaId?: string;
+  claimId?: string;      // versioned claim this check applies to
+  claimVersion?: number; // verification counts only for this exact version
   system: string;
   systemVersion?: string;
   sourceArtifactId?: string;
@@ -103,3 +106,111 @@ export interface PaperKnowledgeNodeDocument extends BaseDocument {
 }
 export interface GraphNodeDocument extends BaseDocument { entityType: GraphEntityType; entityId: string; label: string; metadata?: unknown; }
 export interface GraphRelationshipDocument extends BaseDocument { fromNodeId: string; toNodeId: string; type: RelationshipType; confidence?: number; rationale?: string; metadata?: unknown; }
+
+// --- Open-problem atlas + public read model (ported from MathLab) -----------
+// Status dimensions stay independent: review state, evidence, formalization,
+// and publication never collapse into one field.
+
+export type AtlasProblemStatus = "unreviewed" | "reported_open" | "resolution_claimed" | "resolved" | "disputed" | "unknown";
+export type ClaimFormalizationStatus = "absent" | "queued" | "in_progress" | "complete" | "failed";
+
+export interface AtlasAreaDocument extends BaseDocument {
+  slug: string;
+  name: string;
+  description?: string;
+  parentId: string | null;
+  depth: number;
+}
+
+export interface AtlasSourceAssertion {
+  sourceUrl: string;
+  sourceTitle: string;
+  authors?: string;
+  publisher?: string;
+  publishedDate?: string;
+  retrievedDate?: string;
+  reusePolicy?: string;
+  location?: string;
+  assertedStatus: string; // open | resolved | disputed | unknown
+  assertedAt?: string;
+  reviewState: string; // unreviewed | confirmed | corrected | rejected
+  notes?: string;
+}
+
+export interface AtlasStatusReview {
+  reviewer?: string;
+  date?: string;
+  from?: string;
+  to?: string;
+  note?: string;
+}
+
+export interface AtlasProblemDocument extends BaseDocument {
+  slug: string;
+  title: string;
+  statement: string;
+  definitions?: string;
+  assumptions?: string;
+  origin: string; // literature | generated
+  attribution?: string;
+  status: AtlasProblemStatus | string;
+  statusCheckedAt?: string;
+  formalTarget?: string;
+  formalTargetStatus?: string;
+  coverage?: { status_reviews?: AtlasStatusReview[]; reference_formalization?: unknown; [key: string]: unknown };
+  areaIds: string[];
+  assertions: AtlasSourceAssertion[];
+}
+
+export interface ClaimDocument extends BaseDocument {
+  statement: string;
+  scope?: string;
+  leanDeclaration?: string;
+  contentHash: string;
+  claimVersion: number;
+  previousVersionId?: string;
+  formalizationStatus: ClaimFormalizationStatus | string;
+  episodeId?: string;
+  problemId?: string; // atlas problem id or episode problem id
+  hypothesisId?: string;
+  sourceIdeaId?: string; // MathLab idea id for migrated claims
+  sourceCampaignId?: string;
+}
+
+export interface RelationDocument extends BaseDocument {
+  layer: "atlas" | "lineage" | "dependency" | "association" | string;
+  kind: string;
+  sourceType: string;
+  sourceId: string;
+  targetType: string;
+  targetId: string;
+  confidence?: number;
+  status: string; // proposed | checked
+  provenance?: Record<string, unknown>;
+}
+
+export interface PublicationDocument {
+  _id: string;
+  recordType: string; // problem | idea | claim | evidence | campaign
+  recordId: string;
+  recordVersion: string; // payload hash — a changed record publishes a new version
+  publicPayload: Record<string, unknown>;
+  evidenceLabel: string;
+  policyVersion: string;
+  eventSeq?: number;
+  publishedAt: Date;
+  withdrawnAt?: Date | null;
+  withdrawalReason?: string;
+}
+
+export interface PublicEventDocument {
+  _id: string;
+  seq: number;
+  type: string;
+  recordType: string;
+  recordId: string;
+  payload: Record<string, unknown>;
+  createdAt: Date;
+}
+
+export interface CounterDocument { _id: string; seq: number; }

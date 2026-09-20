@@ -5,6 +5,7 @@ import {
   IconGraph,
   IconHome2,
   IconArrowLeft,
+  IconMap2,
 } from "@tabler/icons-react";
 import { TrivialityLogo } from "@/components/triviality-logo";
 import {
@@ -18,6 +19,7 @@ const links = [
   { label: "Overview", href: "/dashboard", icon: <IconHome2 size={20} /> },
   { label: "Research graph", href: "/dashboard/graph", icon: <IconGraph size={20} /> },
   { label: "Literature", href: "/dashboard/literature", icon: <IconBook2 size={20} /> },
+  { label: "Atlas explorer", href: "/explore", icon: <IconMap2 size={20} /> },
 ];
 
 export function DashboardSidebar() {

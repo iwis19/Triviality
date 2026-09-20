@@ -7,6 +7,7 @@ import type {
   ResearchEpisodeDocument, ResearchHypothesisDocument, ResearchProblemDocument, ResearchProjectDocument, ResearchResultDocument,
   ResearchEventDocument, ResearchDiscoveryDocument,
   SourceDocument, TechniqueDocument, TheoremDocument,
+  AtlasAreaDocument, AtlasProblemDocument, ClaimDocument, CounterDocument, PublicationDocument, PublicEventDocument, RelationDocument,
 } from "./types.js";
 
 export function getMongoUri(): string {
@@ -56,6 +57,13 @@ export interface DatabaseCollections {
   paperNodes: Collection<PaperKnowledgeNodeDocument>;
   graphNodes: Collection<GraphNodeDocument>;
   graphRelationships: Collection<GraphRelationshipDocument>;
+  atlasAreas: Collection<AtlasAreaDocument>;
+  atlasProblems: Collection<AtlasProblemDocument>;
+  claims: Collection<ClaimDocument>;
+  relations: Collection<RelationDocument>;
+  publications: Collection<PublicationDocument>;
+  publicEvents: Collection<PublicEventDocument>;
+  counters: Collection<CounterDocument>;
 }
 
 export async function getCollections(): Promise<DatabaseCollections> {
@@ -72,5 +80,8 @@ export async function getCollections(): Promise<DatabaseCollections> {
     counterexamples: db.collection("counterexamples"), failures: db.collection("failures"), formalizations: db.collection("formalizations"),
     sources: db.collection("sources"), paperSources: db.collection("paper_sources"), paperDiscoveries: db.collection("paper_discoveries"), objectArtifacts: db.collection("object_artifacts"),
     paperEmbeddings: db.collection("paper_embeddings"), paperNodes: db.collection("paper_nodes"), graphNodes: db.collection("graph_nodes"), graphRelationships: db.collection("graph_relationships"),
+    atlasAreas: db.collection("atlas_areas"), atlasProblems: db.collection("atlas_problems"),
+    claims: db.collection("claims"), relations: db.collection("relations"),
+    publications: db.collection("publications"), publicEvents: db.collection("public_events"), counters: db.collection("counters"),
   };
 }
