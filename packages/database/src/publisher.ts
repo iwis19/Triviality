@@ -117,6 +117,8 @@ type BuiltPayload = { payload: Record<string, unknown>; label: string } | null;
 async function buildProblem(collections: DatabaseCollections, problemId: string): Promise<BuiltPayload> {
   const problem = await collections.atlasProblems.findOne({ _id: problemId });
   if (!problem) return null;
+  // Legacy run-generated atlas rows are retained for history, not republished.
+  if (problem.origin === "generated" && problem.attribution === "Triviality research episode") return null;
   // Never publish an unsourced literature problem.
   if (problem.origin !== "generated" && problem.assertions.length === 0) return null;
   const areas = await collections.atlasAreas.find({ _id: { $in: problem.areaIds } }).toArray();
@@ -436,10 +438,6 @@ async function addRelation(
   );
 }
 
-function slugify(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "problem";
-}
-
 /** Publish a completed research episode into the public read model: the episode
  *  becomes a campaign record, hypotheses become ideas, claims keep their
  *  version, and formalizations/results publish as evidence. */
@@ -448,30 +446,9 @@ export async function publishEpisode(collections: DatabaseCollections, episodeId
   if (!episode) return 0;
   let published = 0;
 
-  // Resolve or materialize the atlas problem this episode worked on.
-  let atlasProblemId = episode.atlasProblemId;
-  if (!atlasProblemId) {
-    const problem = await collections.researchProblems.findOne({ episodeId });
-    if (problem) {
-      const slug = `${slugify(problem.title)}-${episodeId.slice(-6)}`;
-      const now = new Date();
-      await collections.atlasProblems.updateOne(
-        { _id: problem._id },
-        {
-          $set: {
-            slug, title: problem.title, statement: problem.statement,
-            assumptions: typeof problem.assumptions === "string" ? problem.assumptions : "",
-            origin: "generated", attribution: "Triviality research episode",
-            status: episode.status === "VERIFIED" ? "resolution_claimed" : "unreviewed",
-            areaIds: [], assertions: [], updatedAt: now,
-          },
-          $setOnInsert: { coverage: {}, createdAt: now },
-        },
-        { upsert: true },
-      );
-      atlasProblemId = problem._id;
-    }
-  }
+  // A run may reference an existing catalogue question, but is never itself
+  // a new question. Ad-hoc prompts stay in researchProblems and campaigns.
+  const atlasProblemId = episode.atlasProblemId;
   if (atlasProblemId && (await projectPublication(collections, "problem", atlasProblemId))) published += 1;
   if (await projectPublication(collections, "campaign", episodeId)) published += 1;
 
