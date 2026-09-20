@@ -16,6 +16,7 @@ interface Props {
   selectedId: string | null;
   highlightIds: Set<string>;
   reducedMotion: boolean;
+  entranceReady: boolean;
   onSelect: (node: GraphNode | null) => void;
 }
 
@@ -26,10 +27,12 @@ function endpointId(e: string | FGNode): string {
   return typeof e === "string" ? e : e.id;
 }
 
-export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlightIds, reducedMotion, onSelect }: Props) {
+export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlightIds, reducedMotion, entranceReady, onSelect }: Props) {
   const ref = useRef<ForceGraphMethods<FGNode, FGLink> | undefined>(undefined);
   const wrapRef = useRef<HTMLDivElement>(null);
   const cameraFrame = useRef<number | null>(null);
+  const initialCameraState = useRef<"idle" | "running" | "done">("idle");
+  const entranceWasReady = useRef(entranceReady);
   const [size, setSize] = useState({ width: 800, height: 600 });
 
   useEffect(() => {
@@ -122,24 +125,41 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
     cameraFrame.current = null;
   }, []);
 
-  const moveCamera = useCallback((position: THREE.Vector3, target: THREE.Vector3) => {
+  const stopInitialCamera = useCallback(() => {
+    initialCameraState.current = "done";
+    stopCamera();
+  }, [stopCamera]);
+
+  const moveCamera = useCallback((position: THREE.Vector3, target: THREE.Vector3, viaPosition?: THREE.Vector3, onComplete?: () => void) => {
     const fg = ref.current;
     if (!fg) return;
     stopCamera();
     const startPosition = fg.camera().position.clone();
     const startTarget = (fg.controls() as { target: THREE.Vector3 }).target.clone();
-    if (reducedMotion) { fg.cameraPosition(position, target, 0); return; }
+    if (reducedMotion) { fg.cameraPosition(position, target, 0); onComplete?.(); return; }
     const started = performance.now();
     const frame = (now: number) => {
-      const t = Math.min(1, (now - started) / 1100);
+      const t = Math.min(1, (now - started) / (viaPosition ? 1200 : 1100));
       // Move the camera and its target together, with gentle acceleration and
       // deceleration. Interrupted moves start from the current visible frame.
-      const eased = t * t * t * (t * (t * 6 - 15) + 10);
-      fg.cameraPosition(
-        startPosition.clone().lerp(position, eased),
-        startTarget.clone().lerp(target, eased), 0,
-      );
+      if (viaPosition) {
+        const rotationProgress = Math.min(1, t / 0.75);
+        const rotationEase = smootherStep(rotationProgress);
+        const zoomProgress = Math.max(0, (t - 0.75) / 0.25);
+        const zoomEase = smootherStep(zoomProgress);
+        fg.cameraPosition(
+          startPosition.clone().lerp(viaPosition, rotationEase).lerp(position, zoomEase),
+          startTarget.clone().lerp(target, rotationEase), 0,
+        );
+      } else {
+        const eased = smootherStep(t);
+        fg.cameraPosition(
+          startPosition.clone().lerp(position, eased),
+          startTarget.clone().lerp(target, eased), 0,
+        );
+      }
       cameraFrame.current = t < 1 ? requestAnimationFrame(frame) : null;
+      if (t === 1) onComplete?.();
     };
     cameraFrame.current = requestAnimationFrame(frame);
   }, [reducedMotion, stopCamera]);
@@ -182,30 +202,48 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
   }, [selectedId, data, size, moveCamera]);
 
   useEffect(() => {
-    stopCamera();
+    if (!selectedId) return;
+    stopInitialCamera();
     // Let the sidebar resize finish before starting one continuous move.
     const timer = window.setTimeout(focusSelection, 80);
     return () => { window.clearTimeout(timer); stopCamera(); };
-  }, [focusSelection, stopCamera]);
+  }, [selectedId, focusSelection, stopInitialCamera, stopCamera]);
 
   useEffect(() => {
     if (!focusNodeId || selectedId) return;
-    stopCamera();
+    stopInitialCamera();
     const timer = window.setTimeout(frameRadialLayout, 80);
     return () => { window.clearTimeout(timer); stopCamera(); };
-  }, [focusNodeId, selectedId, frameRadialLayout, stopCamera]);
+  }, [focusNodeId, selectedId, frameRadialLayout, stopInitialCamera, stopCamera]);
 
   const settleCamera = useCallback(() => {
     const fg = ref.current;
-    if (!fg || selectedId || focusNodeId) return;
+    if (!fg || !entranceReady || data.nodes.length === 0 || initialCameraState.current !== "idle" || selectedId || focusNodeId) return;
+    initialCameraState.current = "running";
     const startPosition = fg.camera().position.clone();
     const startTarget = (fg.controls() as { target: THREE.Vector3 }).target.clone();
-    fg.zoomToFit(0, 45);
-    const position = fg.camera().position.clone();
+    fg.zoomToFit(0, 20);
     const target = (fg.controls() as { target: THREE.Vector3 }).target.clone();
+    // Rotate at the fitted distance first, then finish with a distinct zoom-in.
+    const rotatedPosition = fg.camera().position.clone().sub(target)
+      .applyEuler(new THREE.Euler(THREE.MathUtils.degToRad(-22), THREE.MathUtils.degToRad(38), 0, "YXZ"))
+      .add(target);
+    const position = target.clone().lerp(rotatedPosition, 0.68);
     fg.cameraPosition(startPosition, startTarget, 0);
-    moveCamera(position, target);
-  }, [selectedId, focusNodeId, moveCamera]);
+    moveCamera(position, target, rotatedPosition, () => { initialCameraState.current = "done"; });
+  }, [entranceReady, data.nodes.length, selectedId, focusNodeId, moveCamera]);
+
+  useEffect(() => {
+    if (!entranceReady) {
+      entranceWasReady.current = false;
+      return;
+    }
+    if (!entranceWasReady.current) {
+      entranceWasReady.current = true;
+      initialCameraState.current = "idle";
+    }
+    settleCamera();
+  }, [entranceReady, settleCamera]);
 
   // Reuse geometry/materials, and update only appearance on selection/search.
   // Previously every click rebuilt all 1,800+ node meshes and their materials.
@@ -260,7 +298,7 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
   }, [resources]);
 
   return (
-    <div ref={wrapRef} className="graph-wrap" onPointerDown={stopCamera} onWheel={stopCamera}>
+    <div ref={wrapRef} className="graph-wrap" onPointerDown={stopInitialCamera} onWheel={stopInitialCamera}>
       <ForceGraph3D<FGNode, FGLink>
         ref={ref}
         width={size.width}
@@ -298,4 +336,8 @@ function hashUnit(value: string): number {
   let hash = 2166136261;
   for (let i = 0; i < value.length; i += 1) hash = Math.imul(hash ^ value.charCodeAt(i), 16777619);
   return (hash >>> 0) / 4294967296;
+}
+
+function smootherStep(value: number): number {
+  return value * value * value * (value * (value * 6 - 15) + 10);
 }

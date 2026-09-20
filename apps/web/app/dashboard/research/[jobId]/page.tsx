@@ -41,13 +41,12 @@ export default function ResearchEpisodePage() {
         <section className="mx-auto max-w-7xl px-6 py-8 sm:px-10 lg:px-14">
           <Link className="mb-6 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-black/45 hover:text-black" href="/dashboard"><IconArrowLeft size={14} /> Overview</Link>
 
-          <div className="flex flex-col justify-between gap-8 border-b border-black/10 pb-10 lg:flex-row lg:items-end">
+          <div className="border-b border-black/10 pb-10">
             <div className="min-w-0">
               <div className="mb-4 flex flex-wrap items-center gap-3 text-[10px] font-medium uppercase tracking-[0.2em] text-black/45"><span className="rounded-full bg-black px-2.5 py-1 text-white">{job.status}</span></div>
               <h1 className="max-w-4xl text-2xl font-semibold tracking-[-0.04em] sm:text-3xl">{job.title}</h1>
               <p className="mt-5 max-w-3xl text-base leading-7 text-black/55">{job.statement}</p>
             </div>
-            <div className="w-full max-w-xs shrink-0"><div className="mb-2 flex justify-between text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40"><span>{job.stage}</span><span>{job.progress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-black/8"><div className="h-full rounded-full bg-black transition-all duration-500" style={{ width: `${job.progress}%` }} /></div></div>
           </div>
 
           {job.roleModels && <section className="mt-6 rounded-xl border border-black/10 bg-white p-5"><h2 className="text-sm font-semibold">Models</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(job.roleModels).map(([roleId, modelId]) => <div key={roleId}><dt className="text-xs text-black/45">{modelCatalog.roles.find((role) => role.id === roleId)?.label ?? roleId.replaceAll("_", " ")}</dt><dd className="mt-1"><ModelLabel id={modelId} fallbackLabel={modelId} /></dd></div>)}</dl></section>}
@@ -139,7 +138,6 @@ function ProofArtifact({ job, tab }: { job: ResearchJob; tab: "lean" | "latex" }
       {proof.explanation?.trim() ? <div className="space-y-4 text-sm leading-8 text-black/75 [overflow-wrap:anywhere]"><ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{proof.explanation}</ReactMarkdown></div> : <p className="text-sm leading-7 text-black/55">This episode did not save a written proof explanation. {proof.latex?.trim() ? "Use View .tex source to inspect the available document." : "Start a new episode to generate a written proof alongside the Lean artifact."}</p>}
       <details className="mt-8 border-t border-black/10 pt-5"><summary className="cursor-pointer text-xs font-semibold">Exact formal statement checked by Lean</summary><pre className="mt-3 overflow-auto whitespace-pre-wrap text-xs leading-6">{proof.statement}</pre></details>
     </article>}
-    <div className="border-t border-black/10 bg-[#fafafa] p-6 text-xs leading-6 text-black/60"><p className="font-semibold text-black">{proof.status === "verified" ? "✓ Lean verification passed" : "Proof is not verified"}</p><p>{proof.checker}</p><p>{job.summary}</p><p className="mt-2">Verification applies to the Lean source; the written exposition is not independently machine-checked.</p>{proof.axioms.length > 0 && <p className="mt-2">Axioms: {proof.axioms.join(", ")}</p>}</div>
   </div>;
 }
 
