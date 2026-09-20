@@ -2,292 +2,147 @@
 
 import Link from "next/link";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
-import {
-  LAYERS,
-  publicApi,
-  type Area,
-  type Graph,
-  type GraphNode,
-  type Layer,
-  type Problem,
-  type ProblemDetail,
-  type PublicEvent,
-} from "./api";
-import { EVIDENCE_COLORS, LAYER_COLORS, nodeColor } from "./palette";
+import { ArrowUpRight, Search, X, Menu } from "lucide-react";
+import { TrivialityLogo } from "@/components/triviality-logo";
+import { TextFlippingBoard } from "@/components/ui/text-flipping-board";
+import { LAYERS, publicApi, type Area, type Graph, type GraphNode, type Problem, type ProblemDetail } from "./api";
+import { EVIDENCE_COLORS } from "./palette";
 import "./explore.css";
 
 const Graph3D = lazy(() => import("./Graph3D"));
 
-type View = "3d" | "list";
-
-function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const handler = (e: MediaQueryListEvent) => setReduced(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return reduced;
-}
-
-export default function ExplorerApp() {
+export default function ExplorerApp({ intro = false }: { intro?: boolean }) {
   const [areas, setAreas] = useState<Area[]>([]);
   const [problems, setProblems] = useState<Problem[]>([]);
   const [graph, setGraph] = useState<Graph | null>(null);
-  const [events, setEvents] = useState<PublicEvent[]>([]);
-  const [layers, setLayers] = useState<Layer[]>([...LAYERS]);
-  const [areaFilter, setAreaFilter] = useState<string>("");
-  const [problemSlug, setProblemSlug] = useState<string>("");
-  const [detailBySlug, setDetailBySlug] = useState<Record<string, ProblemDetail>>({});
+  const [areaFilter, setAreaFilter] = useState("");
+  const [problemSlug, setProblemSlug] = useState("");
+  const [details, setDetails] = useState<Record<string, ProblemDetail>>({});
   const [selected, setSelected] = useState<GraphNode | null>(null);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<View>("3d");
-  const [replayCursor, setReplayCursor] = useState<number | null>(null);
-  const [showArchived, setShowArchived] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const systemReduced = usePrefersReducedMotion();
-  const [motionOverride, setMotionOverride] = useState<boolean | null>(null);
-  const reducedMotion = motionOverride ?? systemReduced;
-
-  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const [introState, setIntroState] = useState(intro ? "playing" : "done");
+  const finishIntro = useCallback(() => setIntroState("fading"), []);
+  const detail = details[problemSlug] ?? null;
+  const closeProblem = useCallback(() => { setProblemSlug(""); setSelected(null); }, []);
 
   useEffect(() => {
-    Promise.all([publicApi.areas(), publicApi.problems(), publicApi.events(0, 1000)])
-      .then(([a, p, e]) => {
-        setAreas(a);
-        setProblems(p);
-        setEvents(e);
-        setError(null);
-      })
-      .catch((e: Error) => setError(e.message));
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([publicApi.areas(), publicApi.problems(), publicApi.graph([...LAYERS])])
+      .then(([a, p, g]) => { if (!cancelled) { setAreas(a); setProblems(p); setGraph(g); setError(null); } })
+      .catch((e: Error) => { if (!cancelled) setError(e.message); });
+    return () => { cancelled = true; };
   }, [refreshKey]);
-
-  useEffect(() => {
-    publicApi
-      .graph(layers, problemSlug || undefined)
-      .then(setGraph)
-      .catch((e: Error) => setError(e.message));
-  }, [layers, problemSlug, refreshKey]);
 
   useEffect(() => {
     if (!problemSlug) return;
     let cancelled = false;
-    publicApi
-      .problem(problemSlug)
-      .then((d) => {
-        if (!cancelled) setDetailBySlug((m) => ({ ...m, [problemSlug]: d }));
-      })
-      .catch((e: Error) => setError(e.message));
-    return () => {
-      cancelled = true;
-    };
+    publicApi.problem(problemSlug)
+      .then(d => { if (!cancelled) { setDetails(prev => ({ ...prev, [problemSlug]: d })); setDetailError(null); } })
+      .catch((e: Error) => { if (!cancelled) setDetailError(e.message); });
+    return () => { cancelled = true; };
   }, [problemSlug, refreshKey]);
 
-  const detail = problemSlug ? detailBySlug[problemSlug] ?? null : null;
+  const chooseProblem = useCallback((slug: string) => {
+    setDetailError(null);
+    setProblemSlug(slug);
+    setSelected(graph?.nodes.find(n => n.type === "problem" && n.slug === slug) ?? null);
+    setMenuOpen(false);
+  }, [graph]);
 
-  // Replay: only records published at or before the cursor event are shown.
-  const publishedBefore = useMemo(() => {
-    if (replayCursor === null) return null;
-    const ids = new Set<string>();
-    for (const e of events) {
-      if (e.id <= replayCursor && e.type === "publication.created") ids.add(e.record_id);
-    }
-    return ids;
-  }, [events, replayCursor]);
+  const chooseArea = useCallback((slug: string) => {
+    setAreaFilter(slug);
+    closeProblem();
+  }, [closeProblem]);
 
   const visibleGraph = useMemo(() => {
-    if (!graph) return { nodes: [] as GraphNode[], links: [] as Graph["links"] };
-    let nodes = graph.nodes;
-    if (areaFilter) {
-      const areaIds = new Set(areas.filter((a) => a.slug === areaFilter || ancestorSlugs(a, areas).includes(areaFilter)).map((a) => a.id));
-      const areaSlugs = new Set(areas.filter((a) => areaIds.has(a.id)).map((a) => a.slug));
-      const problemIds = new Set(nodes.filter((n) => n.type === "problem" && n.areas?.some((s) => areaSlugs.has(s))).map((n) => n.id));
-      const ideaIds = new Set(nodes.filter((n) => n.type === "idea" && n.problem_id && problemIds.has(n.problem_id)).map((n) => n.id));
-      nodes = nodes.filter(
-        (n) =>
-          (n.type === "area" && areaIds.has(n.id)) ||
-          (n.type === "problem" && problemIds.has(n.id)) ||
-          (n.type === "idea" && ideaIds.has(n.id)) ||
-          (n.type === "claim" && n.idea_id && ideaIds.has(n.idea_id)),
-      );
+    if (!graph) return { nodes: [], links: [] };
+    if (!areaFilter) return graph;
+    const matchingAreas = areas.filter(a => a.slug === areaFilter || ancestorSlugs(a, areas).includes(areaFilter));
+    const areaIds = new Set(matchingAreas.map(a => a.id));
+    const slugs = new Set(matchingAreas.map(a => a.slug));
+    const problemIds = new Set(graph.nodes.filter(n => n.type === "problem" && n.areas?.some(s => slugs.has(s))).map(n => n.id));
+    const ideaIds = new Set(graph.nodes.filter(n => n.type === "idea" && n.problem_id && problemIds.has(n.problem_id)).map(n => n.id));
+    const nodes = graph.nodes.filter(n => areaIds.has(n.id) || problemIds.has(n.id) || ideaIds.has(n.id) || (n.idea_id && ideaIds.has(n.idea_id)));
+    const ids = new Set(nodes.map(n => n.id));
+    return { nodes, links: graph.links.filter(l => ids.has(l.source) && ids.has(l.target)) };
+  }, [graph, areas, areaFilter]);
+
+  const query = search.trim().toLowerCase();
+  const filteredProblems = useMemo(() => problems.filter(p =>
+    (!areaFilter || p.areas.some(a => a.slug === areaFilter || ancestorSlugsBySlug(a.slug, areas).includes(areaFilter))) &&
+    (!query || `${p.title} ${p.statement}`.toLowerCase().includes(query))
+  ), [problems, areas, areaFilter, query]);
+  const searchHits = useMemo(() => new Set(query ? filteredProblems.map(p => p.id) : []), [query, filteredProblems]);
+
+  const onSelect = useCallback((node: GraphNode | null) => {
+    if (!node) { closeProblem(); return; }
+    if (node.type === "problem" && node.slug) chooseProblem(node.slug);
+    else if (node.type === "area" && node.slug) chooseArea(node.slug);
+    else {
+      const idea = node.type === "claim" ? graph?.nodes.find(n => n.id === node.idea_id) : node;
+      const problem = problems.find(p => p.id === idea?.problem_id);
+      if (problem) { setDetailError(null); setProblemSlug(problem.slug); setSelected(node); }
     }
-    if (!showArchived) nodes = nodes.filter((n) => n.scheduling_status !== "archived");
-    if (publishedBefore) nodes = nodes.filter((n) => n.type === "area" || publishedBefore.has(n.id));
-    const ids = new Set(nodes.map((n) => n.id));
-    const links = graph.links.filter((l) => ids.has(l.source) && ids.has(l.target));
-    return { nodes, links };
-  }, [graph, areaFilter, areas, showArchived, publishedBefore]);
-
-  const searchHits = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return new Set<string>();
-    return new Set(visibleGraph.nodes.filter((n) => n.label.toLowerCase().includes(q) || n.method_tags?.some((t) => t.includes(q))).map((n) => n.id));
-  }, [search, visibleGraph]);
-
-  const onSelect = useCallback(
-    (node: GraphNode | null) => {
-      setSelected(node);
-      if (node?.type === "problem" && node.slug) setProblemSlug(node.slug);
-      if (node?.type === "area" && node.slug) setAreaFilter(node.slug);
-    },
-    [],
-  );
+  }, [chooseProblem, chooseArea, closeProblem, graph, problems]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { closeProblem(); setMenuOpen(false); }
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === "Escape") {
-        setSelected(null);
-        setProblemSlug("");
-      } else if (e.key === "/") {
-        e.preventDefault();
-        document.getElementById("search")?.focus();
-      } else if (e.key === "l") setView((v) => (v === "3d" ? "list" : "3d"));
+      if (e.key === "/") { e.preventDefault(); document.getElementById("atlas-search")?.focus(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  const exportJson = () => {
-    const blob = new Blob([JSON.stringify({ graph: visibleGraph, detail, exported_at: new Date().toISOString() }, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `triviality-${problemSlug || areaFilter || "atlas"}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const maxEvent = events.length ? events[events.length - 1].id : 0;
+  }, [closeProblem]);
 
   return (
     <div className="mlx">
-      <header>
-        <h1>Triviality explorer</h1>
-        <span className="tag">atlas of reported open problems · research lineage · evidence labels</span>
-        <input
-          id="search"
-          placeholder="Search nodes ( / )"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Search graph nodes"
-        />
-        <button onClick={() => setView(view === "3d" ? "list" : "3d")} aria-pressed={view === "list"}>
-          {view === "3d" ? "List view (l)" : "3D view (l)"}
-        </button>
-        <label>
-          <input type="checkbox" checked={reducedMotion} onChange={(e) => setMotionOverride(e.target.checked)} /> reduced motion
-        </label>
-        <button onClick={exportJson}>Export JSON</button>
-        <Link className="navlink" href="/dashboard">
-          Workspace →
-        </Link>
+      <header className="atlas-header">
+        <button className="menu-toggle" aria-label="Toggle problem browser" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><Menu size={18} /></button>
+        <TrivialityLogo />
+        <div className="atlas-search"><Search size={16} aria-hidden="true" /><input id="atlas-search" aria-label="Search problems" placeholder="Search mathematical problems…" value={search} onChange={e => { setSearch(e.target.value); if (e.target.value) setMenuOpen(true); }} />{search && <button aria-label="Clear search" onClick={() => setSearch("")}><X size={14} /></button>}</div>
+        <Link className="workspace-link" href="/dashboard">Workspace <ArrowUpRight size={15} /></Link>
       </header>
-      {error && (
-        <div className="error" role="alert">
-          {error} <button onClick={refresh}>retry</button>
-        </div>
-      )}
-      <div className="body">
-        <aside className="left">
-          <section>
-            <h2>Layers</h2>
-            {LAYERS.map((l) => (
-              <label key={l} className="layer">
-                <input
-                  type="checkbox"
-                  checked={layers.includes(l)}
-                  onChange={(e) => setLayers(e.target.checked ? [...layers, l] : layers.filter((x) => x !== l))}
-                />
-                <span className="swatch" style={{ background: LAYER_COLORS[l] }} /> {l}
-              </label>
-            ))}
-            <label className="layer">
-              <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> show archived branches
-            </label>
+      {error && <div className="error" role="alert">Could not load the atlas. <button onClick={() => setRefreshKey(k => k + 1)}>Try again</button></div>}
+      <div className={`body ${problemSlug ? "has-detail" : ""}`}>
+        <aside className={`left ${menuOpen ? "is-open" : ""}`} aria-label="Browse mathematics">
+          <section className="area-section">
+            <div className="section-heading"><h2>Mathematics</h2><span>{areas.length} areas</span></div>
+            <button className={`all-areas ${areaFilter ? "" : "active"}`} onClick={() => chooseArea("")}>All of mathematics <span>{problems.length}</span></button>
+            <ul className="areas">{orderAreas(areas).map(a => <li key={a.id} style={{ paddingLeft: a.depth * 12 }}><button className={areaFilter === a.slug ? "active" : ""} onClick={() => chooseArea(a.slug)}><span>{a.name}</span><small>{a.problem_count}</small></button></li>)}</ul>
           </section>
-          <section>
-            <h2>Areas</h2>
-            <button className={areaFilter ? "" : "active"} onClick={() => { setAreaFilter(""); setProblemSlug(""); }}>
-              All of mathematics
-            </button>
-            <ul className="areas">
-              {orderAreas(areas).map((a) => (
-                <li key={a.id} style={{ paddingLeft: a.depth * 12 }}>
-                  <button className={areaFilter === a.slug ? "active" : ""} onClick={() => { setAreaFilter(a.slug); setProblemSlug(""); }}>
-                    {a.name} <small>{a.problem_count}</small>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-          <section>
-            <h2>Problems {areaFilter && <small>in {areaFilter}</small>}</h2>
-            <ul className="problems">
-              {problems
-                .filter((p) => !areaFilter || p.areas.some((a) => a.slug === areaFilter || ancestorSlugsBySlug(a.slug, areas).includes(areaFilter)))
-                .map((p) => (
-                  <li key={p.id}>
-                    <button className={problemSlug === p.slug ? "active" : ""} onClick={() => setProblemSlug(p.slug)}>
-                      {p.title}
-                    </button>
-                    <small>{p.evidence_label}</small>
-                  </li>
-                ))}
-            </ul>
-          </section>
-          <section>
-            <h2>Legend</h2>
-            {Object.entries(EVIDENCE_COLORS).map(([k, c]) => (
-              <div key={k} className="legend">
-                <span className="swatch" style={{ background: c }} /> {k.replace(/_/g, " ")}
-              </div>
-            ))}
+          <section className="problem-section">
+            <div className="section-heading"><h2>{query ? "Search results" : "Problems"}</h2><span>{filteredProblems.length}</span></div>
+            {!graph && !error && <p className="empty">Loading the atlas…</p>}
+            {graph && !filteredProblems.length && <p className="empty">No problems match this search.</p>}
+            <ul className="problems">{filteredProblems.map(p => <li key={p.id}><button className={problemSlug === p.slug ? "active" : ""} onClick={() => chooseProblem(p.slug)}>{p.title}<small>{p.evidence_label}</small></button></li>)}</ul>
           </section>
         </aside>
-
-        <main>
-          {view === "3d" ? (
-            <Suspense fallback={<div className="loading">Loading 3D explorer…</div>}>
-              <Graph3D
-                nodes={visibleGraph.nodes}
-                links={visibleGraph.links}
-                selectedId={selected?.id ?? null}
-                highlightIds={searchHits}
-                reducedMotion={reducedMotion}
-                onSelect={onSelect}
-              />
-            </Suspense>
-          ) : (
-            <ListView nodes={visibleGraph.nodes} links={visibleGraph.links} selectedId={selected?.id ?? null} onSelect={onSelect} highlight={searchHits} />
-          )}
-          <div className="replay">
-            <label>
-              Replay publication timeline
-              <input
-                type="range"
-                min={0}
-                max={maxEvent}
-                value={replayCursor ?? maxEvent}
-                onChange={(e) => setReplayCursor(Number(e.target.value) >= maxEvent ? null : Number(e.target.value))}
-                aria-label="Replay public events"
-              />
-            </label>
-            <span>
-              {replayCursor === null ? "live" : `event #${replayCursor}`} · {visibleGraph.nodes.length} nodes / {visibleGraph.links.length} links
-            </span>
-            {replayCursor !== null && <button onClick={() => setReplayCursor(null)}>back to live</button>}
-          </div>
+        <main aria-label="Mathematical research graph">
+          <Suspense fallback={<div className="loading">Loading graph…</div>}><Graph3D nodes={visibleGraph.nodes} links={visibleGraph.links} selectedId={selected?.id ?? null} highlightIds={searchHits} reducedMotion={reducedMotion} onSelect={onSelect} /></Suspense>
         </main>
-
-        <aside className="right">
-          <DetailPanel selected={selected} detail={detail} areas={areas} onSelectIdea={(id) => setSelected(visibleGraph.nodes.find((n) => n.id === id) ?? null)} />
-        </aside>
+        {problemSlug && <aside className="right" aria-label="Selected problem">
+          <div className="detail-toolbar"><span>Problem details</span><button aria-label="Close problem details" onClick={closeProblem}><X size={18} /></button></div>
+          {detailError ? <div role="alert" className="error">Could not load this problem. <button onClick={() => setRefreshKey(k => k + 1)}>Try again</button></div> : detail ? <>
+            <Link className="solve-link" href={`/dashboard?problem=${encodeURIComponent(problemSlug)}`}>Solve this problem <ArrowUpRight size={16} /></Link>
+            <DetailPanel selected={selected} detail={detail} areas={areas} onSelectIdea={id => setSelected(graph?.nodes.find(n => n.id === id) ?? null)} />
+          </> : <div className="loading" role="status">Loading problem…</div>}
+        </aside>}
       </div>
+      {introState !== "done" && <div aria-hidden="true" className={`atlas-intro ${introState === "fading" ? "is-fading" : ""}`} onAnimationEnd={e => { if (e.target === e.currentTarget) setIntroState("done"); }}><TextFlippingBoard text="TRIVIALITY" className="!max-w-5xl !bg-transparent !p-0 !shadow-none" onComplete={finishIntro} /></div>}
     </div>
   );
 }
@@ -319,55 +174,6 @@ function ancestorSlugsBySlug(slug: string, areas: Area[]): string[] {
   return a ? ancestorSlugs(a, areas) : [];
 }
 
-function ListView({
-  nodes,
-  links,
-  selectedId,
-  onSelect,
-  highlight,
-}: {
-  nodes: GraphNode[];
-  links: Graph["links"];
-  selectedId: string | null;
-  onSelect: (n: GraphNode) => void;
-  highlight: Set<string>;
-}) {
-  const byType = (t: GraphNode["type"]) => nodes.filter((n) => n.type === t);
-  const degree = useMemo(() => {
-    const d = new Map<string, number>();
-    for (const l of links) {
-      d.set(l.source, (d.get(l.source) ?? 0) + 1);
-      d.set(l.target, (d.get(l.target) ?? 0) + 1);
-    }
-    return d;
-  }, [links]);
-  return (
-    <div className="list" role="list">
-      {(["area", "problem", "idea", "claim"] as const).map((t) => (
-        <section key={t}>
-          <h3>
-            {t}s <small>{byType(t).length}</small>
-          </h3>
-          {byType(t).map((n) => (
-            <button
-              key={n.id}
-              role="listitem"
-              className={`row ${n.id === selectedId ? "active" : ""} ${highlight.size && !highlight.has(n.id) ? "dim" : ""}`}
-              onClick={() => onSelect(n)}
-            >
-              <span className="swatch" style={{ background: nodeColor(n) }} />
-              <span className="grow">{n.label}</span>
-              {n.generation !== undefined && <small>gen {n.generation}</small>}
-              {n.evidence_label && <small>{n.evidence_label}</small>}
-              <small>{degree.get(n.id) ?? 0} links</small>
-            </button>
-          ))}
-        </section>
-      ))}
-    </div>
-  );
-}
-
 function DetailPanel({
   selected,
   detail,
@@ -391,7 +197,7 @@ function DetailPanel({
           <b>Lean verified</b> means an independent checker accepted the exact approved target with no <code>sorry</code> and only allowed axioms.
           Every other label is weaker and says so.
         </p>
-        <p>Keys: <kbd>/</kbd> search · <kbd>l</kbd> list/3D · <kbd>Esc</kbd> clear.</p>
+
       </div>
     );
   }

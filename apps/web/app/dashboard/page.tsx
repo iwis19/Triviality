@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { Suspense, useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { IconArrowUpRight, IconChevronDown, IconChevronRight, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
 import { motion } from "motion/react";
+import { publicApi } from "../explore/api";
 import { DashboardSidebar } from "./dashboard-sidebar";
 import { DashboardTopbar } from "./dashboard-topbar";
 import { ModelSelect } from "@/components/model-select";
@@ -27,6 +28,7 @@ type ResearchForm = {
   explorationRounds: number;
   stagnationThreshold: number;
   leanStatement: string;
+  problemSlug?: string;
 };
 
 const initialForm: ResearchForm = {
@@ -42,6 +44,12 @@ const initialForm: ResearchForm = {
 };
 
 export default function DashboardPage() {
+  return <Suspense fallback={<div className="p-8 text-sm text-black/40">Loading workspace…</div>}><DashboardContent /></Suspense>;
+}
+
+function DashboardContent() {
+  const searchParams = useSearchParams();
+  const sourceProblem = searchParams.get("problem");
   const router = useRouter();
   const [jobs, setJobs] = useState<ResearchJob[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +65,25 @@ export default function DashboardPage() {
     const interval = window.setInterval(refresh, 1500);
     return () => window.clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!sourceProblem) return;
+    let cancelled = false;
+    publicApi.problem(sourceProblem).then(({ problem }) => {
+      if (cancelled) return;
+      setForm({ ...initialForm, title: problem.title,
+        statement: [problem.statement, problem.definitions && `Definitions: ${problem.definitions}`, problem.assumptions && `Assumptions: ${problem.assumptions}`].filter(Boolean).join("\n\n"),
+        area: problem.areas[0]?.name || "Mathematics", leanStatement: problem.formal_target || "", problemSlug: problem.slug });
+      setSubmitError(null);
+      setModalOpen(true);
+    }).catch(() => { if (!cancelled) setError("Could not load the selected problem. Return to the explorer and try again."); });
+    return () => { cancelled = true; };
+  }, [sourceProblem]);
+
+  const closeModal = () => {
+    setModalOpen(false);
+    if (sourceProblem) router.replace("/dashboard", { scroll: false });
+  };
 
   const filteredJobs = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -86,7 +113,7 @@ export default function DashboardPage() {
         <section className="mx-auto max-w-7xl px-6 py-10 sm:px-10 lg:px-14 lg:py-14">
           <div className="flex flex-col justify-between gap-8 border-b border-black/10 pb-10 lg:flex-row lg:items-end">
             <div>
-              <HoverBorderGradient containerClassName="rounded-md" className="flex items-center gap-2 rounded-[inherit] bg-black px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-white" duration={1.2} onClick={() => setModalOpen(true)}><IconPlus size={14} /> New research</HoverBorderGradient>
+              <HoverBorderGradient containerClassName="rounded-md" className="flex items-center gap-2 rounded-[inherit] bg-black px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-white" duration={1.2} onClick={() => { setForm(initialForm); setSubmitError(null); setModalOpen(true); }}><IconPlus size={14} /> New research</HoverBorderGradient>
             </div>
             <label className="relative block w-full sm:w-72 lg:ml-auto"><IconSearch className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-black/35" size={16} /><input className="h-11 w-full rounded-xl border border-black/12 bg-white pl-10 pr-4 text-sm outline-none transition placeholder:text-black/35 focus:border-black/40" placeholder="Search research" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
           </div>
@@ -98,7 +125,7 @@ export default function DashboardPage() {
             {filteredJobs.length === 0 ? <div className="rounded-lg border border-dashed border-black/15 px-6 py-14 text-center text-sm text-black/45">{jobs.length === 0 ? "No research yet." : "No matching research."}</div> : <div className="grid gap-3">{filteredJobs.map((job) => <EpisodeRow key={job.id} job={job} />)}</div>}
           </section>
         </section>
-        {modalOpen && <ResearchDeployModal form={form} setForm={setForm} creating={creating} error={submitError} onClose={() => setModalOpen(false)} onSubmit={submit} />}
+        {modalOpen && <ResearchDeployModal form={form} setForm={setForm} creating={creating} error={submitError} onClose={closeModal} onSubmit={submit} />}
       </div>
     </main>
   );
@@ -141,13 +168,13 @@ function ResearchDeployModal({
           </section>
 
           <section className="grid gap-4 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
-              {<button type="button" className="w-fit text-sm underline underline-offset-4 lg:col-span-2" onClick={() => setForm((current) => ({ ...current, title: "Addition preserves order", statement: "Prove that adding the same natural number to both sides preserves an inequality. Explore a direct arithmetic proof and independently examine the assumptions and possible counterexamples.", area: "Number theory", leanStatement: "(a b c : Nat) (h : a ≤ b) : a + c ≤ b + c", budget: 2 }))}>Use example</button>}
+              {<button type="button" className="w-fit text-sm underline underline-offset-4 lg:col-span-2" onClick={() => setForm((current) => ({ ...current, problemSlug: undefined, title: "Addition preserves order", statement: "Prove that adding the same natural number to both sides preserves an inequality. Explore a direct arithmetic proof and independently examine the assumptions and possible counterexamples.", area: "Number theory", leanStatement: "(a b c : Nat) (h : a ≤ b) : a + c ≤ b + c", budget: 2 }))}>Use example</button>}
             <div className="grid gap-4">
               <label className="grid gap-1.5 text-sm font-medium">Title<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm font-normal outline-none transition focus:border-black/45" placeholder="e.g. Compactness methods in finite graph theory" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></label>
               <label className="grid gap-1.5 text-sm font-medium">Problem<textarea required className="min-h-24 resize-y rounded-md border border-black/12 bg-white px-3.5 py-2.5 text-sm font-normal leading-6 outline-none transition focus:border-black/45" placeholder="What do you want to prove?" value={form.statement} onChange={(event) => setForm((current) => ({ ...current, statement: event.target.value }))} /></label>
             </div>
             <div className="grid content-start gap-4">
-              <FieldSelect label="Area" value={form.area} onChange={(value) => setForm((current) => ({ ...current, area: value }))} options={["Algebra", "Analysis", "Combinatorics", "Geometry", "Logic", "Number theory", "Topology"]} />
+              <FieldSelect label="Area" value={form.area} onChange={(value) => setForm((current) => ({ ...current, area: value }))} options={Array.from(new Set([form.area, "Algebra", "Analysis", "Combinatorics", "Geometry", "Logic", "Number theory", "Topology"]))} />
 
               <label className="grid gap-1.5 text-sm font-medium">Proof attempts (1-6)<input className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm font-normal outline-none" min={1} max={6} type="number" value={form.budget} onChange={(event) => setForm((current) => ({ ...current, budget: Number(event.target.value) }))} /></label>
               <label className="grid gap-1.5 text-sm font-medium">Exploration rounds (1–20)<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm" min={1} max={20} type="number" value={form.explorationRounds} onChange={(event) => setForm((current) => ({ ...current, explorationRounds: Number(event.target.value) }))} /><span className="text-xs font-normal text-black/50">Three researchers explore each round. A checked proof ends the run early.</span></label>

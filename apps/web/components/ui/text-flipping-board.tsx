@@ -354,6 +354,7 @@ export interface TextFlippingBoardProps {
   className?: string;
   /** Total animation duration in seconds. Defaults to ~1.2s. */
   duration?: number;
+  onComplete?: () => void;
 }
 
 export function TextFlippingBoard({
@@ -361,6 +362,7 @@ export function TextFlippingBoard({
   text,
   className,
   duration = BASE_TOTAL_S,
+  onComplete,
 }: TextFlippingBoardProps) {
   const scale = duration / BASE_TOTAL_S;
   const colDelay = BASE_COL_DELAY * scale;
@@ -407,6 +409,16 @@ export function TextFlippingBoard({
 
     return grid;
   }, [rows, text]);
+
+  useEffect(() => {
+    if (!onComplete) return;
+    const lastDelay = Math.max(0, ...board.flatMap((row, r) => row.map((cell, c) =>
+      cell.type === "char" && cell.value.trim() ? c * colDelay + r * rowDelay : 0
+    )));
+    // A nonblank cell takes at most 39 scramble steps, then its final flap settles.
+    const timer = setTimeout(onComplete, lastDelay + 39 * stepMs + flipDur * 1350 + 350);
+    return () => clearTimeout(timer);
+  }, [board, colDelay, rowDelay, stepMs, flipDur, onComplete]);
 
   return (
     <div
