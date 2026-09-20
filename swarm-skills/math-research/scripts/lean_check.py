@@ -5,6 +5,9 @@ import re
 import shutil
 import subprocess
 import tempfile
+import json
+import urllib.request
+import urllib.error
 
 FORBIDDEN = re.compile(
     r"\b(sorry|admit|axiom|unsafe|native_decide|implemented_by|run_tac|run_elab|"
@@ -41,7 +44,7 @@ def lean_executable(executable=None):
     return shutil.which(binary) or binary
 
 
-def check(statement, proof, *, executable=None, timeout=30):
+def check(statement, proof, *, executable=None, timeout=30, local_only=False):
     result = {"verified": False, "checker": "", "axioms": [], "log": "", "lean": "",
               "theoremName": "triviality_target", "statement": statement}
     # Statements and proof terms are inserted into an application-owned wrapper.
@@ -63,6 +66,8 @@ def check(statement, proof, *, executable=None, timeout=30):
     source += " :=\n  " + proof.strip().replace("\n", "\n  ")
     source += "\n\n#print axioms triviality_target\n"
     result["lean"] = source
+    if not local_only and os.environ.get("LEAN_API_URL", "").strip():
+        return remote_check(statement, proof, result, timeout)
     executable = lean_executable(executable)
     try:
         with tempfile.TemporaryDirectory(prefix="triviality-proof-") as directory:
@@ -90,3 +95,44 @@ def check(statement, proof, *, executable=None, timeout=30):
     except OSError as error:
         result["checker"] = f"Lean could not run: {error}"
     return result
+
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def remote_check(statement, proof, result, timeout):
+    """Trust only the configured private checker, never model-selected endpoints."""
+    key = os.environ.get("LEAN_API_KEY", "")
+    if not key:
+        return {**result, "checker": "Remote Lean unavailable; LEAN_API_KEY missing"}
+    try:
+        request = urllib.request.Request(os.environ["LEAN_API_URL"].rstrip("/") + "/lean/check",
+            data=json.dumps({"statement": statement, "proof": proof}).encode(),
+            headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
+        with urllib.request.build_opener(NoRedirect()).open(request, timeout=timeout + 15) as response:
+            body = response.read(262145)
+        if len(body) > 262144:
+            raise ValueError("Oversized checker response")
+        checked = json.loads(body)
+        if (not isinstance(checked, dict) or checked.get("statement") != statement
+                or checked.get("lean") != result["lean"]
+                or checked.get("theoremName") != "triviality_target"
+                or checked.get("toolchain") != LEAN_TOOLCHAIN
+                or type(checked.get("verified")) is not bool
+                or not isinstance(checked.get("axioms"), list)
+                or not all(isinstance(a, str) for a in checked["axioms"])
+                or not isinstance(checked.get("log"), str)
+                or not isinstance(checked.get("checker"), str)):
+            raise ValueError("Invalid checker response")
+        if checked["verified"]:
+            audit = re.search(r"'triviality_target' depends on axioms: \[([^\]]*)\]", checked["log"])
+            independent = "'triviality_target' does not depend on any axioms" in checked["log"]
+            axioms = [a.strip() for a in audit[1].split(",") if a.strip()] if audit else []
+            if (not audit and not independent) or axioms != checked["axioms"] or not set(axioms) <= ALLOWED_AXIOMS:
+                raise ValueError("Missing or disallowed axiom audit")
+        checked["execution"] = "remote"
+        return checked
+    except (OSError, ValueError, TypeError):
+        return {**result, "checker": "Remote Lean unavailable or returned invalid verification; candidate remains unverified"}

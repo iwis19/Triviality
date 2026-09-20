@@ -14,8 +14,11 @@ need to install or configure Lean on their own machines.
   unverified, never be treated as a successful proof.
 - Bound execution resources and isolate verification jobs.
 
-Status: agreed requirement, recorded for implementation. This note does not
-provision a VM or change the runtime.
+Status: implemented in the existing private VM worker, with pinned Lean 4.19.0,
+shared fixed-theorem and axiom checks, authenticated transport, bounded execution,
+and `pnpm lean:demo`. Rerun `experiments:setup` to install the upgrade on the VM;
+the updated Linux image and remote proof smoke test still need deployment validation.
+See [setup and limitations](experiment-worker.md).
 
 ## Add a Vultr experiment worker for the Challenger
 

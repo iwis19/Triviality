@@ -7,6 +7,7 @@ import { existsSync } from "node:fs";
 import { resolve, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline/promises";
+import { workerDomain, deploymentEnvironment } from "./experiment-deployment.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const state = join(root, ".data", "experiment-launcher");
@@ -92,7 +93,9 @@ async function experiment(url, key, request) {
   return result;
 }
 
-async function setup(host) {
+async function setup(host, requestedDomain) {
+  const existing = await loadConfig();
+  host ||= existing?.host;
   if (!host) {
     if (!process.stdin.isTTY) throw new Error("Supply your VM: pnpm experiments:setup root@YOUR_VM_IP");
     const prompt = createInterface({ input: process.stdin, output: process.stdout });
@@ -100,24 +103,37 @@ async function setup(host) {
     finally { prompt.close(); }
   }
   checkHost(host);
-  const existing = await loadConfig();
   const key = existing?.host === host ? existing.key : randomBytes(32).toString("hex");
+  const domain = requestedDomain || (existing?.host === host ? existing.domain : undefined);
+  const publicEnvironment = domain ? deploymentEnvironment(domain, key) : null;
   const staging = await mkdtemp(join(state, "upload-"));
   const archive = `${staging}.tar`;
   try {
-    for (const file of ["compute.py", "server.py", "Dockerfile", "compose.yml", "Caddyfile", ".dockerignore", "setup.sh"]) {
+    for (const file of ["compute.py", "server.py", "lean_job.py", "Dockerfile", "compose.yml", "Caddyfile", "Caddyfile.https", ".dockerignore", "setup.sh"]) {
       // Linux shell scripts must not inherit Windows checkout CRLFs.
       const source = await readFile(join(root, "apps/experiment-worker", file), "utf8");
       await writeFile(join(staging, file), source.replace(/\r\n/g, "\n"));
     }
-    await writeFile(join(staging, ".env"), `EXPERIMENT_API_KEY=${key}\n`, { mode: 0o600 });
+    // Ship the canonical checker, not a second implementation with different rules.
+    await writeFile(join(staging, "lean_check.py"), (await readFile(join(root,
+      "swarm-skills/math-research/scripts/lean_check.py"), "utf8")).replace(/\r\n/g, "\n"));
+    await writeFile(join(staging, ".env"), `EXPERIMENT_API_KEY=${key}\n${domain ? `WORKER_DOMAIN=${workerDomain(domain)}\n` : ""}`, { mode: 0o600 });
     await start("tar", ["-cf", archive, "-C", staging, "."]).completion;
     console.log(`Deploying experiment service to ${host}. SSH may ask for your key/password or host confirmation.`);
     await start("ssh", [host, "umask 077; mkdir -p ~/triviality-experiments"]).completion;
     await start("scp", [archive, `${host}:triviality-experiments/upload.tar`]).completion;
     await start("ssh", [host, "set -e; umask 077; cd ~/triviality-experiments; tar -xf upload.tar; rm upload.tar; sh setup.sh"]).completion;
-    await writeFile(configPath, JSON.stringify({ host, key }, null, 2) + "\n", { mode: 0o600 });
-    console.log("Setup saved privately. Next: pnpm experiments:demo\nFor live research: pnpm experiments:worker");
+    await writeFile(configPath, JSON.stringify({ host, key, domain }, null, 2) + "\n", { mode: 0o600 });
+    if (domain) {
+      const environmentPath = join(state, "deployment.env");
+      await writeFile(environmentPath, publicEnvironment, { mode: 0o600 });
+      console.log(`Worker endpoint: https://${workerDomain(domain)}\nImport ${environmentPath} into your deployed research worker's private environment settings once. It contains secrets; do not commit it.`);
+      await experiment(`https://${workerDomain(domain)}`, key, { coefficients: [0], start: 0, end: 0, property: "zero" });
+      await leanDemo(`https://${workerDomain(domain)}`, key);
+      console.log("HTTPS worker verified. Your deployed research worker can connect directly; no laptop or SSH tunnel needed.");
+      return;
+    }
+    console.log("Setup saved privately. Check Lean: pnpm lean:demo\nFor live research: pnpm experiments:worker");
   } finally {
     if (!resolve(staging).startsWith(resolve(state) + sep)) throw new Error("Refusing to clean a staging path outside launcher storage.");
     await rm(staging, { recursive: true, force: true });
@@ -127,6 +143,12 @@ async function setup(host) {
 
 async function connect(local) {
   const config = local ? null : await loadConfig();
+  if (config?.domain) {
+    const url = `https://${workerDomain(config.domain)}`;
+    console.log(`Connecting directly to ${url}...`);
+    await experiment(url, config.key, { coefficients: [0], start: 0, end: 0, property: "zero" });
+    return { url, key: config.key, child: null };
+  }
   const port = await freePort();
   const url = `http://127.0.0.1:${port}`;
   const key = config?.key || randomBytes(32).toString("hex");
@@ -149,14 +171,19 @@ async function connect(local) {
 }
 
 async function main() {
-  const [command, argument] = process.argv.slice(2);
-  if (!["setup", "demo", "worker"].includes(command) || (argument && command !== "setup" && argument !== "--local")) {
-    throw new Error("Usage: experiments:setup [user@host] | experiments:demo [--local] | experiments:worker [--local]");
+  const [command, argument, ...options] = process.argv.slice(2);
+  let domain;
+  if (command === "setup" && options.length === 2 && options[0] === "--domain") domain = workerDomain(options[1]);
+  else if (options.length) throw new Error("For HTTPS use: pnpm experiments:setup user@host --domain worker.yourdomain.com");
+  if (!["setup", "demo", "lean-demo", "worker"].includes(command) || (argument && command !== "setup" && argument !== "--local")) {
+    throw new Error("Usage: experiments:setup [user@host] | experiments:demo [--local] | lean:demo [--local] | experiments:worker [--local]");
   }
   await mkdir(state, { recursive: true, mode: 0o700 });
-  if (command === "setup") return setup(argument);
+  if (command === "setup") return setup(argument, domain);
   const { url, key, child: connection } = await connect(argument === "--local");
-  if (command === "demo") {
+  if (command === "lean-demo") {
+    await leanDemo(url, key);
+  } else if (command === "demo") {
     console.log("\nDeterministic execution demo (no model API calls or Lean required).");
     console.log("Claim: n² + n + 41 is prime for every natural number.");
     for (const end of [39, 100]) {
@@ -169,15 +196,40 @@ async function main() {
     console.log("\nEvidence is ready for Challenger review. This demo uses a preset request, not a live Challenger.");
   } else {
     if (!process.env.npm_execpath) throw new Error("Start this command using pnpm experiments:worker.");
+    await leanDemo(url, key);
     console.log("Experiment connection ready. Building the research worker...");
     await start(process.execPath, [process.env.npm_execpath, "--filter", "@triviality/research-worker...", "build"]).completion;
     if (stopping) return;
     console.log("Starting research worker; Ctrl+C stops the worker and experiment connection.");
     const worker = start(process.execPath, ["--env-file-if-exists=.env", "apps/research-worker/dist/worker.js"],
-      { detached: process.platform !== "win32", env: { ...process.env, EXPERIMENT_API_URL: url, EXPERIMENT_API_KEY: key } });
+      { detached: process.platform !== "win32", env: { ...process.env, EXPERIMENT_API_URL: url, EXPERIMENT_API_KEY: key,
+        LEAN_API_URL: url, LEAN_API_KEY: key } });
     worker.ownsProcessGroup = true;
-    await Promise.race([worker.completion, connection.completion.then(() => { throw new Error("Experiment connection closed."); })]);
+    await (connection ? Promise.race([worker.completion, connection.completion.then(() => { throw new Error("Experiment connection closed."); })]) : worker.completion);
   }
+}
+
+async function leanDemo(url, key) {
+  console.log("Checking Lean on the connected worker (no model API calls)...");
+  for (const candidate of [
+    { statement: "(n : Nat) : n = n", proof: "by rfl", expected: true },
+    { statement: ": False", proof: "by decide", expected: false },
+  ]) {
+    const response = await fetch(`${url}/lean/check`, {
+      method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ statement: candidate.statement, proof: candidate.proof }),
+      signal: AbortSignal.timeout(45000),
+    });
+    if (!response.ok) throw new Error(`Lean endpoint returned HTTP ${response.status}. Rerun experiments:setup to upgrade your VM.`);
+    const result = await response.json();
+    if (result.verified !== candidate.expected || result.statement !== candidate.statement
+        || result.toolchain !== "leanprover/lean4:v4.19.0"
+        || (!candidate.expected && result.checker !== "Lean rejected the candidate")) {
+      throw new Error(`Lean check failed: ${result.checker || "Invalid response"}. Rerun experiments:setup to install the pinned compiler.`);
+    }
+    console.log(`${candidate.statement}: ${result.verified ? "verified" : "rejected"} (${result.duration_ms} ms)`);
+  }
+  console.log("Lean check passed. Proofs will be compiled on this worker.");
 }
 
 try { await main(); }

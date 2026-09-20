@@ -1,5 +1,47 @@
 # Experiment worker: quick start
 
+## Upgrade your existing VM to run Lean
+
+Run these from the project on your laptop:
+
+```bash
+pnpm experiments:setup root@YOUR_VM_IP
+pnpm lean:demo
+pnpm experiments:worker
+```
+
+Setup upgrades the existing small worker on the same VM. It installs pinned
+Lean 4.19.0 inside its Docker image and preserves the experiment results volume
+and saved credentials. The first build downloads the toolchain and takes longer.
+Use an x86-64 Ubuntu VM with at least 2 GB RAM. It does not deploy the dashboard,
+research API, database, or model orchestration onto the VM.
+
+`lean:demo` sends a valid `n = n` proof and an invalid proof of `False` to the VM;
+it succeeds only when the first is verified and the second is rejected by Lean.
+No model calls are made. `experiments:worker` repeats this check before starting
+the research worker and automatically sends proof checks through the same SSH
+tunnel. You do not need Lean installed on your laptop for this path.
+
+The VM runs the same fixed-theorem wrapper, input restrictions, and axiom audit
+as local verification. Only `propext`, `Classical.choice`, and `Quot.sound` are
+accepted dependencies; `sorry` and unsupported executable constructs are rejected.
+Results include compiler diagnostics, source, job ID, duration, and toolchain.
+Requests and results are stored in the worker's SQLite database. Lean requests
+are checked again on submission so transient failures can recover.
+
+Set `LEAN_API_URL` and `LEAN_API_KEY` manually for a separately managed private
+connection. A blank URL uses the existing local checker. A configured remote
+checker never silently falls back to local Lean: authentication, transport,
+timeout, or invalid-response failures leave the candidate unverified.
+Keep this endpoint private; the dashboard never receives its credential.
+
+The worker uses a fresh subprocess and temporary directory per proof, with no
+model credentials, a 30-second compiler deadline, Linux CPU/file limits, and
+the container's 1 GB memory and network restrictions. Experiments and Lean share
+one container and run serially; this is intended for the current private demo,
+not high-throughput or hostile multi-tenant use. Only bundled `Std` is supported,
+not arbitrary imports or Mathlib. Hosted Lean disproof generation is separate work.
+
 ## Demo — one command
 
 ```bash
@@ -20,8 +62,8 @@ repeated requests reuse saved results; displayed execution times are recorded ti
 ## Vultr — one-time setup
 
 Create an Ubuntu 24.04 VM and attach your SSH key in Vultr. Allow SSH from your
-IP; leave port 8090 closed publicly. For this worker alone, 1 vCPU and 1–2 GB RAM
-is a starting estimate. Then run from your local project:
+IP; leave port 8090 closed publicly. With Lean enabled, start with at least
+1 vCPU and 2 GB RAM. Then run from your local project:
 
 ```bash
 pnpm experiments:setup root@YOUR_VM_IP
@@ -77,10 +119,10 @@ expression strings, paths or model-selected URLs are accepted.
 Results distinguish counterexample_found, no_counterexample_in_bounds, and
 execution_error. All have verified:false. The Challenger must confirm a witness
 matches the original domain and assumptions. Automatic Lean disproof generation
-and hosted Lean checking remain separate work.
+remain separate work. Hosted Lean checking is included via `/lean/check`.
 
-Docker provides a six-second computation deadline, Linux CPU/address-space
-limits, non-root/read-only execution, bounded memory/processes and an internal
+Polynomial jobs have a six-second computation deadline and Linux CPU/address-space
+limits. Docker provides non-root/read-only execution, bounded memory/processes and an internal
 network without external egress. A loopback Caddy gateway is accessed over SSH.
 Local Python demos lack container isolation. SQLite stores requests/results by
 hash and engine version; interrupted jobs rerun on resubmission. Completed errors
@@ -98,7 +140,9 @@ python -m unittest discover -s apps/research-swarm/tests -p 'test_*.py' -v
 ```
 
 Coverage includes witnesses, bounds, invalid input, authentication, failures,
-caching, recovery and real HTTP handoff to scripted Challenger review. The local
-one-command demo and Linux Docker request path have been exercised. The user
-has also completed Vultr setup and run the remote deterministic demo. Live
-model-driven Challenger validation against the VM remains outstanding.
+caching, recovery, hosted Lean transport/audit validation, and real HTTP handoff
+to scripted Challenger review. Compiler-success tests for the remote transport
+use simulated compiler output; the Docker build and `lean:demo` perform actual
+compiler checks. The polynomial demo and its previous Linux Docker request path
+have been exercised, including a user-run Vultr demo. The upgraded Lean image
+and live model-driven research against the VM still need deployment validation.

@@ -12,6 +12,7 @@ import tempfile
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from compute import VERSION, validate
+from lean_job import checker_module, validate as validate_lean
 
 
 class Service:
@@ -19,6 +20,31 @@ class Service:
         self.database = str(database)
         with closing(sqlite3.connect(self.database)) as db, db:
             db.execute("CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, request TEXT, result TEXT)")
+
+    def check_lean(self, request):
+        validate_lean(request)
+        body = json.dumps(request, sort_keys=True, separators=(",", ":"))
+        job_id = hashlib.sha256(("lean-4.19.0-audit-v1" + body).encode()).hexdigest()
+        started = time.monotonic()
+        # Always recheck: an earlier timeout or unavailable compiler is retryable.
+        environment = {key: os.environ[key] for key in ("SYSTEMROOT", "WINDIR", "PATH", "SWARM_LEAN_BIN") if key in os.environ}
+        environment["SWARM_LEAN_BIN"] = checker_module().lean_executable()
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                completed = subprocess.run([sys.executable, str(Path(__file__).with_name("lean_job.py"))],
+                    input=body, capture_output=True, text=True, encoding="utf-8", timeout=40,
+                    cwd=directory, env=environment)
+            if completed.returncode:
+                raise ValueError("Checker subprocess failed")
+            result = json.loads(completed.stdout)
+        except (subprocess.TimeoutExpired, OSError, ValueError):
+            result = dict(verified=False, checker="Remote Lean could not run or exceeded resource limits",
+                          statement=request["statement"], theoremName="triviality_target", axioms=[], log="", lean="",
+                          toolchain="leanprover/lean4:v4.19.0")
+        result.update(job_id=job_id, duration_ms=round((time.monotonic()-started)*1000))
+        with closing(sqlite3.connect(self.database)) as db, db:
+            db.execute("INSERT OR REPLACE INTO jobs VALUES (?, ?, ?)", (job_id, body, json.dumps(result)))
+        return result
 
     def execute(self, request):
         validate(request)
@@ -64,22 +90,23 @@ def handler(service, key):
 
         def do_GET(self):
             self.respond(200 if self.path == "/health" else 404,
-                         {"service": "experiment-worker", "engine": VERSION})
+                         {"service": "experiment-worker", "engine": VERSION, "capabilities": ["experiments", "lean"]})
 
         def do_POST(self):
             if not hmac.compare_digest(self.headers.get("Authorization", "").encode(), ("Bearer " + key).encode()):
                 return self.respond(401, {"error": "Unauthorized"})
-            if self.path != "/experiments":
+            if self.path not in ("/experiments", "/lean/check"):
                 return self.respond(404, {"error": "Unknown endpoint"})
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= 8192 or self.headers.get("Transfer-Encoding"):
-                    return self.respond(413, {"error": "Use a JSON body of at most 8192 bytes"})
+                limit = 196608 if self.path == "/lean/check" else 8192
+                if not 0 < length <= limit or self.headers.get("Transfer-Encoding"):
+                    return self.respond(413, {"error": f"Use a JSON body of at most {limit} bytes"})
                 request = json.loads(self.rfile.read(length))
-                validate(request)
+                (validate_lean if self.path == "/lean/check" else validate)(request)
             except (ValueError, TypeError):
-                return self.respond(400, {"error": "Invalid bounded polynomial experiment"})
-            self.respond(200, service.execute(request))
+                return self.respond(400, {"error": "Invalid bounded verification request"})
+            self.respond(200, service.check_lean(request) if self.path == "/lean/check" else service.execute(request))
 
         def log_message(self, *args):
             pass  # Never log credentials or mathematical request bodies.

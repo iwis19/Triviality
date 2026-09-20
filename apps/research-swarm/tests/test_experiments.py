@@ -1,5 +1,6 @@
 """Exercise the real workflow against a real local experiment HTTP service."""
 import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -15,6 +16,33 @@ from server import Service, handler
 
 
 class ExperimentWorkflowTests(unittest.IsolatedAsyncioTestCase):
+    async def test_workflow_uses_remote_lean_without_local_install(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service = Service(Path(directory) / "jobs.db")
+            server = HTTPServer(("127.0.0.1", 0), handler(service, "a" * 32))
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+
+            def hosted(request):
+                completed = subprocess.CompletedProcess([], 0, "'triviality_target' does not depend on any axioms", "")
+                with patch("subprocess.run", return_value=completed):
+                    result = test_research.checker.check(**request, local_only=True)
+                return {**result, "toolchain": test_research.checker.LEAN_TOOLCHAIN}
+
+            try:
+                with patch.object(service, "check_lean", side_effect=hosted) as remote:
+                    with patch.dict(os.environ, LEAN_API_URL=f"http://127.0.0.1:{server.server_port}",
+                                    LEAN_API_KEY="a" * 32, SWARM_LEAN_BIN="nonexistent-local-lean", EXPERIMENT_API_URL=""):
+                        result, _ = await test_research.WorkflowTests().run_flow(FixtureBackend(), exploration_rounds=3)
+                self.assertEqual(result["status"], "verified")
+                self.assertEqual(result["proof"]["execution"], "remote")
+                self.assertEqual(result["proof"]["statement"], test_research.TARGET)
+                remote.assert_called_once()
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join()
+
     async def test_inapplicable_experiment_does_not_call_service(self):
         backend = FixtureBackend(stop=True)
         original = backend.run

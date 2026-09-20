@@ -13,5 +13,10 @@ if ! command -v docker >/dev/null 2>&1 || ! $elevate docker compose version >/de
     $elevate apt-get update -qq
     $elevate apt-get install -y docker.io docker-compose-v2
 fi
-$elevate docker compose --env-file .env -p triviality-experiments -f compose.yml up --build -d --wait --wait-timeout 120
-echo 'Experiment service deployed. Port 8090 is private to the VM.'
+$elevate systemctl enable --now docker
+set --
+if grep -q '^WORKER_DOMAIN=.' .env; then
+    set -- --profile https
+fi
+$elevate docker compose --env-file .env -p triviality-experiments -f compose.yml "$@" up --build -d --wait --wait-timeout 120
+echo 'Worker stays running after SSH disconnects and restarts with the VM.'

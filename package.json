@@ -24,6 +24,7 @@
     "swarm:test": "node --env-file-if-exists=.env scripts/swarm.mjs test",
     "experiments:setup": "node scripts/experiments.mjs setup",
     "experiments:demo": "node scripts/experiments.mjs demo",
+    "lean:demo": "node scripts/experiments.mjs lean-demo",
     "experiments:worker": "node --env-file-if-exists=.env scripts/experiments.mjs worker",
     "atlas:migrate": "pnpm --filter @triviality/database migrate-mathlab"
   },

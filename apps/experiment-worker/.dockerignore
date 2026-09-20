@@ -1,3 +1,5 @@
 *
 !compute.py
 !server.py
+!lean_job.py
+!lean_check.py

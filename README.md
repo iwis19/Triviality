@@ -57,6 +57,9 @@ Run `pnpm experiments:demo` for a self-contained execution demo. Deploy once wit
 `pnpm experiments:setup root@YOUR_VM_IP`; subsequent demos automatically use
 Vultr. `pnpm experiments:worker` starts the research worker with its experiment
 connection, including the SSH tunnel.
+The same VM worker now supports Lean verification: rerun `experiments:setup` to
+upgrade it, then run `pnpm lean:demo`. `experiments:worker` automatically routes
+proof checks to the VM, so this path requires no local Lean installation.
 
 The research workspace is backed by two additional apps:
 
