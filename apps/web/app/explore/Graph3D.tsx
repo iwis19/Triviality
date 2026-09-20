@@ -12,6 +12,7 @@ import { LAYER_COLORS, nodeColor, nodeSize } from "./palette";
 interface Props {
   nodes: GraphNode[];
   links: GraphLink[];
+  focusNodeId: string | null;
   selectedId: string | null;
   highlightIds: Set<string>;
   reducedMotion: boolean;
@@ -21,7 +22,11 @@ interface Props {
 type FGNode = GraphNode & { x?: number; y?: number; z?: number; fx?: number; fy?: number; fz?: number };
 type FGLink = GraphLink & { source: string | FGNode; target: string | FGNode };
 
-export default function Graph3D({ nodes, links, selectedId, highlightIds, reducedMotion, onSelect }: Props) {
+function endpointId(e: string | FGNode): string {
+  return typeof e === "string" ? e : e.id;
+}
+
+export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlightIds, reducedMotion, onSelect }: Props) {
   const ref = useRef<ForceGraphMethods<FGNode, FGLink> | undefined>(undefined);
   const wrapRef = useRef<HTMLDivElement>(null);
   const cameraFrame = useRef<number | null>(null);
@@ -51,8 +56,58 @@ export default function Graph3D({ nodes, links, selectedId, highlightIds, reduce
     });
     const ids = new Set(fgNodes.map((n) => n.id));
     const fgLinks: FGLink[] = links.filter((l) => ids.has(l.source) && ids.has(l.target)).map((l) => ({ ...l }));
+
+    if (focusNodeId && ids.has(focusNodeId)) {
+      const adjacency = new Map(fgNodes.map((n) => [n.id, [] as string[]]));
+      for (const link of fgLinks) {
+        const source = endpointId(link.source);
+        const target = endpointId(link.target);
+        adjacency.get(source)?.push(target);
+        adjacency.get(target)?.push(source);
+      }
+
+      const distance = new Map<string, number>([[focusNodeId, 0]]);
+      const queue = [focusNodeId];
+      for (let i = 0; i < queue.length; i++) {
+        const id = queue[i];
+        const nextDistance = (distance.get(id) ?? 0) + 1;
+        for (const neighbor of adjacency.get(id) ?? []) {
+          if (distance.has(neighbor)) continue;
+          distance.set(neighbor, nextDistance);
+          queue.push(neighbor);
+        }
+      }
+
+      const maxDistance = Math.max(0, ...distance.values());
+      for (const node of fgNodes) {
+        if (!distance.has(node.id)) distance.set(node.id, maxDistance + 1);
+      }
+
+      const rings = new Map<number, FGNode[]>();
+      for (const node of fgNodes) {
+        const ring = distance.get(node.id) ?? 0;
+        const group = rings.get(ring) ?? [];
+        group.push(node);
+        rings.set(ring, group);
+      }
+
+      for (const [ring, ringNodes] of rings) {
+        ringNodes.sort((a, b) => a.label.localeCompare(b.label));
+        const radius = ring === 0 ? 0 : Math.max(ring * 100, ringNodes.length * 8);
+        ringNodes.forEach((node, index) => {
+          const angle = -Math.PI / 2 + (index * Math.PI * 2) / ringNodes.length;
+          node.fx = radius * Math.cos(angle);
+          node.fy = radius * Math.sin(angle);
+          node.fz = 0;
+          node.x = node.fx;
+          node.y = node.fy;
+          node.z = 0;
+        });
+      }
+    }
+
     return { nodes: fgNodes, links: fgLinks };
-  }, [nodes, links]);
+  }, [nodes, links, focusNodeId]);
 
   useEffect(() => {
     const fg = ref.current;
@@ -91,6 +146,21 @@ export default function Graph3D({ nodes, links, selectedId, highlightIds, reduce
 
   useEffect(() => stopCamera, [stopCamera]);
 
+  const frameRadialLayout = useCallback(() => {
+    const fg = ref.current;
+    if (!fg || !focusNodeId) return;
+    const radius = Math.max(
+      40,
+      ...data.nodes.map((node) => Math.hypot(node.fx ?? 0, node.fy ?? 0) + nodeSize(node)),
+    );
+    const camera = fg.camera() as THREE.PerspectiveCamera;
+    const verticalFit = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    const limitingFit = Math.min(verticalFit, verticalFit * (size.width / size.height));
+    const fill = Math.min(0.82, 0.54 + Math.log2(Math.max(2, data.nodes.length)) * 0.04);
+    const distance = Math.max(120, radius / (limitingFit * fill));
+    moveCamera(new THREE.Vector3(0, 0, distance), new THREE.Vector3(0, 0, 0));
+  }, [data, focusNodeId, size, moveCamera]);
+
   const focusSelection = useCallback(() => {
     const fg = ref.current;
     if (!fg || !selectedId) return;
@@ -118,9 +188,16 @@ export default function Graph3D({ nodes, links, selectedId, highlightIds, reduce
     return () => { window.clearTimeout(timer); stopCamera(); };
   }, [focusSelection, stopCamera]);
 
+  useEffect(() => {
+    if (!focusNodeId || selectedId) return;
+    stopCamera();
+    const timer = window.setTimeout(frameRadialLayout, 80);
+    return () => { window.clearTimeout(timer); stopCamera(); };
+  }, [focusNodeId, selectedId, frameRadialLayout, stopCamera]);
+
   const settleCamera = useCallback(() => {
     const fg = ref.current;
-    if (!fg || selectedId) return;
+    if (!fg || selectedId || focusNodeId) return;
     const startPosition = fg.camera().position.clone();
     const startTarget = (fg.controls() as { target: THREE.Vector3 }).target.clone();
     fg.zoomToFit(0, 45);
@@ -128,7 +205,7 @@ export default function Graph3D({ nodes, links, selectedId, highlightIds, reduce
     const target = (fg.controls() as { target: THREE.Vector3 }).target.clone();
     fg.cameraPosition(startPosition, startTarget, 0);
     moveCamera(position, target);
-  }, [selectedId, moveCamera]);
+  }, [selectedId, focusNodeId, moveCamera]);
 
   // Reuse geometry/materials, and update only appearance on selection/search.
   // Previously every click rebuilt all 1,800+ node meshes and their materials.

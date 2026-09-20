@@ -18,6 +18,27 @@ def emit(kind, **payload):
     print(json.dumps({"kind": kind, **payload}, ensure_ascii=False), flush=True)
 
 
+def normalize_role_models(args, catalog):
+    if args.get("role_models") is None:
+        return {**args, "role_models": {role["id"]: catalog["defaultModel"] for role in catalog["roles"]}}
+    selections = args.get("role_models")
+    if isinstance(selections, dict) and set(selections) == {"coordinator", "researcher", "challenger", "critic", "proof_writer"}:
+        selections = {"coordinator": selections["coordinator"], "researcher_1": selections["researcher"],
+                "researcher_2": selections["challenger"], "researcher_3": selections["researcher"],
+                "challenger": selections["critic"], "proof_writer": selections["proof_writer"]}
+    expected_roles = [role["id"] for role in catalog["roles"]]
+    if isinstance(selections, dict):
+        selected_models = {value for value in selections.values() if isinstance(value, str) and value}
+        missing_roles = [role for role in expected_roles if not selections.get(role)]
+        # A uniform selection means the user chose one model for the whole team.
+        # Carry it across newly-added or stale omitted roles before canonicalizing.
+        if missing_roles and len(selected_models) == 1:
+            shared_model = next(iter(selected_models))
+            selections = {**selections, **{role: shared_model for role in missing_roles}}
+        return {**args, "role_models": {role: selections.get(role) for role in expected_roles}}
+    return args
+
+
 class ModelBackend(engine.AgentBackend):
     """Each framework agent has its own prompt, role, and validated output.
 
@@ -102,13 +123,7 @@ class ModelBackend(engine.AgentBackend):
 async def execute(args, backend=None, progress=None):
     import re
     catalog = json.loads((ROOT / "config/research-models.json").read_text(encoding="utf-8"))
-    if args.get("role_models") is None:
-        args = {**args, "role_models": {role["id"]: catalog["defaultModel"] for role in catalog["roles"]}}
-    legacy = args.get("role_models")
-    if isinstance(legacy, dict) and set(legacy) == {"coordinator", "researcher", "challenger", "critic", "proof_writer"}:
-        args = {**args, "role_models": {"coordinator": legacy["coordinator"], "researcher_1": legacy["researcher"],
-                "researcher_2": legacy["challenger"], "researcher_3": legacy["researcher"],
-                "challenger": legacy["critic"], "proof_writer": legacy["proof_writer"]}}
+    args = normalize_role_models(args, catalog)
     episode_id = args.get("episode_id", "")
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", episode_id):
         raise ValueError("Invalid episode_id")
@@ -131,7 +146,7 @@ async def execute(args, backend=None, progress=None):
         selections = args.get("role_models")
         if selections is not None:
             expected = {role["id"] for role in backend.catalog["roles"]}
-            if not isinstance(selections, dict) or set(selections) != expected:
+            if not isinstance(selections, dict) or any(not selections.get(role) for role in expected):
                 raise ValueError("Choose a model for every research role")
             allowed = {model["id"] for model in backend.catalog["models"] if not model.get("disabled")}
             for selection in selections.values():

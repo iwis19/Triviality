@@ -137,16 +137,10 @@ const FlapCell = React.memo(function FlapCell({
     <div className="flex aspect-3/6 flex-col overflow-hidden rounded-[2px] border border-neutral-300 md:rounded-[3px] md:border-2 dark:border-black">
       {/* Flap content area */}
       <div className="relative flex-1 perspective-dramatic transform-3d">
-        <div className="absolute inset-0 z-40 hidden flex-row items-center justify-center md:flex">
-          <div className="h-1/2 w-px rounded-tr-sm rounded-br-sm bg-neutral-300 dark:bg-black" />
-          <div className="flex h-px flex-1 bg-neutral-300 dark:bg-black" />
-          <div className="h-1/2 w-px rounded-tl-sm rounded-bl-sm bg-neutral-300 dark:bg-black" />
-        </div>
-
         {/* Static top – new character top half */}
         <div
           className={cn(
-            "absolute inset-x-0 top-0 h-[calc(50%-0.5px)] overflow-hidden rounded-t-[3px]",
+            "absolute inset-x-0 top-0 h-1/2 overflow-hidden rounded-t-[3px]",
             topBg,
           )}
         >
@@ -161,7 +155,7 @@ const FlapCell = React.memo(function FlapCell({
         {/* Static bottom – new character bottom half */}
         <div
           className={cn(
-            "absolute inset-x-0 bottom-0 h-[calc(50%-0.5px)] overflow-hidden rounded-b-[3px]",
+            "absolute inset-x-0 bottom-0 h-1/2 overflow-hidden rounded-b-[3px]",
             bottomBg,
           )}
         >
@@ -187,7 +181,7 @@ const FlapCell = React.memo(function FlapCell({
           <motion.div
             key={flipId}
             className={cn(
-              "absolute inset-x-0 top-0 z-10 h-[calc(50%-0.5px)] origin-bottom overflow-hidden rounded-t-[3px] backface-hidden transform-3d",
+              "absolute inset-x-0 top-0 z-10 h-1/2 origin-bottom overflow-hidden rounded-t-[3px] backface-hidden transform-3d",
               flapTopBg,
             )}
             initial={{ rotateX: 0 }}
@@ -217,7 +211,7 @@ const FlapCell = React.memo(function FlapCell({
           <motion.div
             key={`b${flipId}`}
             className={cn(
-              "absolute inset-x-0 bottom-0 z-10 h-[calc(50%-0.5px)] origin-top overflow-hidden rounded-b-[3px] backface-hidden transform-3d",
+              "absolute inset-x-0 bottom-0 z-10 h-1/2 origin-top overflow-hidden rounded-b-[3px] backface-hidden transform-3d",
               bottomBg,
             )}
             initial={{ rotateX: 90 }}
@@ -246,8 +240,6 @@ const FlapCell = React.memo(function FlapCell({
           </motion.div>
         )}
 
-        {/* Split line */}
-        <div className="pointer-events-none absolute inset-x-0 top-1/2 z-20 h-px -translate-y-[0.5px] bg-neutral-400/50 dark:bg-black/50" />
       </div>
 
       {/* Bottom stripes – decorative, outside the flap area */}

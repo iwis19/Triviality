@@ -8,13 +8,19 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from runner import ModelBackend
+from runner import ModelBackend, normalize_role_models
 from devin_backend import run_session
 from test_research import FixtureBackend
 import test_research
 
 
 class RoutingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_uniform_selection_fills_a_stale_missing_role(self):
+        catalog = json.loads((Path(__file__).resolve().parents[3] / "config/research-models.json").read_text())
+        roles = {role: "shared-model" for role in ["coordinator", "researcher_1", "researcher_2", "challenger", "proof_writer"]}
+        normalized = normalize_role_models({"role_models": roles}, catalog)
+        self.assertEqual(normalized["role_models"], {role["id"]: "shared-model" for role in catalog["roles"]})
+
     async def test_provider_credentials_do_not_cross_routes(self):
         with patch.dict(os.environ, {"OPENAI_API_KEY": "openai-fixture", "GEMINI_API_KEY": "gemini-fixture"}, clear=True):
             backend = ModelBackend()
