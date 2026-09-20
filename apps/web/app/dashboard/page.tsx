@@ -200,9 +200,10 @@ function PublishedProofRow() {
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{trihexagonalProof.title}</span>
         <span className="mt-1 block truncate text-xs text-black/45">{trihexagonalProof.statement}</span>
+        <span className="mt-2 block sm:hidden"><ResearchStatusBadge state="certificate_checked" /></span>
       </span>
       <span className="hidden shrink-0 text-right sm:block">
-        <span className="block text-xs capitalize text-black/55">completed</span>
+        <ResearchStatusBadge state="certificate_checked" />
         <span className="mt-1 block text-[10px] text-black/35">{trihexagonalProof.area}</span>
       </span>
       <IconChevronRight className="shrink-0 text-black/25 transition group-hover:translate-x-0.5 group-hover:text-black/50" size={17} />
