@@ -148,8 +148,9 @@ async function runEpisode(episodeId: string): Promise<void> {
       const phases: Record<string, number> = { Plan: 35, Explore: 45, Challenge: 60, Formalize: 75, Deliver: 95 };
       const outcome = await runSwarm({
         episode_id: episodeId, title: episode.title, statement: problem.statement,
-        lean_statement: episode.leanStatement ?? "", proof_attempts: Math.min(6, episode.budget ?? 2),
+        lean_statement: episode.leanStatement ?? "", proof_attempts: Math.min(6, episode.budget ?? 4),
         role_models: episode.roleModels,
+        token_budget: episode.tokenBudget,
         exploration_rounds: episode.explorationRounds ?? 4, stagnation_threshold: episode.stagnationThreshold ?? 2,
         literature: works.map((work, index) => ({ id: paperIds[index], title: work.title, year: work.publication_year,
           abstract: abstractFromIndex(work.abstract_inverted_index), url: work.primary_location?.landing_page_url ?? work.id })),

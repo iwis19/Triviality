@@ -20,6 +20,7 @@ type ResearchForm = {
   roleModels: RoleModels;
   mode: string;
   budget: number;
+  tokenBudget: number;
   explorationRounds: number;
   stagnationThreshold: number;
   leanStatement: string;
@@ -32,7 +33,8 @@ const initialForm: ResearchForm = {
   area: "Combinatorics",
   roleModels: { ...defaultRoleModels },
   mode: "Diverse portfolio",
-  budget: 2,
+  budget: 4,
+  tokenBudget: 60000,
   explorationRounds: 4,
   stagnationThreshold: 2,
   leanStatement: "",
@@ -242,6 +244,7 @@ function ResearchDeployModal({
             <div className="grid content-start gap-4">
               <FieldSelect label="Area" value={form.area} onChange={(value) => setForm((current) => ({ ...current, area: value }))} options={Array.from(new Set([form.area, "Algebra", "Analysis", "Combinatorics", "Geometry", "Logic", "Number theory", "Topology"]))} />
 
+              <label className="grid gap-1.5 text-sm font-medium">Token budget<input required aria-describedby="token-budget-help" className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm" min={10000} max={1000000} step={1000} type="number" value={form.tokenBudget} onChange={(event) => setForm((current) => ({ ...current, tokenBudget: Number(event.target.value) }))} /><span id="token-budget-help" className="text-xs font-normal leading-5 text-black/55">10,000–1,000,000 tokens across the team. Includes input and output; 35% reserved for proof and repair. Higher budgets can increase cost. Devin usage is measured separately in ACUs.</span></label>
               <label className="grid gap-1.5 text-sm font-medium">Proof attempts (1-6)<input className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm font-normal outline-none" min={1} max={6} type="number" value={form.budget} onChange={(event) => setForm((current) => ({ ...current, budget: Number(event.target.value) }))} /></label>
               <label className="grid gap-1.5 text-sm font-medium">Exploration rounds (1–20)<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm" min={1} max={20} type="number" value={form.explorationRounds} onChange={(event) => setForm((current) => ({ ...current, explorationRounds: Number(event.target.value) }))} /></label>
               <label className="grid gap-1.5 text-sm font-medium">Stagnation limit (1–6)<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm" min={1} max={6} type="number" value={form.stagnationThreshold} onChange={(event) => setForm((current) => ({ ...current, stagnationThreshold: Number(event.target.value) }))} /></label>

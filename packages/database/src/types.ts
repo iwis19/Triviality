@@ -36,6 +36,7 @@ export interface ResearchEpisodeDocument extends BaseDocument {
   roleModels?: Record<string, string>;
   mode?: string;
   budget?: number;
+  tokenBudget?: number;
   explorationRounds?: number;
   stagnationThreshold?: number;
   branches?: unknown[];

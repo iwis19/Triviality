@@ -44,7 +44,7 @@ class ExperimentWorkflowTests(unittest.IsolatedAsyncioTestCase):
                 thread.join()
 
     async def test_inapplicable_experiment_does_not_call_service(self):
-        backend = FixtureBackend(stop=True)
+        backend = FixtureBackend(stop=True, complete=False)
         original = backend.run
 
         async def scripted(prompt, opts, schema_json, **kwargs):
@@ -62,7 +62,7 @@ class ExperimentWorkflowTests(unittest.IsolatedAsyncioTestCase):
             server = HTTPServer(("127.0.0.1", 0), handler(Service(Path(directory)/"jobs.db"), "a"*32))
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
-            backend = FixtureBackend(stop=True)
+            backend = FixtureBackend(stop=True, complete=False)
             original = backend.run
 
             async def scripted(prompt, opts, schema_json, **kwargs):

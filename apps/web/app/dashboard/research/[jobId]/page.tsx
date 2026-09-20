@@ -11,6 +11,7 @@ import { ResearchGraph } from "@/components/research-graph";
 import { ResearchLiteratureTabs } from "@/components/research-literature-tabs";
 import { ModelLabel } from "@/components/model-select";
 import { ResearchStatusBadge } from "@/components/research-status-badge";
+import { ResearchTokenUsage } from "@/components/research-token-usage";
 import { getResearchJob, modelCatalog, type ResearchJob } from "@/lib/research-store";
 
 import { latexArtifactMarkdown } from "@/lib/research-markdown";
@@ -51,6 +52,7 @@ export default function ResearchEpisodePage() {
           </div>
 
           {job.roleModels && <section className="mt-6 rounded-xl border border-black/10 bg-white p-5"><h2 className="text-sm font-semibold">Models</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(job.roleModels).map(([roleId, modelId]) => <div key={roleId}><dt className="text-xs text-black/45">{modelCatalog.roles.find((role) => role.id === roleId)?.label ?? roleId.replaceAll("_", " ")}</dt><dd className="mt-1"><ModelLabel id={modelId} fallbackLabel={modelId} /></dd></div>)}</dl></section>}
+          <ResearchTokenUsage job={job} />
           {job.status === "running" ? <RunningEpisode /> : job.status === "failed" ? <FailedEpisode job={job} /> : <CompletedEpisode job={job} tab={tab} setTab={setTab} />}
           {(job.orchestrator === "workswarm" || job.provider === "huawei") && <><ExplorationBanks job={job} /><TeamTrace job={job} /></>}
         </section>

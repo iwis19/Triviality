@@ -50,6 +50,10 @@ class ModelBackend(engine.AgentBackend):
         self.directory = directory
         self.calls = 0
         self.max_calls = max_calls
+        self.reserved = 0
+        self.admission = asyncio.Condition()
+        self.budget_declined = False
+        self.research_closed = False
         self.catalog = json.loads((ROOT / "config/research-models.json").read_text(encoding="utf-8"))
         self.model = self.catalog["defaultModel"]
 
@@ -105,14 +109,57 @@ class ModelBackend(engine.AgentBackend):
         }
         if route[3] in {"gemini", "qwen", "deepseek"}:
             payload["max_tokens"] = payload.pop("max_completion_tokens")
-        result = await asyncio.to_thread(self.request, payload, route)
-        usage = result.get("usage", {}).get("total_tokens")
-        if not isinstance(usage, int) or usage < 0:
-            raise RuntimeError("Provider omitted token usage; cannot enforce the token budget")
-        self.budget.add(usage)
-        if self.workflow_budget is not None:
-            self.workflow_budget.add(usage)
-        emit("usage", tokens=usage, calls=self.calls, model=payload["model"])
+        # Conservative UTF-8 byte estimate, including the output schema and
+        # message framing. Provider tokenizers differ; actual usage is authoritative.
+        input_allowance = len(json.dumps(payload["messages"], ensure_ascii=False).encode("utf-8")) + 256
+        output_key = "max_tokens" if "max_tokens" in payload else "max_completion_tokens"
+        formalizing = str(opts.get("label", "")).startswith("Proof writer")
+        async with self.admission:
+            while True:
+                ceilings = [ledger.total - ledger.spent for ledger in [self.budget, self.workflow_budget]
+                            if ledger is not None and ledger.total is not None]
+                if not formalizing and self.budget.total is not None:
+                    ceilings.append(int(self.budget.total * .65) - self.budget.spent)
+                available = min(ceilings) - self.reserved if ceilings else input_allowance + payload[output_key]
+                if available >= input_allowance + 512 or not self.reserved:
+                    break
+                await self.admission.wait()
+            if available < input_allowance + 512:
+                self.budget_declined = True
+                if not formalizing:
+                    self.research_closed = True
+                emit("budget_admission", phase="Formalize" if formalizing else "Explore",
+                     message="Remaining allocation cannot safely fit another model request.")
+                return engine.AgentResult(skipped=True)
+            payload[output_key] = min(payload[output_key], available - input_allowance)
+            reservation = input_allowance + payload[output_key]
+            self.reserved += reservation
+        try:
+            # urllib runs in a thread and cannot be cancelled mid-request. Keep
+            # its reservation until the response is accounted for, even when
+            # the orchestration timeout cancels this coroutine.
+            request_task = asyncio.create_task(asyncio.to_thread(self.request, payload, route))
+            cancelled = False
+            try:
+                result = await asyncio.shield(request_task)
+            except asyncio.CancelledError:
+                cancelled = True
+                result = await request_task
+            usage = result.get("usage", {}).get("total_tokens")
+            if not isinstance(usage, int) or usage < 0:
+                raise RuntimeError("Provider omitted token usage; cannot enforce the token budget")
+            self.budget.add(usage)
+            if self.workflow_budget is not None:
+                self.workflow_budget.add(usage)
+            emit("usage", tokens=usage, calls=self.calls, model=payload["model"],
+                 spent=self.budget.spent, limit=self.budget.total,
+                 phase="Formalize" if formalizing else "Research")
+            if cancelled:
+                raise asyncio.CancelledError
+        finally:
+            async with self.admission:
+                self.reserved -= reservation
+                self.admission.notify_all()
         content = result["choices"][0]["message"]["content"]
         if not isinstance(content, str):
             raise RuntimeError("Provider returned no text output")
@@ -126,6 +173,9 @@ async def execute(args, backend=None, progress=None):
     import re
     catalog = json.loads((ROOT / "config/research-models.json").read_text(encoding="utf-8"))
     args = normalize_role_models(args, catalog)
+    token_limit = args.get("token_budget", int(os.environ.get("SWARM_TOKEN_BUDGET", "60000")))
+    if type(token_limit) is not int or token_limit < 0 or token_limit > 1000000:
+        raise ValueError("token_budget must be an integer from 0 to 1000000")
     episode_id = args.get("episode_id", "")
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", episode_id):
         raise ValueError("Invalid episode_id")
@@ -158,6 +208,7 @@ async def execute(args, backend=None, progress=None):
     if args.get("retrieval_bridge"):
         from retrieval import Retrieval
         sys.modules["triviality_retrieval"] = Retrieval(directory, emit)
+    sys.modules["triviality_budget"] = backend
     # Snapshot domain events before forwarding them. A budget stop is terminal,
     # but must not erase the completed prefix of the exploration.
     snapshot = dict(status="candidate", reports=[], branches=[], discoveries=[],
@@ -190,7 +241,8 @@ async def execute(args, backend=None, progress=None):
     try:
         result = await engine.run_workflow(str(workflow), args=args, backend=backend,
             resume=str(journal), journal_path=str(journal), run_id=episode_id, cap=3,
-            budget=engine.BudgetLedger(total=int(os.environ.get("SWARM_TOKEN_BUDGET", "60000"))),
+            budget=engine.BudgetLedger(total=token_limit),
+            workflow_budget=engine.BudgetLedger(total=token_limit),
             progress_sink=on_progress,
             log_sink=lambda message: emit("log", message=message))
     except engine.BudgetExhausted as error:
@@ -200,6 +252,11 @@ async def execute(args, backend=None, progress=None):
                              "Completed findings, challenges and proof attempts are preserved."}
     finally:
         sys.modules.pop("triviality_retrieval", None)
+        sys.modules.pop("triviality_budget", None)
+    result["token_usage"] = {"spent": backend.budget.spent, "limit": token_limit}
+    if getattr(backend, "budget_declined", False) and result["status"] in {"candidate", "blocked"} and not result.get("stop_reason"):
+        result["stop_reason"] = "token_budget"
+        result["summary"] += " Remaining token allocation could not safely fit another request; findings are preserved."
     (directory / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     if result.get("proof") and result["proof"].get("lean"):
         (directory / "Proof.lean").write_text(result["proof"]["lean"], encoding="utf-8")

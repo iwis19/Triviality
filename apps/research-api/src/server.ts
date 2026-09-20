@@ -6,6 +6,7 @@ import { getCollections, getDatabase, getMongoClient, proofDocument } from "@tri
 import { catalog, validateRoleModels } from "./models.js";
 import { config } from "./config.js";
 import { registerPublicRoutes } from "./public.js";
+import { tokenBudgetForRequest } from "./token-budget.js";
 
 type CreateJobBody = {
   title?: string;
@@ -15,6 +16,7 @@ type CreateJobBody = {
   provider?: string; // Compatibility with the frontend before per-role selection.
   mode?: string;
   budget?: number;
+  tokenBudget?: number;
   explorationRounds?: number;
   stagnationThreshold?: number;
   leanStatement?: string;
@@ -120,6 +122,7 @@ async function serializeJob(episodeId: string) {
     mode: episode.mode ?? "Diverse portfolio",
     provider: episode.modelProvider ?? (episode.orchestrator ? undefined : "openai"),
     budget: episode.budget ?? 0,
+    tokenBudget: episode.tokenBudget,
     explorationRounds: episode.explorationRounds ?? 4,
     stagnationThreshold: episode.stagnationThreshold ?? 2,
     branches: episode.branches ?? [],
@@ -207,7 +210,10 @@ app.post("/research/jobs", async (request: FastifyRequest<{ Body: CreateJobBody 
   }
   catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
   const mode = body.mode?.trim() || "Diverse portfolio";
-  const budget = Math.max(1, Math.min(6, Number(body.budget ?? 2)));
+  const budget = Math.max(1, Math.min(6, Number(body.budget ?? 4)));
+  let tokenBudget: number;
+  try { tokenBudget = tokenBudgetForRequest(body.tokenBudget); }
+  catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
   const explorationRounds = body.explorationRounds ?? 4;
   const stagnationThreshold = body.stagnationThreshold ?? 2;
   if (!Number.isInteger(explorationRounds) || explorationRounds < 1 || explorationRounds > 20) return reply.code(400).send({ error: "explorationRounds must be an integer from 1 to 20" });
@@ -222,7 +228,7 @@ app.post("/research/jobs", async (request: FastifyRequest<{ Body: CreateJobBody 
     atlasProblemId = atlasProblem._id;
   }
   await collections.researchProjects.insertOne({ _id: projectId, name: title, description: statement, status: "ACTIVE", createdAt: now, updatedAt: now });
-  await collections.researchEpisodes.insertOne({ _id: episodeId, projectId, title, objective: statement, status: "ACTIVE", area, orchestrator: "workswarm", roleModels, mode, budget, explorationRounds, stagnationThreshold, branches: [], atlasProblemId, leanStatement: body.leanStatement?.trim() || undefined, stage: "Queued for research worker", progress: 2, createdAt: now, updatedAt: now });
+  await collections.researchEpisodes.insertOne({ _id: episodeId, projectId, title, objective: statement, status: "ACTIVE", area, orchestrator: "workswarm", roleModels, mode, budget, tokenBudget, explorationRounds, stagnationThreshold, branches: [], atlasProblemId, leanStatement: body.leanStatement?.trim() || undefined, stage: "Queued for research worker", progress: 2, createdAt: now, updatedAt: now });
   await collections.researchProblems.insertOne({ _id: problemId, episodeId, title, statement, assumptions: "", status: "ACTIVE", createdAt: now, updatedAt: now });
 
   try {

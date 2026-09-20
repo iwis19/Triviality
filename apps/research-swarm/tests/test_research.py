@@ -28,7 +28,7 @@ REAL_LEAN_AVAILABLE = Path(checker.lean_executable()).is_file()
 
 class FixtureBackend(engine.AgentBackend):
     """Scripted agents for deterministic tests, never used by the live runner."""
-    def __init__(self, *, stop=False, fail_researcher=False, bad_first_proof=False):
+    def __init__(self, *, stop=False, fail_researcher=False, bad_first_proof=False, complete=True):
         super().__init__()
         self.prompts = []
         self.active = 0
@@ -37,6 +37,7 @@ class FixtureBackend(engine.AgentBackend):
         self.fail_researcher = fail_researcher
         self.bad_first_proof = bad_first_proof
         self.proofs = 0
+        self.complete = complete
 
     async def run(self, prompt, opts, schema_json, *, call_key=None):
         self.prompts.append(prompt)
@@ -52,7 +53,7 @@ class FixtureBackend(engine.AgentBackend):
         elif "approach" in fields:
             data = {"approach": "Monotonicity", "evidence": "Addition preserves natural-number order.",
                     "risks": "Check domain and direction.", "next_step": "Apply omega.", "source_ids": [],
-                    "discovery_ids": [], "search_query": "natural number order", "candidate_complete": True}
+                    "discovery_ids": [], "search_query": "natural number order", "candidate_complete": self.complete}
         elif "resolution_test" in fields:
             ready = not self.stop and '"previous_report": null' not in prompt
             data = {"claim": "Order preservation", "feedback": "Address the natural-number domain explicitly.",
@@ -77,14 +78,16 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         from runner import execute
         for limit in [0, 45, 65]:
             with self.subTest(limit=limit), patch.dict(os.environ, {"SWARM_TOKEN_BUDGET": str(limit)}):
-                backend = FixtureBackend()
+                backend = FixtureBackend(stop=True, complete=False)
                 result = await execute({"episode_id": "fixture-budget-" + uuid.uuid4().hex,
                                         "statement": "Order preservation", "lean_statement": TARGET},
                                        backend=backend, progress=lambda event: None)
                 self.assertEqual(result["stop_reason"], "token_budget")
                 self.assertEqual(result["status"], "candidate")
                 self.assertFalse((result.get("proof") or {}).get("verified", False))
-                self.assertGreaterEqual(result["token_usage"]["spent"], limit)
+                # Allocation exhaustion can stop below the overall ceiling to
+                # protect proof tokens when no eligible candidate exists.
+                self.assertGreaterEqual(result["token_usage"]["spent"], int(limit * .65))
                 if limit:
                     self.assertEqual(len(result["reports"]), 3)
                     self.assertTrue(all(result["reports"]))
@@ -140,7 +143,7 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(second.prompts, [])
 
     async def test_iteration_limit_and_stagnation_restart(self):
-        backend = FixtureBackend()
+        backend = FixtureBackend(complete=False)
         original = backend.run
         async def stuck(prompt, opts, schema_json, **kwargs):
             response = await original(prompt, opts, schema_json, **kwargs)
@@ -163,8 +166,8 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         with patch("subprocess.run", return_value=passed):
             result, _ = await self.run_flow(backend, exploration_rounds=10)
         self.assertEqual(result["status"], "verified")
-        self.assertEqual(len([p for p in backend.prompts if p.startswith("Investigate your independent")]), 6)
-        self.assertEqual(len([d for d in result["discoveries"] if d["kind"] == "finding"]), 6)
+        self.assertEqual(len([p for p in backend.prompts if p.startswith("Investigate your independent")]), 3)
+        self.assertEqual(len([d for d in result["discoveries"] if d["kind"] == "finding"]), 3)
         self.assertEqual(result["proof"]["statement"], TARGET)
 
     async def test_model_generated_target_needs_review_with_successful_checker(self):
