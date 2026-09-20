@@ -140,17 +140,29 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
     if (reducedMotion) { fg.cameraPosition(position, target, 0); onComplete?.(); return; }
     const started = performance.now();
     const frame = (now: number) => {
-      const t = Math.min(1, (now - started) / (viaPosition ? 1200 : 1100));
+      const t = Math.min(1, (now - started) / (viaPosition ? 2400 : 1100));
       // Move the camera and its target together, with gentle acceleration and
       // deceleration. Interrupted moves start from the current visible frame.
       if (viaPosition) {
-        const rotationProgress = Math.min(1, t / 0.75);
+        const rotationProgress = Math.min(1, t / 0.45);
         const rotationEase = smootherStep(rotationProgress);
-        const zoomProgress = Math.max(0, (t - 0.75) / 0.25);
+        const zoomProgress = Math.max(0, (t - 0.55) / 0.45);
         const zoomEase = smootherStep(zoomProgress);
+        const startOffset = startPosition.clone().sub(startTarget);
+        const viaOffset = viaPosition.clone().sub(target);
+        const finalOffset = position.clone().sub(target);
+        // Interpolate radius separately: a straight chord during rotation can
+        // cancel the outward zoom, even when its endpoint is farther away.
+        const distance = THREE.MathUtils.lerp(
+          THREE.MathUtils.lerp(startOffset.length(), viaOffset.length(), rotationEase),
+          finalOffset.length(), zoomEase,
+        );
+        const direction = startOffset.normalize().lerp(viaOffset.normalize(), rotationEase)
+          .lerp(finalOffset.normalize(), zoomEase).normalize();
+        const currentTarget = startTarget.clone().lerp(target, rotationEase);
         fg.cameraPosition(
-          startPosition.clone().lerp(viaPosition, rotationEase).lerp(position, zoomEase),
-          startTarget.clone().lerp(target, rotationEase), 0,
+          currentTarget.clone().addScaledVector(direction, distance),
+          currentTarget, 0,
         );
       } else {
         const eased = smootherStep(t);
@@ -239,21 +251,16 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
     initialCameraState.current = "running";
     const startPosition = fg.camera().position.clone();
     const startTarget = (fg.controls() as { target: THREE.Vector3 }).target.clone();
-    fg.zoomToFit(0, 20);
-    const target = (fg.controls() as { target: THREE.Vector3 }).target.clone();
-    // Rotate at the fitted distance first, then finish with a distinct zoom-in.
-    const rotatedPosition = fg.camera().position.clone().sub(target)
+    const target = startTarget.clone();
+    const startOffset = startPosition.clone().sub(target);
+    // Use the opening view, not zoomToFit's render-dependent bounding box.
+    // The intro always pulls back by 55%, then returns to its starting scale.
+    const finalDistance = startOffset.length();
+    const rotatedOffset = startOffset
       .applyEuler(new THREE.Euler(THREE.MathUtils.degToRad(-22), THREE.MathUtils.degToRad(38), 0, "YXZ"))
-      .add(target);
-    // Fitting a large graph can pull much farther back than the opening view.
-    // Return at least as close as we started, rather than only undoing 32% of
-    // that fitted distance and leaving the graph permanently smaller.
-    const finalDistance = Math.min(
-      startPosition.distanceTo(startTarget),
-      rotatedPosition.distanceTo(target) * 0.68,
-    );
-    const position = rotatedPosition.clone().sub(target).setLength(finalDistance).add(target);
-    fg.cameraPosition(startPosition, startTarget, 0);
+      .normalize();
+    const rotatedPosition = target.clone().addScaledVector(rotatedOffset, finalDistance * 1.55);
+    const position = target.clone().addScaledVector(rotatedOffset, finalDistance);
     moveCamera(position, target, rotatedPosition, () => { initialCameraState.current = "done"; placeDemoAtTop(); });
   }, [entranceReady, data.nodes.length, selectedId, focusNodeId, moveCamera, placeDemoAtTop]);
 
