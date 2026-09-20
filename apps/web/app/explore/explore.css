@@ -1,0 +1,105 @@
+/* Explorer styles — ported from the MathLab explorer and scoped under .mlx so
+   the dark theme never leaks into the rest of the app. */
+
+.mlx {
+  --bg: #0b1020;
+  --panel: #111a2e;
+  --border: #23304d;
+  --text: #e5e9f2;
+  --muted: #9aa5bd;
+  --accent: #f2b134;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  color-scheme: dark;
+}
+.mlx, .mlx * { box-sizing: border-box; }
+.mlx header {
+  display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+  background: var(--panel); border-bottom: 1px solid var(--border);
+}
+.mlx header h1 { font-size: 18px; margin: 0; letter-spacing: .5px; }
+.mlx header .tag { color: var(--muted); font-size: 12px; flex: 1; }
+.mlx header input[type="text"], .mlx header input:not([type]) { width: 220px; }
+.mlx header a.navlink { color: var(--accent); text-decoration: none; font-weight: 600; }
+.mlx .body { display: grid; grid-template-columns: 290px 1fr 380px; flex: 1; min-height: 0; }
+.mlx aside { overflow: auto; background: var(--panel); border-color: var(--border); padding: 10px 12px; }
+.mlx aside.left { border-right: 1px solid var(--border); }
+.mlx aside.right { border-left: 1px solid var(--border); }
+.mlx main { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.mlx main > :first-child { flex: 1; min-height: 0; }
+.mlx h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 14px 0 6px; }
+.mlx h4 { margin: 14px 0 4px; font-size: 13px; color: var(--accent); }
+.mlx h5 { margin: 10px 0 4px; font-size: 12px; color: var(--muted); }
+.mlx section + section { margin-top: 8px; }
+.mlx ul { list-style: none; padding: 0; margin: 0; }
+.mlx button {
+  background: #1a2540; color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+  padding: 5px 9px; cursor: pointer; font: inherit; text-align: left;
+}
+.mlx button:hover { border-color: #3b4d78; }
+.mlx button:disabled { opacity: .5; cursor: default; }
+.mlx button.active { border-color: var(--accent); color: var(--accent); }
+.mlx button.primary { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 600; }
+.mlx button.link { background: none; border: none; color: #8ab4f8; padding: 0 4px; text-decoration: underline; }
+.mlx input, .mlx select, .mlx textarea {
+  background: #0d1526; color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font: inherit;
+}
+.mlx label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.mlx .layer { padding: 3px 0; text-transform: capitalize; }
+.mlx .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.mlx .legend { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); padding: 2px 0; text-transform: capitalize; }
+.mlx .areas li button, .mlx .problems li button { width: 100%; background: none; border: none; padding: 3px 6px; border-radius: 4px; }
+.mlx .areas li button:hover, .mlx .problems li button:hover { background: #1a2540; }
+.mlx .areas small, .mlx .problems small { color: var(--muted); margin-left: 4px; }
+.mlx .problems li { margin-bottom: 6px; }
+.mlx .problems li small { display: block; padding-left: 6px; font-size: 11px; }
+.mlx .replay {
+  display: flex; align-items: center; gap: 12px; padding: 6px 12px; background: var(--panel);
+  border-top: 1px solid var(--border); font-size: 12px; color: var(--muted);
+}
+.mlx .replay label { flex: 1; }
+.mlx .replay input[type="range"] { flex: 1; }
+.mlx .detail p { line-height: 1.45; margin: 6px 0; }
+.mlx .detail pre { background: #0d1526; padding: 8px; border-radius: 6px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
+.mlx .label {
+  display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; color: #111; background: #9ca3af;
+}
+.mlx .label.small { font-size: 10px; }
+.mlx .card { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin: 6px 0; background: #0f172b; }
+.mlx .card.certified { border-color: #2ecc71; }
+.mlx .card.active { border-color: var(--accent); }
+.mlx .row {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 8px; margin: 2px 0; background: none; border: 1px solid transparent;
+}
+.mlx .row:hover { background: #1a2540; }
+.mlx .row.static { cursor: default; }
+.mlx .row.active { border-color: var(--accent); }
+.mlx .row.dim { opacity: .35; }
+.mlx .row .grow { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mlx .row small { color: var(--muted); white-space: nowrap; }
+.mlx .list { overflow: auto; padding: 10px 16px; }
+.mlx .list h3 { text-transform: capitalize; color: var(--muted); font-size: 13px; margin: 12px 0 4px; }
+.mlx .sources li { margin-bottom: 8px; }
+.mlx .sources a { color: #8ab4f8; }
+.mlx .error { color: #fca5a5; padding: 6px 14px; }
+.mlx .warn { color: #fbbf24; }
+.mlx .msg { color: var(--muted); font-size: 12px; word-break: break-all; }
+.mlx .toolbar { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; align-items: center; }
+.mlx .toolbar a { color: #8ab4f8; }
+.mlx .loading { display: grid; place-items: center; color: var(--muted); }
+.mlx kbd { background: #1a2540; border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; font-family: monospace; }
+.mlx .tip { background: rgba(10, 15, 30, .92); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; max-width: 260px; }
+.mlx .graph-wrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
+@media (max-width: 1000px) {
+  .mlx .body { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+  .mlx aside.left { max-height: 30vh; }
+  .mlx aside.right { max-height: 40vh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mlx * { transition: none !important; animation: none !important; }
+}

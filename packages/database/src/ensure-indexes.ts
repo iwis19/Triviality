@@ -24,6 +24,18 @@ export async function ensureIndexes(): Promise<void> {
     collections.graphRelationships.createIndex({ fromNodeId: 1, toNodeId: 1, type: 1 }, { unique: true }),
     collections.graphRelationships.createIndex({ "metadata.episodeIds": 1, createdAt: 1 }),
     collections.papers.createIndex({ citedByCount: -1 }),
+    collections.atlasAreas.createIndex({ slug: 1 }, { unique: true }),
+    collections.atlasAreas.createIndex({ parentId: 1 }),
+    collections.atlasProblems.createIndex({ slug: 1 }, { unique: true }),
+    collections.atlasProblems.createIndex({ areaIds: 1 }),
+    collections.claims.createIndex({ contentHash: 1 }),
+    collections.claims.createIndex({ problemId: 1, claimVersion: -1 }),
+    collections.claims.createIndex({ hypothesisId: 1, claimVersion: -1 }),
+    collections.relations.createIndex({ layer: 1, kind: 1 }),
+    collections.relations.createIndex({ sourceId: 1, targetId: 1 }),
+    collections.publications.createIndex({ recordType: 1, recordId: 1, recordVersion: 1 }, { unique: true }),
+    collections.publications.createIndex({ recordType: 1, withdrawnAt: 1, publishedAt: 1 }),
+    collections.publicEvents.createIndex({ seq: 1 }, { unique: true }),
   ]);
 
   try {

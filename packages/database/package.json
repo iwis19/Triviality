@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc --outDir dist",
     "typecheck": "tsc --noEmit",
-    "ensure-indexes": "tsx src/ensure-indexes.ts"
+    "ensure-indexes": "tsx src/ensure-indexes.ts",
+    "migrate-mathlab": "tsx src/migrate-mathlab.ts"
   },
   "exports": {
     ".": {
@@ -19,7 +20,7 @@
     "mongodb": "^6.17.0"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/node": "^24",
     "tsx": "^4.19.3",
     "typescript": "^5"
   }
