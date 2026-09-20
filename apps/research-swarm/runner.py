@@ -59,12 +59,14 @@ class ModelBackend(engine.AgentBackend):
             raise RuntimeError("Unknown or unavailable model selection")
         key_name = entry["keyEnv"]
         key = os.environ.get(key_name, "")
+        if entry["provider"] == "devin":
+            key = key or os.environ.get("MATHLAB_DEVIN_API_KEY", "")
         base = os.environ.get(entry["provider"].upper() + "_BASE_URL") or entry["baseUrl"]
         model = entry["model"]
         if not key or not model:
             raise RuntimeError(f"Configure {key_name} and the selected model in the worker environment")
-        if entry and entry["provider"] == "devin" and not os.environ.get("DEVIN_ORG_ID"):
-            raise RuntimeError("Configure DEVIN_ORG_ID for Devin role assignments")
+        if entry["provider"] == "devin" and not (os.environ.get("DEVIN_ORG_ID") or os.environ.get("MATHLAB_DEVIN_ORG_ID")):
+            raise RuntimeError("Configure DEVIN_ORG_ID (or MATHLAB_DEVIN_ORG_ID) for Devin role assignments")
         return key, base.rstrip("/"), model, entry["provider"]
 
     def request(self, payload, route):

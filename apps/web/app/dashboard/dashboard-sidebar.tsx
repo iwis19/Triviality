@@ -15,6 +15,8 @@ import {
 import { TrivialityLogo } from "@/components/triviality-logo";
 import { deleteResearchJob, getResearchJobs, type ResearchJob } from "@/lib/research-store";
 
+const hiddenPublishedProofKey = "triviality:hidden-chat:trihexagonal-shell:v2";
+
 export function DashboardSidebar({ jobs: providedJobs, onDeleted }: { jobs?: ResearchJob[]; onDeleted?: (id: string) => void }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -25,7 +27,8 @@ export function DashboardSidebar({ jobs: providedJobs, onDeleted }: { jobs?: Res
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      setShowPublishedProof(window.localStorage.getItem("triviality:hidden-chat:trihexagonal-shell") !== "1");
+      window.localStorage.removeItem("triviality:hidden-chat:trihexagonal-shell");
+      setShowPublishedProof(window.localStorage.getItem(hiddenPublishedProofKey) !== "1");
     });
     return () => window.cancelAnimationFrame(frame);
   }, []);
@@ -60,7 +63,7 @@ export function DashboardSidebar({ jobs: providedJobs, onDeleted }: { jobs?: Res
       showPublishedProof={showPublishedProof}
       onRemovePublishedProof={() => {
         if (!window.confirm("Remove the trihexagonal shell proof from Chats? The published proof page will remain available.")) return;
-        window.localStorage.setItem("triviality:hidden-chat:trihexagonal-shell", "1");
+        window.localStorage.setItem(hiddenPublishedProofKey, "1");
         setShowPublishedProof(false);
       }}
       onDelete={async (job) => {

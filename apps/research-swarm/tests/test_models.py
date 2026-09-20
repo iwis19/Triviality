@@ -29,6 +29,13 @@ class RoutingTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(RuntimeError, "DEEPSEEK_API_KEY"):
                 backend.route("deepseek/deepseek-v4-pro")
 
+    async def test_devin_accepts_existing_mathlab_secret_names(self):
+        env = {"MATHLAB_DEVIN_API_KEY": "devin-fixture", "MATHLAB_DEVIN_ORG_ID": "org-fixture"}
+        with patch.dict(os.environ, env, clear=True):
+            backend = ModelBackend()
+            self.assertEqual(backend.route("devin/agent"),
+                             ("devin-fixture", "https://api.devin.ai", "agent", "devin"))
+
     async def test_gemini_uses_selected_model_and_compatible_payload(self):
         with patch.dict(os.environ, {"GEMINI_API_KEY": "fixture"}, clear=True):
             backend = ModelBackend()
@@ -63,22 +70,38 @@ class RoutingTests(unittest.IsolatedAsyncioTestCase):
 
 class DevinTests(unittest.IsolatedAsyncioTestCase):
     async def test_structured_result_and_session_reuse(self):
-        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"DEVIN_ORG_ID": "test-org"}):
+        env = {"DEVIN_ORG_ID": "test-org", "DEVIN_MODE": "ultra", "DEVIN_CREATE_AS_USER_ID": "user-1"}
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, env, clear=True):
             replies = [{"session_id": "devin-test"}, {"status": "exit", "structured_output": {"evidence": "test"}, "acus_consumed": 0.1}]
             events = []
             with patch("devin_backend.request", side_effect=replies) as request:
                 result = await run_session("test", {"type": "object"}, ("key", "https://fixture", "agent", "devin"), directory, "call", lambda *a, **kw: events.append((a, kw)))
             self.assertEqual(result, {"evidence": "test"})
-            self.assertTrue(request.call_args_list[0].args[4]["structured_output_required"])
+            create = request.call_args_list[0].args[4]
+            self.assertTrue(create["structured_output_required"])
+            self.assertEqual(create["devin_mode"], "ultra")
+            self.assertEqual(create["create_as_user_id"], "user-1")
+            self.assertIn('"type":"object"', create["prompt"])
             self.assertEqual(events[-1][1]["unit"], "ACU")
-            with patch("devin_backend.request", return_value=replies[-1]) as request:
-                await run_session("test", {}, ("key", "https://fixture", "agent", "devin"), directory, "call", lambda *a, **kw: None)
-            self.assertEqual(len(request.call_args_list), 1)
-            self.assertEqual(len(request.call_args.args), 3)  # GET only, no duplicate POST.
+            with patch("devin_backend.request") as request:
+                await run_session("test", {"type": "object"}, ("key", "https://fixture", "agent", "devin"), directory, "call", lambda *a, **kw: None)
+            request.assert_not_called()
+
+    async def test_valid_output_is_accepted_when_devin_waits_for_user(self):
+        schema = {"type": "object", "properties": {"answer": {"type": "string"}}, "required": ["answer"]}
+        replies = [{"session_id": "devin-test"},
+                   {"status": "running", "status_detail": "waiting_for_user", "structured_output": {"answer": "done"}}]
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"DEVIN_ORG_ID": "test-org"}, clear=True):
+            with patch("devin_backend.request", side_effect=replies) as request:
+                result = await run_session("test", schema, ("key", "https://fixture", "agent", "devin"), directory, "call", lambda *a, **kw: None)
+        self.assertEqual(result, {"answer": "done"})
+        self.assertEqual(len(request.call_args_list), 3)  # create + poll + cleanup of the waiting session
+        self.assertEqual(request.call_args.args[-1], "DELETE")
 
     async def test_waiting_for_user_terminates_session_and_fails(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"DEVIN_ORG_ID": "test-org"}):
             with patch("devin_backend.request", side_effect=[{"session_id": "devin-test"}, {"status": "running", "status_detail": "waiting_for_user"}, {}]) as request:
-                with self.assertRaisesRegex(RuntimeError, "needs attention"):
+                with self.assertRaisesRegex(RuntimeError, "without valid structured output"):
                     await run_session("test", {}, ("key", "https://fixture", "agent", "devin"), directory, "call", lambda *a, **kw: None)
             self.assertEqual(request.call_args.args[-1], "DELETE")
+            self.assertEqual(list(Path(directory).glob("devin-*.json")), [])

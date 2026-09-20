@@ -36,6 +36,12 @@ const initialForm: ResearchForm = {
   leanStatement: "",
 };
 
+const trihexagonalProof = {
+  title: "Trihexagonal shell: a counterexample to the proposed bound",
+  statement: "A connected 23-cell shell enclosing a connected 31-cell hole.",
+  area: "Combinatorics",
+};
+
 export default function DashboardPage() {
   return <Suspense fallback={<div className="p-8 text-sm text-black/40">Loading workspace…</div>}><DashboardContent /></Suspense>;
 }
@@ -89,6 +95,8 @@ function DashboardContent() {
       (!normalized || `${job.title} ${job.statement} ${job.area} ${job.orchestrator ?? job.provider}`.toLowerCase().includes(normalized)),
     );
   }, [jobs, query, areaFilter]);
+  const showTrihexagonalProof = (!areaFilter || areaFilter === trihexagonalProof.area)
+    && (!query.trim() || `${trihexagonalProof.title} ${trihexagonalProof.statement} ${trihexagonalProof.area}`.toLowerCase().includes(query.trim().toLowerCase()));
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -140,7 +148,7 @@ function DashboardContent() {
 
             <section className="mt-10" id="jobs">
               <p className="mb-3 px-2 text-xs font-medium text-black/45">Recent</p>
-              {filteredJobs.length === 0 ? (
+              {!showTrihexagonalProof && filteredJobs.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-black/15 px-6 py-16 text-center">
                   <IconMessage className="mx-auto text-black/25" size={28} />
                   <p className="mt-4 text-sm text-black/45">{jobs.length === 0 ? "No research chats yet." : "No matching chats."}</p>
@@ -148,6 +156,7 @@ function DashboardContent() {
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-2xl border border-black/8 bg-white">
+                  {showTrihexagonalProof && <PublishedProofRow />}
                   {filteredJobs.map((job) => <EpisodeRow key={job.id} job={job} />)}
                 </div>
               )}
@@ -157,6 +166,28 @@ function DashboardContent() {
         {(modalOpen || startNewResearch) && <ResearchDeployModal form={form} setForm={setForm} creating={creating} error={submitError} onClose={closeModal} onSubmit={submit} />}
       </div>
     </main>
+  );
+}
+
+function PublishedProofRow() {
+  return (
+    <Link
+      className="group flex items-center gap-4 border-b border-black/8 px-4 py-4 transition last:border-b-0 hover:bg-[#f7f7f8] sm:px-5"
+      href="/proofs/trihexagonal-shell"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[0.055] text-black/55">
+        <IconMessage size={17} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{trihexagonalProof.title}</span>
+        <span className="mt-1 block truncate text-xs text-black/45">{trihexagonalProof.statement}</span>
+      </span>
+      <span className="hidden shrink-0 text-right sm:block">
+        <span className="block text-xs capitalize text-black/55">completed</span>
+        <span className="mt-1 block text-[10px] text-black/35">{trihexagonalProof.area}</span>
+      </span>
+      <IconChevronRight className="shrink-0 text-black/25 transition group-hover:translate-x-0.5 group-hover:text-black/50" size={17} />
+    </Link>
   );
 }
 

@@ -5,12 +5,12 @@ import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
-import { IconArrowUpRight, IconCopy, IconCheck } from "@tabler/icons-react";
+import { IconArrowLeft, IconArrowUpRight, IconCopy, IconCheck } from "@tabler/icons-react";
 import { TrivialityLogo } from "@/components/triviality-logo";
 import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
 import type { LiteraturePaper } from "@/lib/literature";
 
-export function LiteratureReader({ paper }: { paper: LiteraturePaper }) {
+export function LiteratureReader({ paper, workspace = false }: { paper: LiteraturePaper; workspace?: boolean }) {
   const [activeSection, setActiveSection] = useState(paper.sections[0]?.id ?? "");
   const [copied, setCopied] = useState(false);
 
@@ -44,20 +44,17 @@ export function LiteratureReader({ paper }: { paper: LiteraturePaper }) {
   };
 
   return (
-    <main className="min-h-screen bg-white text-[#171717]">
-      <ReaderNav />
+    <div className={workspace ? "text-[#171717]" : "min-h-screen bg-white text-[#171717]"}>
+      {!workspace && <ReaderNav />}
 
-      <div className="mx-auto max-w-[1200px] px-5 pb-16 pt-8 sm:px-10 lg:px-16 lg:pt-12">
+      <div className={workspace ? "mx-auto max-w-7xl px-6 py-8 sm:px-10 lg:px-14" : "mx-auto max-w-[1200px] px-5 pb-16 pt-8 sm:px-10 lg:px-16 lg:pt-12"}>
+        {workspace && <Link className="mb-6 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-black/45 hover:text-black" href="/dashboard"><IconArrowLeft size={14} /> Overview</Link>}
         <div className="grid grid-cols-1 gap-12 lg:grid-cols-[minmax(0,1fr)_220px] lg:gap-16">
           <article className="min-w-0">
             <header className="mx-auto max-w-[820px]">
-              <div className="flex items-center gap-3 text-sm font-medium text-black/60 sm:text-base">
-                <time>{paper.date}</time>
-                <span className="text-black/20">·</span>
-                <span>{paper.category}</span>
-              </div>
+              {workspace ? <div className="mb-4 flex flex-wrap items-center gap-3 text-[10px] font-medium uppercase tracking-[0.2em] text-black/45"><span className="rounded-full bg-black px-2.5 py-1 text-white">completed</span></div> : <div className="flex items-center gap-3 text-sm font-medium text-black/60 sm:text-base"><time>{paper.date}</time><span className="text-black/20">·</span><span>{paper.category}</span></div>}
               <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.04em] sm:text-4xl">{paper.title}</h1>
-              <p className="mt-5 text-xs text-black/55"><span className="text-black/75">{paper.authors}</span>{paper.source ? ` · ${paper.source}` : ""}</p>
+              {workspace ? <p className="mt-5 max-w-3xl text-base leading-7 text-black/55">{paper.subtitle}</p> : <p className="mt-5 text-xs text-black/55"><span className="text-black/75">{paper.authors}</span>{paper.source ? ` · ${paper.source}` : ""}</p>}
               {paper.verification && <div className="mt-6 rounded-2xl border border-emerald-900/15 bg-emerald-50/60 px-5 py-4"><p className="text-sm font-semibold text-emerald-950">{paper.verification.label}</p><p className="mt-1 text-xs leading-5 text-emerald-950/65">{paper.verification.detail}</p></div>}
               {paper.artifacts && paper.artifacts.length > 0 && <div className="mt-5 flex flex-wrap gap-2">{paper.artifacts.map((artifact) => <a className="rounded-full border border-black/15 px-4 py-2 text-xs font-medium transition hover:border-black/35 hover:bg-black/[.025]" href={artifact.href} key={artifact.href}>{artifact.label}</a>)}</div>}
             </header>
@@ -104,7 +101,7 @@ export function LiteratureReader({ paper }: { paper: LiteraturePaper }) {
         </div>
       </div>
 
-    </main>
+    </div>
   );
 }
 
