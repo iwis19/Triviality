@@ -1,0 +1,80 @@
+{
+  "roles": [
+    {
+      "id": "coordinator",
+      "label": "Coordinator",
+      "description": "Plans the investigation and recovers failed assignments."
+    },
+    {
+      "id": "researcher",
+      "label": "Researcher",
+      "description": "Develops a constructive proof approach."
+    },
+    {
+      "id": "challenger",
+      "label": "Counterexample researcher",
+      "description": "Challenges assumptions and searches for counterexamples."
+    },
+    {
+      "id": "critic",
+      "label": "Critic",
+      "description": "Reviews evidence and requests revisions."
+    },
+    {
+      "id": "proof_writer",
+      "label": "Proof writer",
+      "description": "Writes and repairs the formal proof using Lean feedback."
+    }
+  ],
+  "defaultModel": "openai/gpt-5.6-sol",
+  "models": [
+    {
+      "id": "openai/gpt-5.6-sol",
+      "label": "OpenAI \u00b7 GPT-5.6 Sol",
+      "provider": "openai",
+      "model": "gpt-5.6-sol",
+      "keyEnv": "OPENAI_API_KEY",
+      "baseUrl": "https://api.openai.com/v1"
+    },
+    {
+      "id": "gemini/gemini-2.5-pro",
+      "label": "Google \u00b7 Gemini 2.5 Pro",
+      "provider": "gemini",
+      "model": "gemini-2.5-pro",
+      "keyEnv": "GEMINI_API_KEY",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai"
+    },
+    {
+      "id": "gemini/gemini-2.5-flash",
+      "label": "Google \u00b7 Gemini 2.5 Flash",
+      "provider": "gemini",
+      "model": "gemini-2.5-flash",
+      "keyEnv": "GEMINI_API_KEY",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai"
+    },
+    {
+      "id": "deepseek/deepseek-v4-pro",
+      "label": "DeepSeek / V4 Pro",
+      "provider": "deepseek",
+      "model": "deepseek-v4-pro",
+      "keyEnv": "DEEPSEEK_API_KEY",
+      "baseUrl": "https://api.deepseek.com"
+    },
+    {
+      "id": "qwen/qwen-plus",
+      "label": "Alibaba / Qwen Plus",
+      "provider": "qwen",
+      "model": "qwen-plus",
+      "keyEnv": "QWEN_API_KEY",
+      "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1"
+    },
+    {
+      "id": "devin/agent",
+      "label": "Devin / Autonomous agent",
+      "provider": "devin",
+      "model": "agent",
+      "keyEnv": "DEVIN_API_KEY",
+      "baseUrl": "https://api.devin.ai"
+    }
+  ]
+}

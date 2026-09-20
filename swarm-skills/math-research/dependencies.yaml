@@ -1,0 +1,11 @@
+skills: []
+tools:
+  - name: swarmflow
+    required: true
+    purpose: WorkSwarm/JiuwenSwarm SwarmFlow host with agent, parallel, phase, log
+  - name: lean
+    required: false
+    purpose: Lean 4.19.0 with Std; SWARM_LEAN_BIN selects the executable. Required for verified output.
+runtime:
+  python: ">=3.11,<3.14"
+  models: A configured host model or named provider credentials with role_models for the embedded adapter

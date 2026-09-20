@@ -1,0 +1,30 @@
+{
+  "name": "triviality",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "backend:dev": "node scripts/backend.mjs dev",
+    "backend:start": "node scripts/backend.mjs start",
+    "backend:test": "node scripts/backend.mjs test",
+    "backend:check": "node scripts/backend.mjs check",
+    "backend:explorer": "npm --prefix external/norththehackers/frontend run dev",
+    "db:up": "docker compose up -d mongodb redis",
+    "db:down": "docker compose down",
+    "db:status": "docker compose ps",
+    "db:ensure-indexes": "pnpm --filter @triviality/database ensure-indexes",
+    "papers:ingest": "pnpm --filter @triviality/paper-ingest ingest",
+    "papers:api": "pnpm --filter @triviality/api-papers dev",
+    "research:api": "pnpm --filter @triviality/research-api dev",
+    "research:worker": "pnpm --filter @triviality/research-worker dev",
+    "preswarm:demo": "pnpm --filter @triviality/research-worker build",
+    "swarm:demo": "node --env-file-if-exists=.env scripts/swarm.mjs",
+    "swarm:test": "node --env-file-if-exists=.env scripts/swarm.mjs test"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.0"
+  },
+  "packageManager": "pnpm@10.15.1"
+}

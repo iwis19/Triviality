@@ -1,215 +1,64 @@
-# MathLab — a Devin-driven laboratory for open mathematical problems
+# Triviality
 
-MathLab maintains a source-backed atlas of reported open problems across mathematics, runs
-bounded Devin research assignments against them, keeps the resulting hypotheses / experiments /
-proof attempts as a versioned lineage graph, culls and refines branches generation by generation,
-independently checks Lean proofs, and publishes everything automatically with explicit evidence
-labels. The full design is in [`docs/plan.md`](docs/plan.md).
+## Included backend
 
-```
-frontend/   React + react-force-graph-3d explorer (public browsing + private research controls)
-backend/    FastAPI system of record: atlas, campaigns, scheduler, Devin adapter, Lean checker,
-            publication projection, public/private/worker APIs
-lean/       Lean 4 project the independent checker compiles submissions against
-docs/       plan.md — the approved research & implementation plan
-```
+`external/norththehackers/` contains regular files tracked by this repository,
+imported from `sharonbasovich/norththehackers` main at
+`04b9875ab1f0e50e0f20a1ab68ff3dfaa01f6883`. A normal clone includes the backend,
+explorer, Lean project, and research snapshots; no submodule setup is required.
 
-## Principles the code enforces
+See [backend setup and commands](docs/backend.md). After installing its Python
+dependencies, `pnpm backend:dev` starts the imported API on port 8000. The
+existing Triviality dashboard continues to use the research API on port 3010
+described below.
 
-- **The app is the system of record; Devin does bounded work.** A graph node is not a Devin
-  session. Sessions are `Attempt`s with a frozen prompt, a requested mode and the mode the
-  provider actually reported; the app owns scheduling, ingestion, selection and publication.
-- **Nothing a worker says is trusted.** Worker-reported evidence is published as
-  *"Worker-reported … — not independently certified"*. Only the independent Lean checker (or a
-  human reviewer via the private API) can certify evidence; only the checker can grant
-  **Lean verified**, and only for the exact approved theorem target with no `sorry`/`sorryAx`
-  and no axioms outside the allow-list. A changed statement is a new claim version and never
-  inherits verification.
-- **Informal proofs are welcome and labelled.** *"Informal proof candidate — not formally
-  verified"* is a first-class public label; Lean remains the end goal.
-- **Public reads never spend money.** `/public/*` serves only the `Publication` projection
-  (allow-listed payloads) and can't create sessions. `/private/*` needs an owner/collaborator
-  `X-API-Key`; `/worker/*` needs an attempt-scoped `X-Worker-Token`.
-- **"Open" is a dated claim by a source, not a fact.** Every problem carries
-  `SourceAssertion`s (URL, location, asserted status, retrieval date, review state). Seed
-  records are marked `unreviewed` until a person confirms them.
-- **Four relation layers stay separate:** `atlas` (classification), `lineage` (research
-  parent/child), `dependency` (idea→claim, proves), `association` (thematic). 3D geometry is
-  presentational, never mathematical distance.
+## WorkSwarm research team
 
-## Quick start (mock provider — consumes no Devin usage)
+The **WorkSwarm** orchestration layer runs a reusable Swarm Skill with parallel
+investigations, shared findings, independent critique, adaptive revision, and
+Lean proof repair. See [setup, demo, and challenge mapping](docs/openjiuwen-challenge.md).
+The skill lives in [swarm-skills/math-research](swarm-skills/math-research/SKILL.md).
+After setup, `pnpm swarm:demo` runs a live terminal demo and `pnpm swarm:test`
+runs deterministic collaboration tests with real Lean checks when installed.
 
-Backend (Python 3.10+):
+## Data layer
+
+The research schema is MongoDB-native. `packages/database` defines typed collections for research state, mathematical knowledge, graph nodes and relationships, raw object-storage artifacts, and paper embeddings. MongoDB Atlas Vector Search indexes `paper_embeddings.embedding`; Redis tracks ingestion jobs.
+
+Start the local MongoDB and Redis services, then run:
 
 ```bash
-cd backend
-pip install -e ".[dev]"
-MATHLAB_OWNER_API_KEY=dev-owner-key uvicorn app.main:app --reload --port 8000
+docker compose up -d mongodb redis
+cp .env.example .env
+pnpm --filter @triviality/database ensure-indexes
+pnpm papers:ingest
 ```
 
-Frontend (Node 22+):
+Convenience commands are also available: `pnpm db:up`, `pnpm db:status`, and `pnpm db:down`.
+
+The local database is available at `mongodb://localhost:27017`, database `triviality`. Atlas can be used later by replacing `MONGODB_URI` in `.env`.
+
+The paper ingestion worker ranks mathematics-related OpenAlex works by citation count, stores normalized metadata and raw JSON artifacts, creates paper graph nodes, and writes embeddings when `EMBEDDING_API_KEY` is configured. OpenAlex is used for ranked discovery; arXiv/PDF URLs are retained as source links when supplied by the record.
+
+The default discovery catalog covers 16 areas and requests up to 100 works per area: algebra, analysis, geometry, topology, number theory, combinatorics, probability, statistics, logic, differential equations, numerical analysis, optimization, dynamical systems, mathematical physics, category theory, and representation theory. Results are deduplicated by OpenAlex work ID; per-area rank and provenance are stored in `paper_discoveries`.
+
+## Local research runtime
+
+The research workspace is backed by two additional apps:
+
+- `apps/research-api` — creates research episodes, stores their state in MongoDB, and enqueues work in Redis.
+- `apps/research-worker` — retrieves OpenAlex literature, runs the openJiuwen SwarmFlow research team with per-role models and independent Lean checks, and writes graph nodes, attempts, results, and artifacts back to MongoDB.
+
+WorkSwarm orchestrates every research episode. Choose a model or Devin agent for each role in the dashboard. Credentials stay server-side; see [provider setup and challenge notes](docs/openjiuwen-challenge.md). Devin runs only when assigned to a role, and its structured findings feed the shared workflow.
+
+Run the services in separate terminals:
 
 ```bash
-cd frontend
-npm install
-npm run dev          # http://localhost:5173, proxies /public and /private to :8000
+cp .env.example .env
+pnpm db:up
+pnpm research:api
+pnpm research:worker
+pnpm --filter web dev
 ```
 
-Then in the UI click **Research controls**, enter `dev-owner-key`, **Load seed atlas**, create
-a portfolio and a campaign, and press **Run scheduler tick** a few times. The mock provider
-returns deterministic role-dependent structured output, so you can watch generations branch,
-get culled and promoted without spending anything. `curl` equivalent:
-
-```bash
-K='X-API-Key: dev-owner-key'
-curl -X POST -H "$K" localhost:8000/private/seed
-PF=$(curl -s -X POST -H "$K" -H 'Content-Type: application/json' \
-     -d '{"name":"pilot","max_concurrent_sessions":2}' localhost:8000/private/portfolios | jq -r .id)
-PR=$(curl -s localhost:8000/public/problems/goldbach-conjecture | jq -r .problem.record_id)
-curl -X POST -H "$K" -H 'Content-Type: application/json' \
-     -d "{\"portfolio_id\":\"$PF\",\"problem_id\":\"$PR\",\"session_budget\":10,\"default_mode\":\"fusion\"}" \
-     localhost:8000/private/campaigns
-for i in $(seq 30); do curl -s -X POST -H "$K" localhost:8000/private/scheduler/tick >/dev/null; done
-curl -s localhost:8000/public/graph | jq '.links | group_by(.layer) | map({(.[0].layer): length})'
-```
-
-Or with Docker: `docker compose up --build` (backend on :8000, frontend on :5173).
-
-### Growing the atlas
-
-The seed is 27 hand-checked problems. `POST /private/atlas/import/wikipedia` bulk-imports the
-`== Unsolved problems ==` sections of Wikipedia's *List of unsolved problems in mathematics*
-(~500 entries; pass `{"dry_run": true}` to preview, `limit` to cap). Each entry becomes a
-`reported_open` problem with `origin="bulk_import"` and two *unreviewed* source assertions:
-the list page (with the section path it was listed under) and the linked article. Being
-listed is a dated claim, not a verified status; the `status_researcher` role and
-`POST /private/problems/{id}/review` exist to check it. Entries whose article URL is already
-asserted for an existing problem are skipped as duplicates, so re-running is idempotent and
-the hand-checked seed records win. `POST /private/atlas/import` accepts any document in the
-seed JSON format for other sources (Open Problem Garden, …).
-
-`POST /private/atlas/import/erdos` imports the Erdős problems from the status table in
-[teorth/erdosproblems](https://github.com/teorth/erdosproblems) (`data/problems.yaml`,
-Apache-2.0): by default the ~640 open-like entries (`open`, `falsifiable`, `verifiable`,
-`decidable`, …; `include_resolved` adds the rest as `resolved`). Every source state string is
-preserved verbatim as an assertion, dated with the table's `last_update`. The statement is the
-problem's own erdosproblems.com page text; where google-deepmind/formal-conjectures has a file,
-its main declaration (research-open part preferred over textbook/solved variants) is stored as
-`reference_formalization` — an *external* reference, never MathLab's approved `formal_target`.
-Re-running refreshes the text/reference of bulk-imported records without touching status,
-assertions or reviews.
-
-Status review is two-tier. A `status_researcher` session that returns a problem-level
-`literature_check` with `result: "refutes"` only *flags* the problem as `resolution_claimed`;
-the scheduler then pauses auto-planned campaigns on it so no more sessions are spent. Moving a
-problem to `resolved`, `disputed`, or back to `reported_open` is a collaborator decision via
-`POST /private/problems/{id}/review` (`status`, `note`, optional `assertion_ids`), which marks
-the checked source assertions `reviewed` and appends a dated, attributed entry to the
-publicly visible `status_reviews` history.
-
-## Turning on real Devin sessions
-
-Set these (environment or `backend/.env`, see `backend/.env.example`; never commit the key):
-
-| Variable | Meaning |
-|---|---|
-| `MATHLAB_DEVIN_PROVIDER=api` | switch from `mock` to the Devin v3 cloud API |
-| `MATHLAB_DEVIN_API_KEY` | organization service-user API key |
-| `MATHLAB_DEVIN_ORG_ID` | organization id used in `POST /v3/organizations/{org}/sessions` |
-| `MATHLAB_DEVIN_CREATE_AS_USER_ID` | optional; attributes sessions to that user's plan |
-| `MATHLAB_DEVIN_MAX_ACU_LIMIT` | default per-session ACU cap; campaign policy `max_acu_limit` / `role_acu_limits` override it (formalizers default to 15) |
-| `MATHLAB_PUBLIC_BASE_URL` | URL Devin sessions can reach to call `/worker/*` back. `localhost` only works for the mock provider; for cloud sessions expose the backend (e.g. `cloudflared tunnel --url http://localhost:8000` gives a temporary URL — fine for pilots, not production hosting). Without reachability sessions still work via structured output only. |
-| `MATHLAB_SCHEDULER_ENABLED=true` | run the scheduler loop in-process every `MATHLAB_SCHEDULER_INTERVAL_SECONDS` |
-| `MATHLAB_OWNER_API_KEY` | **change from the default before exposing the API** |
-
-Modes (`normal`, `fast`, `lite`, `ultra`, `fusion`) are passed through verbatim as `devin_mode`
-and stored as `requested_mode`; whatever the API reports back is stored separately as
-`reported_mode`. Nothing is silently downgraded. Per-assignment mode choice and a
-`comparison_group` tag support the Fusion-vs-Ultra pilot from the plan (§6.4); the first
-matched pair is recorded in `docs/pilot-fusion-vs-ultra.md` and motivates the default
-`role_modes` policy (Ultra for generation/critique/formalization, Fusion for tool-heavy
-experimenter and status-research roles).
-
-Worker output is accepted with worker-local ids (`I1`, `C1`, …) and resolved to lab records;
-evidence that resolves to nothing is kept in `attempt.result["unattached_evidence"]` along
-with the raw output, and `target: "problem"` attaches literature/status evidence to the
-problem itself. `POST /private/attempts/{id}/reingest` replays a stored result idempotently
-after a resolver fix.
-
-With a live provider every scheduler tick may create sessions billed to the attributed account;
-the UI shows a warning when the provider is not `mock`.
-
-## Lean checker
-
-`lean/` is a Lake project pinned to `leanprover/lean4:v4.24.0` with Mathlib `v4.24.0` as a
-dependency. Install [elan](https://github.com/leanprover/elan), then
-`cd lean && lake exe cache get && lake build` (the Mathlib cache is ~6 GB). The checker:
-
-1. statically rejects `sorry`, `sorryAx`, `axiom`, `unsafe`, `implemented_by`, `extern`,
-   `native_decide`, and any declaration whose name/signature differs from the approved target;
-2. compiles the submission inside the project and runs `#print axioms` on the target;
-3. records toolchain, project hash, elapsed time and full log as `Evidence.details`.
-
-If Lean is not installed the checker records a `checker_unavailable` blocker; it never
-pretends to verify. `MATHLAB_LEAN_PROJECT_DIR=""` disables it explicitly.
-
-### Formalization stage
-
-After each cull the scheduler gives every promoted (or best surviving unrefuted) idea one
-`prover_formalizer` pass before the next generation branches from it. The formalizer is told
-to prove the problem's approved formal target exactly if one exists, otherwise the strongest
-*smaller* faithful statement (a lemma, finite case, equivalence or reduction), and it can
-iterate against the lab's own checker with `POST /worker/attempts/{id}/lean-check` (a dry run;
-nothing is recorded). Only the final `lean_attempt` artifact is checked for real, and the
-public evidence carries `check_status`, `approved_target`, `target_origin`
-(`problem_formal_target` vs `worker_proposed`) and `toolchain` so readers can tell a verified
-sub-lemma from a verified solution of the stated problem. A worker never certifies its own
-work.
-
-## Development
-
-```bash
-cd backend && ruff check app tests && ruff format --check app tests && mypy app && pytest
-cd frontend && npm run typecheck && npm test && npm run build
-```
-
-The backend suite includes a real Lean round-trip (skipped when the toolchain is absent).
-Frontend tests (vitest) cover the palette (evidence-status colouring, never worker self-reports)
-and the API clients (public calls carry no credentials; the private key travels only as
-`X-API-Key`).
-SQLite is the default database; set `MATHLAB_DATABASE_URL` to a PostgreSQL URL for deployment.
-
-### Restoring a research snapshot
-
-`snapshots/` holds dated copies of the live SQLite database plus the `artifacts/` tree
-(Lean sources, checker logs, experiment outputs) from real runs. To resume from one:
-
-```bash
-cp snapshots/mathlab-2026-09-19.db backend/mathlab.db
-cp -r snapshots/artifacts backend/artifacts
-```
-
-Collaborator keys are stored hashed, so the owner key comes from `MATHLAB_OWNER_API_KEY` as
-usual; attempts still marked running belong to sessions of the account that launched them
-and are reconciled or timed out by the scheduler on the next tick.
-
-## API surface
-
-| Prefix | Auth | Purpose |
-|---|---|---|
-| `GET /public/areas, /problems, /problems/{slug}, /ideas/{id}, /graph, /events, /labels` | none | published projection only |
-| `POST /private/seed, /problems, /portfolios, /campaigns, /campaigns/{id}/assignments, /scheduler/tick …` | `X-API-Key` | research controls (owner or collaborator) |
-| `POST /private/collaborators, /publications/{id}/withdraw` | owner key | account and retraction controls |
-| `GET /worker/attempts/{id}/context`, `POST /worker/attempts/{id}/lean-check`, `POST /worker/attempts/{id}/submit` | `X-Worker-Token` | what a Devin session calls back into (context incl. Lean environment, dry-run checker, final submission) |
-
-## Status
-
-Phase 0–1 of the plan: atlas + research loop + Lean checker (Mathlib) + formalization stage +
-automatic publication + 3D explorer, validated against the deterministic mock provider, one
-live Devin API smoke session and the matched Fusion vs Ultra pilot on the lonely runner
-conjecture (all ingested and auto-published with empirical/untested labels; no open conjecture
-has been solved and nothing is labelled verified without the checker). The atlas grows via
-the Wikipedia bulk import above (~480 problems, 30+ subareas). Not yet done: more import
-sources, source review workflow UI, an MCP tool server (the
-HTTP worker routes cover callbacks today), durable public hosting, PostgreSQL deployment
-manifests, and the adapters for external evolution engines listed in the plan.
+The web app proxies `/api/research/*` to `RESEARCH_API_URL` (default `http://localhost:3010`). A research job is not considered verified because a model says it is: when Lean is unavailable or rejects the generated file, the episode remains a candidate/blocked result and the checker detail is shown in the episode page. To enable independent verification, install Lean 4.19.0 and set `SWARM_LEAN_BIN` as described in the challenge notes.

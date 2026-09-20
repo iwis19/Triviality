@@ -1,0 +1,2 @@
+# Preserve imported research evidence byte-for-byte, including on Windows.
+external/norththehackers/snapshots/** -text -whitespace linguist-generated=true
