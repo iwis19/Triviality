@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import Link from "next/link";
 import { trihexagonalChatHref } from "@/lib/research-chat-links";
 import { trihexagonalDemo } from "@/lib/trihexagonal-demo";
@@ -13,7 +13,7 @@ import { DashboardTopbar } from "./dashboard-topbar";
 import { ProblemDataset } from "./problem-dataset";
 import { ModelSelect } from "@/components/model-select";
 import { ResearchStatusBadge } from "@/components/research-status-badge";
-import { createResearchJob, getResearchJobs, type ResearchJob, modelCatalog, defaultRoleModels, type RoleModels } from "@/lib/research-store";
+import { createResearchJob, getResearchJob, getResearchJobs, type ResearchJob, modelCatalog, defaultRoleModels, type RoleModels } from "@/lib/research-store";
 
 type ResearchForm = {
   title: string;
@@ -241,7 +241,7 @@ function ResearchDeployModal({
           <button aria-label="Close new research dialog" className="rounded-md p-1.5 text-black/45 transition hover:bg-black/5 hover:text-black" onClick={onClose} type="button"><IconX size={18} /></button>
         </div>
 
-        {loadingDemo ? <DemoLoadingProgress /> : <div className="min-h-0 flex-1 overflow-y-auto">
+        {loadingDemo ? <DemoLoadingProgress form={form} /> : <div className="min-h-0 flex-1 overflow-y-auto">
           <section className="grid gap-x-6 gap-y-5 border-b border-black/10 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
             <div className="grid min-h-full grid-rows-[auto_minmax(0,1fr)] gap-5">
               <label className="grid gap-1.5 text-sm font-medium">Title<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm font-normal outline-none transition focus:border-black/45" placeholder="e.g. Compactness methods in finite graph theory" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></label>
@@ -279,7 +279,27 @@ function ResearchDeployModal({
   );
 }
 
-function DemoLoadingProgress() {
+function DemoLoadingProgress({ form }: { form: ResearchForm }) {
+  const request = useRef<Promise<ResearchJob> | null>(null);
+  const [liveJob, setLiveJob] = useState<ResearchJob | null>(null);
+  const [liveError, setLiveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!trihexagonalDemo.liveResearchEnabled) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    request.current ??= createResearchJob({ ...form, problemSlug: undefined, demoRun: true,
+      tokenBudget: Math.min(form.tokenBudget, 10000), budget: 1, explorationRounds: 1 });
+    const poll = async (job: ResearchJob) => {
+      if (cancelled) return;
+      setLiveJob(job);
+      if (job.status === "running") timer = setTimeout(() => {
+        void getResearchJob(job.id).then(poll).catch((error: Error) => { if (!cancelled) setLiveError(error.message); });
+      }, 1000);
+    };
+    void request.current.then(poll).catch((error: Error) => { if (!cancelled) setLiveError(error.message); });
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [form]);
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
@@ -290,19 +310,24 @@ function DemoLoadingProgress() {
     return () => window.clearInterval(interval);
   }, []);
 
-  const stage = progress < 30 ? "Loading the problem…" : progress < 70 ? "Preparing the example…" : "Opening the result shortly…";
+  const stage = liveError ? "Live research unavailable; the saved example will still open." : liveJob ? liveJob.stage : trihexagonalDemo.liveResearchEnabled ? "Starting the research team…" : progress < 30 ? "Loading the problem…" : progress < 70 ? "Preparing the example…" : "Opening the result shortly…";
 
   return (
     <div className="min-h-0 overflow-y-auto px-6 py-12 sm:px-12 sm:py-16">
       <div className="mx-auto max-w-md">
         <span className="mb-5 inline-flex items-center gap-2 text-xs font-medium text-black/50"><span className="h-2 w-2 rounded-full bg-amber-400" />Example research</span>
         <h3 className="text-xl font-semibold tracking-tight">{trihexagonalDemo.title}</h3>
-        <p className="mt-3 text-sm leading-6 text-black/50">Your result will open automatically when ready.</p>
+        <p className="mt-3 text-sm leading-6 text-black/50">The saved example opens after 25 seconds, independently of this live run.</p>
         <div className="mt-8 flex items-center justify-between gap-4 text-sm">
           <p role="status" className="text-black/65">{stage}</p>
           <span className="tabular-nums text-black/45">{progress}%</span>
         </div>
-        <div role="progressbar" aria-label="Preparing example result" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="mt-3 h-2 overflow-hidden rounded-full bg-black/[0.06]">
+        {liveJob && <div className="mt-5 space-y-2 text-xs text-black/60">
+          <p>{liveJob.attempts.length} research attempts · {liveJob.literature.length} sources</p>
+          <p className="max-h-28 overflow-y-auto whitespace-pre-wrap">{liveJob.attempts.at(-1)?.result || liveJob.attempts.at(-1)?.strategy || "The team is working on the problem."}</p>
+          <p>Reported tokens: {(liveJob.events ?? []).reduce((sum, event) => sum + (event.type === "research.swarm.event" && event.payload.kind === "usage" && typeof event.payload.tokens === "number" ? event.payload.tokens : 0), 0).toLocaleString()}</p>
+        </div>}
+        <div role="progressbar" aria-label="Time until saved example opens" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="mt-3 h-2 overflow-hidden rounded-full bg-black/[0.06]">
           <div className="h-full rounded-full bg-amber-400 transition-[width] duration-150 ease-linear motion-reduce:transition-none" style={{ width: `${progress}%` }} />
         </div>
       </div>

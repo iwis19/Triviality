@@ -22,6 +22,8 @@ export async function runSwarm(
   onEvent: (event: Record<string, unknown>) => Promise<void>,
   onTool?: (request: Record<string, unknown>) => Promise<unknown>,
 ): Promise<SwarmResult> {
+  const deadline = typeof input.deadline_at === "number" ? input.deadline_at : undefined;
+  if (deadline !== undefined && deadline <= Date.now()) throw new Error("Demo window ended before the worker could start.");
   const environment = loadWorkerEnvironment();
   const python = environment.SWARM_PYTHON || resolve(repositoryRoot,
     process.platform === "win32" ? ".venv/Scripts/python.exe" : ".venv/bin/python");
@@ -29,15 +31,18 @@ export async function runSwarm(
     const child = spawn(python, [resolve(repositoryRoot, "apps/research-swarm/runner.py")], {
       cwd: repositoryRoot, env: { ...environment, PYTHONUNBUFFERED: "1" },
       stdio: ["pipe", "pipe", "pipe"], windowsHide: true,
+      detached: deadline !== undefined && process.platform !== "win32",
     });
     let result: SwarmResult | undefined;
     let error = "";
     let persistenceError: unknown;
     let pending = Promise.resolve();
     const timeout = setTimeout(() => {
-      error = "Research team exceeded SWARM_TIMEOUT_MS";
-      child.kill();
-    }, Number(environment.SWARM_TIMEOUT_MS || 900000));
+      error = deadline !== undefined ? "Demo stopped after its 25-second window. Partial activity is preserved." : "Research team exceeded SWARM_TIMEOUT_MS";
+      if (deadline !== undefined && process.platform !== "win32" && child.pid) {
+        try { process.kill(-child.pid, "SIGKILL"); } catch { child.kill("SIGKILL"); }
+      } else child.kill();
+    }, deadline !== undefined ? Math.max(1, deadline - Date.now()) : Number(environment.SWARM_TIMEOUT_MS || 900000));
     child.on("error", (cause) => { clearTimeout(timeout); reject(cause); });
     child.stderr.on("data", (chunk: Buffer) => { error = (error + chunk.toString()).slice(-4000); });
     const lines = createInterface({ input: child.stdout });

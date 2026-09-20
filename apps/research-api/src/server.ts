@@ -17,6 +17,7 @@ type CreateJobBody = {
   mode?: string;
   budget?: number;
   tokenBudget?: number;
+  demoRun?: boolean;
   explorationRounds?: number;
   stagnationThreshold?: number;
   leanStatement?: string;
@@ -214,6 +215,8 @@ app.post("/research/jobs", async (request: FastifyRequest<{ Body: CreateJobBody 
   let tokenBudget: number;
   try { tokenBudget = tokenBudgetForRequest(body.tokenBudget); }
   catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
+  if (body.demoRun !== undefined && typeof body.demoRun !== "boolean") return reply.code(400).send({ error: "demoRun must be a boolean" });
+  const demoDeadlineAt = body.demoRun ? new Date(Date.now() + 25000) : undefined;
   const explorationRounds = body.explorationRounds ?? 4;
   const stagnationThreshold = body.stagnationThreshold ?? 2;
   if (!Number.isInteger(explorationRounds) || explorationRounds < 1 || explorationRounds > 20) return reply.code(400).send({ error: "explorationRounds must be an integer from 1 to 20" });
@@ -228,7 +231,7 @@ app.post("/research/jobs", async (request: FastifyRequest<{ Body: CreateJobBody 
     atlasProblemId = atlasProblem._id;
   }
   await collections.researchProjects.insertOne({ _id: projectId, name: title, description: statement, status: "ACTIVE", createdAt: now, updatedAt: now });
-  await collections.researchEpisodes.insertOne({ _id: episodeId, projectId, title, objective: statement, status: "ACTIVE", area, orchestrator: "workswarm", roleModels, mode, budget, tokenBudget, explorationRounds, stagnationThreshold, branches: [], atlasProblemId, leanStatement: body.leanStatement?.trim() || undefined, stage: "Queued for research worker", progress: 2, createdAt: now, updatedAt: now });
+  await collections.researchEpisodes.insertOne({ _id: episodeId, projectId, title, objective: statement, status: "ACTIVE", area, orchestrator: "workswarm", roleModels, mode, budget, tokenBudget, ...(demoDeadlineAt ? { demoDeadlineAt } : {}), explorationRounds, stagnationThreshold, branches: [], atlasProblemId, leanStatement: body.leanStatement?.trim() || undefined, stage: "Queued for research worker", progress: 2, createdAt: now, updatedAt: now });
   await collections.researchProblems.insertOne({ _id: problemId, episodeId, title, statement, assumptions: "", status: "ACTIVE", createdAt: now, updatedAt: now });
 
   try {
@@ -245,7 +248,7 @@ app.post("/research/jobs", async (request: FastifyRequest<{ Body: CreateJobBody 
 
 app.get("/research/jobs", async () => {
   const collections = await getCollections();
-  const episodes = await collections.researchEpisodes.find({}).sort({ createdAt: -1 }).toArray();
+  const episodes = await collections.researchEpisodes.find({ demoDeadlineAt: { $exists: false } }).sort({ createdAt: -1 }).toArray();
   return (await Promise.all(episodes.map((episode) => serializeJob(episode._id)))).filter(Boolean);
 });
 

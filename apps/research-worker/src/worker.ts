@@ -118,7 +118,7 @@ async function runEpisode(episodeId: string): Promise<void> {
   try {
     await addGraphNode(episodeId, problem._id, "RESEARCH_PROBLEM", "Research space", `${episode.area ?? "Mathematics"} · ${episode.title}`, 50, 13, "active");
     await updateStage(episodeId, "Finding seed literature for the research space", 14);
-    const works = await fetchLiterature(episode.title, problem.statement, episode.area ?? "Mathematics").catch(async (error) => {
+    const works = episode.demoDeadlineAt ? [] : await fetchLiterature(episode.title, problem.statement, episode.area ?? "Mathematics").catch(async (error) => {
       await emit(episodeId, "research.literature.unavailable", { message: "Literature lookup unavailable; continuing with explicitly uncited mathematical reasoning" });
       return [] as LiteratureHit[];
     });
@@ -151,6 +151,7 @@ async function runEpisode(episodeId: string): Promise<void> {
         lean_statement: episode.leanStatement ?? "", proof_attempts: Math.min(6, episode.budget ?? 4),
         role_models: episode.roleModels,
         token_budget: episode.tokenBudget,
+        deadline_at: episode.demoDeadlineAt?.getTime(),
         exploration_rounds: episode.explorationRounds ?? 4, stagnation_threshold: episode.stagnationThreshold ?? 2,
         literature: works.map((work, index) => ({ id: paperIds[index], title: work.title, year: work.publication_year,
           abstract: abstractFromIndex(work.abstract_inverted_index), url: work.primary_location?.landing_page_url ?? work.id })),

@@ -37,6 +37,7 @@ export interface ResearchEpisodeDocument extends BaseDocument {
   mode?: string;
   budget?: number;
   tokenBudget?: number;
+  demoDeadlineAt?: Date;
   explorationRounds?: number;
   stagnationThreshold?: number;
   branches?: unknown[];

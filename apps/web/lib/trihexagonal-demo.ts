@@ -1,6 +1,6 @@
 import { trihexagonalChatHref } from "./research-chat-links";
 
-// This demo opens the existing published proof without creating a research job.
+// Temporary live preview: set liveResearchEnabled to false to restore the loading-only demo.
 export const trihexagonalDemo = {
   id: "demo:trihexagonal-shell",
   slug: "trihexagonal-shell-demo",
@@ -9,4 +9,5 @@ export const trihexagonalDemo = {
   area: "Combinatorics",
   proofUrl: trihexagonalChatHref,
   delayMs: 25000,
+  liveResearchEnabled: true,
 };
