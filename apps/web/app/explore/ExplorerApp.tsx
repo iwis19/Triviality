@@ -5,7 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, Search, X, Menu } from "lucide-react";
+import { ArrowUpRight, BookOpen, Search, X, Menu } from "lucide-react";
 import { TrivialityLogo } from "@/components/triviality-logo";
 import { TextFlippingBoard } from "@/components/ui/text-flipping-board";
 import { LAYERS, publicApi, type Area, type Graph, type GraphNode, type Problem, type ProblemDetail } from "./api";
@@ -123,6 +123,7 @@ export default function ExplorerApp({ intro = false }: { intro?: boolean }) {
         <button className="menu-toggle" aria-label="Toggle problem browser" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}><Menu size={18} /></button>
         <TrivialityLogo />
         <div className="atlas-search"><Search size={16} aria-hidden="true" /><input id="atlas-search" aria-label="Search problems" placeholder="Search mathematical problems…" value={search} onChange={e => { setSearch(e.target.value); if (e.target.value) setMenuOpen(true); }} />{search && <button aria-label="Clear search" onClick={() => setSearch("")}><X size={14} /></button>}</div>
+        <Link aria-label="Proofs" className="proofs-link" href="/proofs/trihexagonal-shell"><BookOpen size={15} /><span>Proofs</span></Link>
         <Link className="workspace-link" href="/dashboard">Workspace <ArrowUpRight size={15} /></Link>
       </header>
       {error && <div className="error" role="alert">Could not load the atlas. <button onClick={() => setRefreshKey(k => k + 1)}>Try again</button></div>}

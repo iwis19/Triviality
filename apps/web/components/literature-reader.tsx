@@ -57,7 +57,9 @@ export function LiteratureReader({ paper }: { paper: LiteraturePaper }) {
                 <span>{paper.category}</span>
               </div>
               <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.04em] sm:text-4xl">{paper.title}</h1>
-              <p className="mt-5 text-xs text-black/55"><span className="text-black/75">{paper.authors}</span></p>
+              <p className="mt-5 text-xs text-black/55"><span className="text-black/75">{paper.authors}</span>{paper.source ? ` · ${paper.source}` : ""}</p>
+              {paper.verification && <div className="mt-6 rounded-2xl border border-emerald-900/15 bg-emerald-50/60 px-5 py-4"><p className="text-sm font-semibold text-emerald-950">{paper.verification.label}</p><p className="mt-1 text-xs leading-5 text-emerald-950/65">{paper.verification.detail}</p></div>}
+              {paper.artifacts && paper.artifacts.length > 0 && <div className="mt-5 flex flex-wrap gap-2">{paper.artifacts.map((artifact) => <a className="rounded-full border border-black/15 px-4 py-2 text-xs font-medium transition hover:border-black/35 hover:bg-black/[.025]" href={artifact.href} key={artifact.href}>{artifact.label}</a>)}</div>}
             </header>
 
             <div className="mx-auto mt-12 max-w-[820px] text-left">
@@ -77,6 +79,7 @@ export function LiteratureReader({ paper }: { paper: LiteraturePaper }) {
                       ul: ({ children }) => <ul className="mt-5 list-disc space-y-2 pl-6 text-[15px] leading-7 text-black/75 sm:text-base sm:leading-8">{children}</ul>,
                       ol: ({ children }) => <ol className="mt-5 list-decimal space-y-2 pl-6 text-[15px] leading-7 text-black/75 sm:text-base sm:leading-8">{children}</ol>,
                       code: ({ children }) => <code className="rounded bg-black/[.05] px-1.5 py-0.5 font-mono text-[0.86em]">{children}</code>,
+                      pre: ({ children }) => <pre className="mt-6 max-h-[38rem] overflow-auto rounded-xl border border-black/10 bg-[#f7f7f5] p-5 text-xs leading-6">{children}</pre>,
                     }}
                   >{`## ${section.title}\n\n${section.markdown}`}</ReactMarkdown>
                 </section>

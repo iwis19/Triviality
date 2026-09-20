@@ -248,6 +248,54 @@ app.get("/research/jobs/:jobId", async (request: FastifyRequest<{ Params: { jobI
   return job ? job : reply.code(404).send({ error: "Research job not found" });
 });
 
+app.delete("/research/jobs/:jobId", async (request: FastifyRequest<{ Params: { jobId: string } }>, reply) => {
+  const episodeId = request.params.jobId;
+  const collections = await getCollections();
+  const episode = await collections.researchEpisodes.findOne({ _id: episodeId });
+  if (!episode) return reply.code(404).send({ error: "Research chat not found" });
+
+  // Remove the episode first so a queued worker cannot begin deleted work. Public
+  // atlas publications remain intact; deleting a chat only removes its workspace history.
+  await collections.researchEpisodes.deleteOne({ _id: episodeId });
+  await Promise.all([
+    collections.researchProjects.deleteOne({ _id: episode.projectId }),
+    collections.researchProblems.deleteMany({ episodeId }),
+    collections.researchHypotheses.deleteMany({ episodeId }),
+    collections.researchAttempts.deleteMany({ episodeId }),
+    collections.researchResults.deleteMany({ episodeId }),
+    collections.researchEvents.deleteMany({ episodeId }),
+    collections.researchDiscoveries.deleteMany({ episodeId }),
+    collections.formalizations.deleteMany({ episodeId }),
+    collections.claims.deleteMany({ episodeId }),
+    collections.papers.updateMany(
+      { "rawMetadata.episodeIds": episodeId },
+      { $pull: { "rawMetadata.episodeIds": episodeId } },
+    ),
+    collections.papers.updateMany(
+      { "rawMetadata.episodeId": episodeId },
+      { $unset: { "rawMetadata.episodeId": "" } },
+    ),
+    collections.graphNodes.updateMany(
+      { "metadata.episodeIds": episodeId },
+      { $pull: { "metadata.episodeIds": episodeId } },
+    ),
+    collections.graphNodes.updateMany(
+      { "metadata.episodeId": episodeId },
+      { $unset: { "metadata.episodeId": "" } },
+    ),
+    collections.graphRelationships.updateMany(
+      { "metadata.episodeIds": episodeId },
+      { $pull: { "metadata.episodeIds": episodeId } },
+    ),
+    collections.graphRelationships.updateMany(
+      { "metadata.episodeId": episodeId },
+      { $unset: { "metadata.episodeId": "" } },
+    ),
+  ]);
+
+  return { deleted: true };
+});
+
 app.get("/research/jobs/:jobId/events", async (request: FastifyRequest<{ Params: { jobId: string } }>) => {
   const collections = await getCollections();
   return collections.researchEvents.find({ episodeId: request.params.jobId }).sort({ createdAt: 1 }).toArray();

@@ -13,5 +13,13 @@ export type LiteraturePaper = {
   subtitle: string;
   authors: string;
   source: string;
+  verification?: {
+    label: string;
+    detail: string;
+  };
+  artifacts?: Array<{
+    label: string;
+    href: string;
+  }>;
   sections: LiteratureSection[];
 };

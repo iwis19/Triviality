@@ -137,6 +137,10 @@ export function createResearchJob(input: { title: string; statement: string; are
   return request<ResearchJob>("", { method: "POST", body: JSON.stringify(input) });
 }
 
+export function deleteResearchJob(id: string): Promise<{ deleted: true }> {
+  return request<{ deleted: true }>(`/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
 export function getResearchStats(jobs: ResearchJob[]): { total: number; running: number; verified: number; literature: number } {
   return {
     total: jobs.length,

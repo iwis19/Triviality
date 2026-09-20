@@ -3,20 +3,13 @@
 import { Suspense, useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { IconArrowUpRight, IconChevronDown, IconChevronRight, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
+import { IconChevronDown, IconChevronRight, IconMessage, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
 import { motion } from "motion/react";
 import { publicApi } from "../explore/api";
 import { DashboardSidebar } from "./dashboard-sidebar";
 import { DashboardTopbar } from "./dashboard-topbar";
 import { ModelSelect } from "@/components/model-select";
-import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
-import { createResearchJob, getResearchJobs, type ResearchJob, type ResearchProvider, modelCatalog, defaultRoleModels, type RoleModels } from "@/lib/research-store";
-
-const providers: Array<{ id: ResearchProvider; name: string; description: string; logo: string }> = [
-  { id: "openai", name: "OpenAI", description: "Hypotheses, synthesis, and formalization.", logo: "https://models.dev/logos/openai.svg" },
-  { id: "devin", name: "Devin", description: "Autonomous research agents and critique.", logo: "https://devin.ai/favicon.ico" },
-
-];
+import { createResearchJob, getResearchJobs, type ResearchJob, modelCatalog, defaultRoleModels, type RoleModels } from "@/lib/research-store";
 
 type ResearchForm = {
   title: string;
@@ -50,6 +43,8 @@ export default function DashboardPage() {
 function DashboardContent() {
   const searchParams = useSearchParams();
   const sourceProblem = searchParams.get("problem");
+  const areaFilter = searchParams.get("area");
+  const startNewResearch = searchParams.get("new") === "1";
   const router = useRouter();
   const [jobs, setJobs] = useState<ResearchJob[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -82,14 +77,18 @@ function DashboardContent() {
 
   const closeModal = () => {
     setModalOpen(false);
-    if (sourceProblem) router.replace("/dashboard", { scroll: false });
+    setForm(initialForm);
+    setSubmitError(null);
+    if (sourceProblem || startNewResearch) router.replace("/dashboard", { scroll: false });
   };
 
   const filteredJobs = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return jobs;
-    return jobs.filter((job) => `${job.title} ${job.statement} ${job.area} ${job.orchestrator ?? job.provider}`.toLowerCase().includes(normalized));
-  }, [jobs, query]);
+    return jobs.filter((job) =>
+      (!areaFilter || job.area === areaFilter) &&
+      (!normalized || `${job.title} ${job.statement} ${job.area} ${job.orchestrator ?? job.provider}`.toLowerCase().includes(normalized)),
+    );
+  }, [jobs, query, areaFilter]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -106,26 +105,56 @@ function DashboardContent() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col bg-[#f5f5f5] text-[#111] md:flex-row">
-      <DashboardSidebar />
-      <div className="min-w-0 flex-1">
-        <DashboardTopbar page="Overview" />
-        <section className="mx-auto max-w-7xl px-6 py-10 sm:px-10 lg:px-14 lg:py-14">
-          <div className="flex flex-col justify-between gap-8 border-b border-black/10 pb-10 lg:flex-row lg:items-end">
-            <div>
-              <HoverBorderGradient containerClassName="rounded-md" className="flex items-center gap-2 rounded-[inherit] bg-black px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-white" duration={1.2} onClick={() => { setForm(initialForm); setSubmitError(null); setModalOpen(true); }}><IconPlus size={14} /> New research</HoverBorderGradient>
+    <main className="flex min-h-dvh flex-col bg-white text-[#202020] md:flex-row">
+      <DashboardSidebar jobs={jobs} onDeleted={(id) => setJobs((current) => current.filter((job) => job.id !== id))} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <DashboardTopbar page={areaFilter ?? "Research workspace"} />
+        <section className="flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-3xl px-5 py-10 sm:px-8 lg:py-16">
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <h1 className="text-3xl font-semibold tracking-[-0.05em]">{areaFilter ?? "Research chats"}</h1>
+                <p className="mt-2 text-sm leading-6 text-black/50">Continue an investigation or begin a new mathematical research session.</p>
+              </div>
+              <button
+                type="button"
+                className="hidden shrink-0 items-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-medium text-white transition hover:bg-black/75 sm:flex"
+                onClick={() => { setForm(initialForm); setSubmitError(null); setModalOpen(true); }}
+              >
+                <IconPlus size={17} />
+                New chat
+              </button>
             </div>
-            <label className="relative block w-full sm:w-72 lg:ml-auto"><IconSearch className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-black/35" size={16} /><input className="h-11 w-full rounded-xl border border-black/12 bg-white pl-10 pr-4 text-sm outline-none transition placeholder:text-black/35 focus:border-black/40" placeholder="Search research" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
+
+            <label className="relative mt-8 block">
+              <IconSearch className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-black/35" size={17} />
+              <input
+                className="h-12 w-full rounded-2xl border border-black/10 bg-[#f7f7f8] pl-11 pr-4 text-sm outline-none transition placeholder:text-black/35 focus:border-black/25 focus:bg-white"
+                placeholder="Search chats"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </label>
+
+            {error && <div className="mt-5 rounded-xl border border-red-900/15 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</div>}
+
+            <section className="mt-10" id="jobs">
+              <p className="mb-3 px-2 text-xs font-medium text-black/45">Recent</p>
+              {filteredJobs.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-black/15 px-6 py-16 text-center">
+                  <IconMessage className="mx-auto text-black/25" size={28} />
+                  <p className="mt-4 text-sm text-black/45">{jobs.length === 0 ? "No research chats yet." : "No matching chats."}</p>
+                  <button className="mt-5 text-sm font-medium underline underline-offset-4" onClick={() => setModalOpen(true)} type="button">Start a new research chat</button>
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-2xl border border-black/8 bg-white">
+                  {filteredJobs.map((job) => <EpisodeRow key={job.id} job={job} />)}
+                </div>
+              )}
+            </section>
           </div>
-
-          {error && <div className="mt-5 rounded-xl border border-red-900/15 bg-red-50 px-4 py-3 text-sm text-red-900">{error}</div>}
-
-          <section className="mt-8" id="jobs">
-            <div className="mb-5 flex items-end justify-between gap-6"><h1 className="text-xl font-semibold tracking-[-0.04em]">Research</h1><Link className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-black/45 hover:text-black" href="/dashboard/graph">Research graph <IconArrowUpRight size={14} /></Link></div>
-            {filteredJobs.length === 0 ? <div className="rounded-lg border border-dashed border-black/15 px-6 py-14 text-center text-sm text-black/45">{jobs.length === 0 ? "No research yet." : "No matching research."}</div> : <div className="grid gap-3">{filteredJobs.map((job) => <EpisodeRow key={job.id} job={job} />)}</div>}
-          </section>
         </section>
-        {modalOpen && <ResearchDeployModal form={form} setForm={setForm} creating={creating} error={submitError} onClose={closeModal} onSubmit={submit} />}
+        {(modalOpen || startNewResearch) && <ResearchDeployModal form={form} setForm={setForm} creating={creating} error={submitError} onClose={closeModal} onSubmit={submit} />}
       </div>
     </main>
   );
@@ -157,31 +186,28 @@ function ResearchDeployModal({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          <section className="border-b border-black/10 p-5 sm:p-6">
-            <h3 className="text-base font-semibold">Models by role</h3>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              {modelCatalog.roles.map((role) => <div key={role.id} className="grid content-start gap-1.5">
-                <ModelSelect label={role.label} value={form.roleModels[role.id]} onChange={(value) => setForm((current) => ({ ...current, roleModels: { ...current.roleModels, [role.id]: value } }))} />
-                <span className="text-xs font-normal leading-5 text-black/45">{role.description}</span>
-              </div>)}
-            </div>
-          </section>
-
-          <section className="grid gap-4 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
-              {<button type="button" className="w-fit text-sm underline underline-offset-4 lg:col-span-2" onClick={() => setForm((current) => ({ ...current, problemSlug: undefined, title: "Addition preserves order", statement: "Prove that adding the same natural number to both sides preserves an inequality. Explore a direct arithmetic proof and independently examine the assumptions and possible counterexamples.", area: "Number theory", leanStatement: "(a b c : Nat) (h : a ≤ b) : a + c ≤ b + c", budget: 2 }))}>Use example</button>}
-            <div className="grid gap-4">
+          <section className="grid gap-x-6 gap-y-5 border-b border-black/10 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
+            <div className="grid min-h-full grid-rows-[auto_minmax(0,1fr)] gap-5">
               <label className="grid gap-1.5 text-sm font-medium">Title<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm font-normal outline-none transition focus:border-black/45" placeholder="e.g. Compactness methods in finite graph theory" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></label>
-              <label className="grid gap-1.5 text-sm font-medium">Problem<textarea required className="min-h-24 resize-y rounded-md border border-black/12 bg-white px-3.5 py-2.5 text-sm font-normal leading-6 outline-none transition focus:border-black/45" placeholder="What do you want to prove?" value={form.statement} onChange={(event) => setForm((current) => ({ ...current, statement: event.target.value }))} /></label>
+              <label className="grid min-h-0 grid-rows-[auto_minmax(8rem,1fr)] gap-1.5 text-sm font-medium">Problem<textarea required className="h-full min-h-32 resize-y rounded-md border border-black/12 bg-white px-3.5 py-2.5 text-sm font-normal leading-6 outline-none transition focus:border-black/45" placeholder="What do you want to prove?" value={form.statement} onChange={(event) => setForm((current) => ({ ...current, statement: event.target.value }))} /></label>
             </div>
             <div className="grid content-start gap-4">
               <FieldSelect label="Area" value={form.area} onChange={(value) => setForm((current) => ({ ...current, area: value }))} options={Array.from(new Set([form.area, "Algebra", "Analysis", "Combinatorics", "Geometry", "Logic", "Number theory", "Topology"]))} />
 
               <label className="grid gap-1.5 text-sm font-medium">Proof attempts (1-6)<input className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm font-normal outline-none" min={1} max={6} type="number" value={form.budget} onChange={(event) => setForm((current) => ({ ...current, budget: Number(event.target.value) }))} /></label>
-              <label className="grid gap-1.5 text-sm font-medium">Exploration rounds (1–20)<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm" min={1} max={20} type="number" value={form.explorationRounds} onChange={(event) => setForm((current) => ({ ...current, explorationRounds: Number(event.target.value) }))} /><span className="text-xs font-normal text-black/50">Three researchers explore each round. A checked proof ends the run early.</span></label>
-              <label className="grid gap-1.5 text-sm font-medium">Stagnation limit (1–6)<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm" min={1} max={6} type="number" value={form.stagnationThreshold} onChange={(event) => setForm((current) => ({ ...current, stagnationThreshold: Number(event.target.value) }))} /><span className="text-xs font-normal text-black/50">Unproductive exchanges before restarting a branch. A refuted foundation can restart immediately.</span></label>
+              <label className="grid gap-1.5 text-sm font-medium">Exploration rounds (1–20)<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm" min={1} max={20} type="number" value={form.explorationRounds} onChange={(event) => setForm((current) => ({ ...current, explorationRounds: Number(event.target.value) }))} /></label>
+              <label className="grid gap-1.5 text-sm font-medium">Stagnation limit (1–6)<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm" min={1} max={6} type="number" value={form.stagnationThreshold} onChange={(event) => setForm((current) => ({ ...current, stagnationThreshold: Number(event.target.value) }))} /></label>
+            </div>
+            <button type="button" className="w-fit text-sm underline underline-offset-4 lg:col-span-2" onClick={() => setForm((current) => ({ ...current, problemSlug: undefined, title: "Addition preserves order", statement: "Prove that adding the same natural number to both sides preserves an inequality. Explore a direct arithmetic proof and independently examine the assumptions and possible counterexamples.", area: "Number theory", leanStatement: "(a b c : Nat) (h : a ≤ b) : a + c ≤ b + c", budget: 2 }))}>Use example</button>
+          </section>
+
+          <section className="border-b border-black/10 p-5 sm:p-6">
+            <h3 className="text-base font-semibold">Models by role</h3>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              {modelCatalog.roles.map((role) => <ModelSelect key={role.id} label={role.label} value={form.roleModels[role.id]} onChange={(value) => setForm((current) => ({ ...current, roleModels: { ...current.roleModels, [role.id]: value } }))} />)}
             </div>
           </section>
-        {<label className="grid gap-2 border-t border-black/10 px-6 py-4 text-sm font-medium">Exact Lean target (optional)<textarea className="min-h-16 rounded-md border border-black/12 p-3 font-mono text-xs" value={form.leanStatement} onChange={(event) => setForm((current) => ({ ...current, leanStatement: event.target.value }))} placeholder="(a b c : Nat) (h : a ≤ b) : a + c ≤ b + c" /><span className="text-xs font-normal text-black/50">Without a supplied target, a checked formalization still needs your review of the mathematical statement.</span></label>}
+        <label className="grid gap-2 border-t border-black/10 px-6 py-4 text-sm font-medium">Exact Lean target (optional)<textarea className="min-h-16 rounded-md border border-black/12 p-3 font-mono text-xs" value={form.leanStatement} onChange={(event) => setForm((current) => ({ ...current, leanStatement: event.target.value }))} placeholder="(a b c : Nat) (h : a ≤ b) : a + c ≤ b + c" /></label>
         </div>
 
         <div className="flex flex-col gap-3 border-t border-black/10 bg-white px-5 py-3.5 sm:flex-row sm:items-center sm:justify-end sm:px-6">
@@ -201,11 +227,24 @@ function FieldSelect({ label, value, onChange, options, displayOptions }: { labe
   return <label className="grid gap-1.5 text-sm font-medium">{label}<span className="relative"><select className="h-11 w-full appearance-none rounded-md border border-black/12 bg-white px-3.5 pr-9 text-sm font-normal outline-none focus:border-black/45" value={value} onChange={(event) => onChange(event.target.value)}>{values.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select><IconChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-black/50" size={16} /></span></label>;
 }
 
-function providerFor(provider?: ResearchProvider) {
-  return providers.find((item) => item.id === provider) ?? providers[0];
-}
-
 function EpisodeRow({ job }: { job: ResearchJob }) {
-  const modelCount = job.roleModels ? new Set(Object.values(job.roleModels)).size : 0;
-  return <Link className="block overflow-hidden rounded-sm border border-black/10 bg-white" href={`/dashboard/research/${job.id}`}><div className="hidden gap-3 sm:grid border-b border-black/10 bg-[#fafafa] px-4 py-2.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40 sm:grid-cols-[minmax(16rem,1fr)_12rem_10rem_2.5rem]"><span>Name</span><span>Research team</span><span>Status</span><span /></div><div className="grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(16rem,1fr)_12rem_10rem_2.5rem] sm:items-center"><div className="min-w-0"><p className="truncate text-sm font-semibold tracking-[-0.02em]">{job.title}</p><p className="mt-1 truncate text-[11px] text-black/45">{job.statement}</p></div><div className="flex items-center gap-2.5"><span className="text-xs">{job.orchestrator === "workswarm" || job.provider === "huawei" ? "WorkSwarm" : providerFor(job.provider).name}<span className="mt-1 block text-[10px] text-black/45">{job.roleModels ? `${modelCount} ${modelCount === 1 ? "model" : "models"} · ${Object.keys(job.roleModels).length} roles` : "Legacy research"}</span></span></div><div><span className={`inline-flex rounded-md px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] ${job.status === "completed" ? "bg-black text-white" : job.status === "failed" ? "bg-red-50 text-red-900" : "bg-black/7 text-black/55"}`}>{job.status}</span><p className="mt-1.5 text-[10px] text-black/40">{job.status === "running" ? `${job.progress}% · ${job.stage}` : job.area}</p></div><IconChevronRight className="text-black/30" size={16} /></div></Link>;
+  return (
+    <Link
+      className="group flex items-center gap-4 border-b border-black/8 px-4 py-4 transition last:border-b-0 hover:bg-[#f7f7f8] sm:px-5"
+      href={`/dashboard/research/${job.id}`}
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[0.055] text-black/55">
+        <IconMessage size={17} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium">{job.title}</span>
+        <span className="mt-1 block truncate text-xs text-black/45">{job.statement}</span>
+      </span>
+      <span className="hidden shrink-0 text-right sm:block">
+        <span className="block text-xs capitalize text-black/55">{job.status}</span>
+        <span className="mt-1 block text-[10px] text-black/35">{job.area}</span>
+      </span>
+      <IconChevronRight className="shrink-0 text-black/25 transition group-hover:translate-x-0.5 group-hover:text-black/50" size={17} />
+    </Link>
+  );
 }
