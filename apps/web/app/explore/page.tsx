@@ -5,7 +5,7 @@ import dynamic from "next/dynamic";
 const ExplorerApp = dynamic(() => import("./ExplorerApp"), {
   ssr: false,
   loading: () => (
-    <div style={{ display: "grid", placeItems: "center", height: "100dvh", background: "#0b1020", color: "#9aa5bd" }}>
+    <div style={{ display: "grid", placeItems: "center", height: "100dvh", background: "#fafaf8", color: "#777" }}>
       Loading explorer…
     </div>
   ),

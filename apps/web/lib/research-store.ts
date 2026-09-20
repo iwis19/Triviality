@@ -129,7 +129,7 @@ export function getResearchJob(id: string): Promise<ResearchJob> {
   return request<ResearchJob>(`/${encodeURIComponent(id)}`);
 }
 
-export function createResearchJob(input: { title: string; statement: string; area: string; roleModels: RoleModels; mode: string; budget: number; leanStatement?: string }): Promise<ResearchJob> {
+export function createResearchJob(input: { title: string; statement: string; area: string; roleModels: RoleModels; mode: string; budget: number; leanStatement?: string; problemSlug?: string }): Promise<ResearchJob> {
   return request<ResearchJob>("", { method: "POST", body: JSON.stringify(input) });
 }
 

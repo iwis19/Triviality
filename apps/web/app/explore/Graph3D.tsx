@@ -104,12 +104,12 @@ export default function Graph3D({ nodes, links, selectedId, highlightIds, reduce
         width={size.width}
         height={size.height}
         graphData={data}
-        backgroundColor="#0b1020"
+        backgroundColor="#fafaf8"
         nodeThreeObject={nodeObject}
         nodeLabel={(n) => `<div class="tip"><b>${n.type}</b> ${escapeHtml(n.label)}${n.evidence_label ? `<br/><i>${escapeHtml(n.evidence_label)}</i>` : ""}</div>`}
         linkColor={(l) => LAYER_COLORS[l.layer]}
         linkWidth={(l) => (l.layer === "lineage" ? 1.4 : l.layer === "atlas" ? 0.6 : 1)}
-        linkOpacity={0.55}
+        linkOpacity={0.28}
         linkCurvature={(l) => (l.layer === "association" ? 0.35 : 0)}
         linkDirectionalParticles={reducedMotion ? 0 : (l) => (l.layer === "lineage" ? 2 : 0)}
         linkDirectionalParticleWidth={1.2}
