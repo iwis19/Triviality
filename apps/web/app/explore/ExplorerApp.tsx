@@ -26,9 +26,15 @@ export default function ExplorerApp({ intro = false }: { intro?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [introState, setIntroState] = useState(intro ? "playing" : "done");
-  const finishIntro = useCallback(() => setIntroState("fading"), []);
+  const finishIntro = useCallback(() => setIntroState("holding"), []);
   const detail = details[problemSlug] ?? null;
   const closeProblem = useCallback(() => { setProblemSlug(""); setSelected(null); }, []);
+
+  useEffect(() => {
+    if (introState !== "holding") return;
+    const timer = window.setTimeout(() => setIntroState("fading"), 1000);
+    return () => window.clearTimeout(timer);
+  }, [introState]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
