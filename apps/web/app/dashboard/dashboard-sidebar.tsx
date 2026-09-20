@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { trihexagonalChatHref } from "@/lib/research-chat-links";
 import { usePathname, useRouter } from "next/navigation";
 import {
   IconArrowLeft,
@@ -182,10 +183,10 @@ function SidebarContent({
           <div className="mt-2 space-y-0.5">
             {showPublishedProof && <div className="group flex items-center rounded-lg hover:bg-black/5">
               <Link
-                href="/dashboard/research/trihexagonal-shell"
+                href={trihexagonalChatHref}
                 onClick={onNavigate}
                 title={`Trihexagonal shell: a counterexample to the proposed bound · ${researchStatusPresentation.completed.label}`}
-                className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-2 text-sm ${pathname === "/dashboard/research/trihexagonal-shell" ? "bg-black/[0.07]" : ""}`}
+                className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-2 text-sm ${pathname === trihexagonalChatHref ? "bg-black/[0.07]" : ""}`}
               >
                 <span aria-label={researchStatusPresentation.completed.label} className={`h-1.5 w-1.5 shrink-0 rounded-full ${researchStatusPresentation.completed.dot}`} />
                 <span className="truncate">Trihexagonal shell counterexample</span>

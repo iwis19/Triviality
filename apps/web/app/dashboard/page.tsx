@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import Link from "next/link";
+import { trihexagonalChatHref } from "@/lib/research-chat-links";
 import { trihexagonalDemo } from "@/lib/trihexagonal-demo";
 import { useRouter, useSearchParams } from "next/navigation";
 import { IconChevronDown, IconChevronRight, IconMessage, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
@@ -192,7 +193,7 @@ function PublishedProofRow() {
   return (
     <Link
       className="group flex items-center gap-4 border-b border-black/8 px-4 py-4 transition last:border-b-0 hover:bg-[#f7f7f8] sm:px-5"
-      href="/dashboard/research/trihexagonal-shell"
+      href={trihexagonalChatHref}
     >
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[0.055] text-black/55">
         <IconMessage size={17} />

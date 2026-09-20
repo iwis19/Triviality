@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
+import { trihexagonalChatHref } from "@/lib/research-chat-links";
 
-export default function TrihexagonalShellProofPage() {
-  redirect("/dashboard/research/trihexagonal-shell");
+export default function LegacyResearchPage() {
+  redirect(trihexagonalChatHref);
 }

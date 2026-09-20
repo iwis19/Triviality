@@ -1,3 +1,5 @@
+import { trihexagonalChatHref } from "./research-chat-links";
+
 // This local demo opens the existing published proof without creating a research job.
 export const trihexagonalDemo = {
   id: "demo:trihexagonal-shell",
@@ -5,6 +7,6 @@ export const trihexagonalDemo = {
   title: "Trihexagonal shell: a counterexample to the proposed bound",
   statement: "A connected 23-cell shell enclosing a connected 31-cell hole.",
   area: "Combinatorics",
-  proofUrl: "http://localhost:3001/dashboard/research/trihexagonal-shell",
+  proofUrl: trihexagonalChatHref,
   delayMs: 3000,
 };
