@@ -8,5 +8,5 @@ export const trihexagonalDemo = {
   statement: "A connected 23-cell shell enclosing a connected 31-cell hole.",
   area: "Combinatorics",
   proofUrl: trihexagonalChatHref,
-  delayMs: 3000,
+  delayMs: 25000,
 };

@@ -230,17 +230,18 @@ function ResearchDeployModal({
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const loadingDemo = creating && form.problemSlug === trihexagonalDemo.slug;
   return (
     <motion.div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 p-3 backdrop-blur-[2px] sm:p-5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} role="dialog" aria-modal="true" aria-labelledby="deploy-research-title">
       <motion.form className="flex max-h-[calc(100vh-1.5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-black/10 bg-white shadow-2xl sm:max-h-[calc(100vh-2.5rem)]" initial={{ opacity: 0, scale: 0.97, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} onSubmit={onSubmit}>
         <div className="flex items-start justify-between border-b border-black/10 px-5 py-4 sm:px-6">
           <div>
-            <h2 className="text-xl font-semibold tracking-[-0.05em]" id="deploy-research-title">New research</h2>
+            <h2 className="text-xl font-semibold tracking-[-0.05em]" id="deploy-research-title">{loadingDemo ? "Preparing your result" : "New research"}</h2>
           </div>
           <button aria-label="Close new research dialog" className="rounded-md p-1.5 text-black/45 transition hover:bg-black/5 hover:text-black" onClick={onClose} type="button"><IconX size={18} /></button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        {loadingDemo ? <DemoLoadingProgress /> : <div className="min-h-0 flex-1 overflow-y-auto">
           <section className="grid gap-x-6 gap-y-5 border-b border-black/10 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
             <div className="grid min-h-full grid-rows-[auto_minmax(0,1fr)] gap-5">
               <label className="grid gap-1.5 text-sm font-medium">Title<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm font-normal outline-none transition focus:border-black/45" placeholder="e.g. Compactness methods in finite graph theory" value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></label>
@@ -264,17 +265,48 @@ function ResearchDeployModal({
             </div>
           </section>
         <label className="grid gap-2 border-t border-black/10 px-6 py-4 text-sm font-medium">Exact Lean target (optional)<textarea className="min-h-16 rounded-md border border-black/12 p-3 font-mono text-xs" value={form.leanStatement} onChange={(event) => setForm((current) => ({ ...current, leanStatement: event.target.value }))} placeholder="(a b c : Nat) (h : a ≤ b) : a + c ≤ b + c" /></label>
-        </div>
+        </div>}
 
         <div className="flex flex-col gap-3 border-t border-black/10 bg-white px-5 py-3.5 sm:flex-row sm:items-center sm:justify-end sm:px-6">
           {error && <p role="alert" className="text-xs text-red-800">{error}</p>}
           <div className="flex justify-end gap-3">
             <button className="h-10 rounded-md border border-black/12 px-4 text-sm font-medium transition hover:bg-black/5" onClick={onClose} type="button">Cancel</button>
-            <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-black px-5 text-sm font-medium text-white transition hover:bg-black/75 disabled:cursor-wait disabled:opacity-50" disabled={creating} type="submit"><IconPlus size={16} />{creating ? <span role="status" className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white motion-reduce:animate-none" />Starting…</span> : "Start research"}</button>
+            {!loadingDemo && <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-black px-5 text-sm font-medium text-white transition hover:bg-black/75 disabled:cursor-wait disabled:opacity-50" disabled={creating} type="submit"><IconPlus size={16} />{creating ? <span role="status" className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white motion-reduce:animate-none" />Starting…</span> : "Start research"}</button>}
           </div>
         </div>
       </motion.form>
     </motion.div>
+  );
+}
+
+function DemoLoadingProgress() {
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    const startedAt = performance.now();
+    const interval = window.setInterval(() => {
+      setProgress(Math.min(100, Math.floor(((performance.now() - startedAt) / trihexagonalDemo.delayMs) * 100)));
+    }, 100);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const stage = progress < 30 ? "Loading the problem…" : progress < 70 ? "Preparing the example…" : "Opening the result shortly…";
+
+  return (
+    <div className="min-h-0 overflow-y-auto px-6 py-12 sm:px-12 sm:py-16">
+      <div className="mx-auto max-w-md">
+        <span className="mb-5 inline-flex items-center gap-2 text-xs font-medium text-black/50"><span className="h-2 w-2 rounded-full bg-amber-400" />Example research</span>
+        <h3 className="text-xl font-semibold tracking-tight">{trihexagonalDemo.title}</h3>
+        <p className="mt-3 text-sm leading-6 text-black/50">Your result will open automatically when ready.</p>
+        <div className="mt-8 flex items-center justify-between gap-4 text-sm">
+          <p role="status" className="text-black/65">{stage}</p>
+          <span className="tabular-nums text-black/45">{progress}%</span>
+        </div>
+        <div role="progressbar" aria-label="Preparing example result" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="mt-3 h-2 overflow-hidden rounded-full bg-black/[0.06]">
+          <div className="h-full rounded-full bg-amber-400 transition-[width] duration-150 ease-linear motion-reduce:transition-none" style={{ width: `${progress}%` }} />
+        </div>
+      </div>
+    </div>
   );
 }
 
