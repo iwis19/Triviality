@@ -158,6 +158,7 @@ function SidebarContent({
       </Link>
 
       <nav className="mt-3 space-y-1" aria-label="Workspace navigation">
+        <SidebarItem href="/dashboard#problems" icon={<IconListDetails size={18} />} label="Problems" onNavigate={onNavigate} />
         <SidebarItem href="/explore" icon={<IconMap2 size={18} />} label="Atlas explorer" onNavigate={onNavigate} />
       </nav>
 
