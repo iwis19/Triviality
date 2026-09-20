@@ -8,6 +8,7 @@ import {
   IconArrowLeft,
   IconFolder,
   IconMap2,
+  IconListDetails,
   IconMenu2,
   IconPlus,
   IconTrash,
