@@ -1,36 +1,41 @@
 {
   "roles": [
     {
-      "id": "coordinator",
       "label": "Coordinator",
-      "description": "Plans the investigation and recovers failed assignments."
+      "id": "coordinator",
+      "description": "Maintains diverse branches and reassigns abandoned approaches."
     },
     {
-      "id": "researcher",
-      "label": "Researcher",
-      "description": "Develops a constructive proof approach."
+      "label": "Researcher 1",
+      "id": "researcher_1",
+      "description": "Explores an independent approach and shares evidence."
     },
     {
+      "label": "Researcher 2",
+      "id": "researcher_2",
+      "description": "Explores a second approach with its own working context."
+    },
+    {
+      "label": "Researcher 3",
+      "id": "researcher_3",
+      "description": "Explores a third approach with its own working context."
+    },
+    {
+      "label": "Challenger",
       "id": "challenger",
-      "label": "Counterexample researcher",
-      "description": "Challenges assumptions and searches for counterexamples."
+      "description": "Tests claims, supplies feedback and challenges failing foundations."
     },
     {
-      "id": "critic",
-      "label": "Critic",
-      "description": "Reviews evidence and requests revisions."
-    },
-    {
-      "id": "proof_writer",
       "label": "Proof writer",
-      "description": "Writes and repairs the formal proof using Lean feedback."
+      "id": "proof_writer",
+      "description": "Writes the mathematical proof and Lean formalization."
     }
   ],
   "defaultModel": "openai/gpt-5.6-sol",
   "models": [
     {
       "id": "openai/gpt-5.6-sol",
-      "label": "OpenAI \u00b7 GPT-5.6 Sol",
+      "label": "OpenAI · GPT-5.6 Sol",
       "provider": "openai",
       "model": "gpt-5.6-sol",
       "keyEnv": "OPENAI_API_KEY",
@@ -38,7 +43,7 @@
     },
     {
       "id": "gemini/gemini-2.5-pro",
-      "label": "Google \u00b7 Gemini 2.5 Pro",
+      "label": "Google · Gemini 2.5 Pro",
       "provider": "gemini",
       "model": "gemini-2.5-pro",
       "keyEnv": "GEMINI_API_KEY",
@@ -46,7 +51,7 @@
     },
     {
       "id": "gemini/gemini-2.5-flash",
-      "label": "Google \u00b7 Gemini 2.5 Flash",
+      "label": "Google · Gemini 2.5 Flash",
       "provider": "gemini",
       "model": "gemini-2.5-flash",
       "keyEnv": "GEMINI_API_KEY",

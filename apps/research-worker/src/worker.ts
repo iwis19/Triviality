@@ -4,6 +4,7 @@ import { Redis } from "ioredis";
 import { getCollections, getMongoClient, proofDocument, recordClaimVersion, publishEpisode } from "@triviality/database";
 import { config } from "./config.js";
 import { runSwarm } from "./swarm.js";
+import { searchLiterature } from "./literature.js";
 
 const redis = new Redis(config.redisUrl, { maxRetriesPerRequest: null });
 
@@ -46,7 +47,7 @@ async function emit(episodeId: string, type: string, payload: Record<string, unk
 
 async function updateStage(episodeId: string, stage: string, progress: number): Promise<void> {
   const collections = await getCollections();
-  await collections.researchEpisodes.updateOne({ _id: episodeId }, { $set: { stage, progress, updatedAt: new Date() } });
+  await collections.researchEpisodes.updateOne({ _id: episodeId }, { $set: { stage, updatedAt: new Date() }, $max: { progress } });
   await emit(episodeId, "research.stage.updated", { stage, progress });
 }
 
@@ -144,17 +145,32 @@ async function runEpisode(episodeId: string): Promise<void> {
 
     {
       await updateStage(episodeId, "Starting WorkSwarm research team", 30);
-      const phases: Record<string, number> = { Plan: 35, Investigate: 45, Critique: 60, Formalize: 75, Deliver: 95 };
+      const phases: Record<string, number> = { Plan: 35, Explore: 45, Challenge: 60, Formalize: 75, Deliver: 95 };
       const outcome = await runSwarm({
         episode_id: episodeId, title: episode.title, statement: problem.statement,
         lean_statement: episode.leanStatement ?? "", proof_attempts: Math.min(6, episode.budget ?? 2),
         role_models: episode.roleModels,
-        literature: works.map((work) => ({ title: work.title, year: work.publication_year,
+        exploration_rounds: episode.explorationRounds ?? 4, stagnation_threshold: episode.stagnationThreshold ?? 2,
+        literature: works.map((work, index) => ({ id: paperIds[index], title: work.title, year: work.publication_year,
           abstract: abstractFromIndex(work.abstract_inverted_index), url: work.primary_location?.landing_page_url ?? work.id })),
       }, async (message) => {
         await emit(episodeId, "research.swarm.event", message);
         if (message.kind !== "progress") return;
         const event = metadata(message.event);
+        if (event.kind === "log" && typeof event.message === "string" && event.message.startsWith("TRIVIALITY_EVENT ")) {
+          const domain = JSON.parse(event.message.slice(17));
+          if (domain.kind === "discovery") {
+            const { id: discoveryId, ...entry } = domain.entry;
+            const now = new Date();
+            await collections.researchDiscoveries.updateOne({ _id: `${episodeId}:${discoveryId}` }, {
+              $set: { ...entry, episodeId, discoveryId, updatedAt: now }, $setOnInsert: { createdAt: now },
+            }, { upsert: true });
+          }
+          if (domain.kind === "branch") {
+            await collections.researchEpisodes.updateOne({ _id: episodeId }, { $set: { [`branches.${domain.branch.id - 1}`]: domain.branch } });
+          }
+          if (domain.kind === "round") await updateStage(episodeId, domain.summary, 30 + Math.floor(60 * domain.round / domain.limit));
+        }
         if (event.kind === "phase") await updateStage(episodeId, `Research team: ${String(event.phase)}`, phases[String(event.phase)] ?? 40);
         if (typeof event.agent_id === "string" && String(event.kind).startsWith("agent_")) {
           const attemptId = `attempt_${createHash("sha256").update(`${episodeId}:${event.agent_id}`).digest("hex").slice(0, 24)}`;
@@ -168,7 +184,7 @@ async function runEpisode(episodeId: string): Promise<void> {
               createdAt: now, startedAt: now },
           }, { upsert: true });
         }
-      });
+      }, async (request) => searchLiterature(episodeId, String(request.query ?? ""), request.broad === true));
       const hypothesisIds: string[] = [];
       for (const [index, report] of outcome.reports.entries()) {
         if (!report) continue;
@@ -178,8 +194,8 @@ async function runEpisode(episodeId: string): Promise<void> {
         await collections.researchHypotheses.insertOne({ _id: hypothesisId, episodeId, problemId: problem._id,
           statement: report.evidence, rationale: report.approach, assumptions: report.risks,
           expectedConsequences: { approach: report.approach, nextStep: report.next_step },
-          status: "PROMISING", createdAt: now, updatedAt: now });
-        await addGraphNode(episodeId, hypothesisId, "RESEARCH_HYPOTHESIS", `Researcher ${index + 1}`, report.approach, 30 + index * 40, 35, "candidate");
+          status: outcome.branches?.[index]?.status === "abandoned" ? "ABANDONED" : "PROMISING", createdAt: now, updatedAt: now });
+        await addGraphNode(episodeId, hypothesisId, "RESEARCH_HYPOTHESIS", `Researcher ${index + 1}`, report.approach, 20 + index * 30, 35, "candidate");
         await addGraphEdge(episodeId, problem._id, hypothesisId, "PRODUCES", "investigates");
       }
       let formalizationId: string | undefined;

@@ -9,6 +9,7 @@ export async function ensureIndexes(): Promise<void> {
     collections.researchAttempts.createIndex({ episodeId: 1, createdAt: 1 }),
     collections.researchResults.createIndex({ episodeId: 1, createdAt: 1 }),
     collections.researchEvents.createIndex({ episodeId: 1, createdAt: 1 }),
+    collections.researchDiscoveries.createIndex({ episodeId: 1, createdAt: 1 }),
     collections.formalizations.createIndex({ episodeId: 1 }),
     collections.papers.createIndex({ "rawMetadata.episodeId": 1, createdAt: 1 }),
     collections.papers.createIndex({ "rawMetadata.episodeIds": 1, createdAt: 1 }),

@@ -13,11 +13,13 @@ export type SwarmResult = {
   status: "verified" | "formalized" | "candidate" | "blocked";
   summary: string; reports: Array<{ approach: string; evidence: string; risks: string; next_step: string } | null>;
   proof?: SwarmProof | null; target_origin?: string;
+  branches?: Array<{ id: number; status: string }>;
 };
 
 export async function runSwarm(
   input: Record<string, unknown>,
   onEvent: (event: Record<string, unknown>) => Promise<void>,
+  onTool?: (request: Record<string, unknown>) => Promise<unknown>,
 ): Promise<SwarmResult> {
   const python = process.env.SWARM_PYTHON || resolve(repositoryRoot,
     process.platform === "win32" ? ".venv/Scripts/python.exe" : ".venv/bin/python");
@@ -40,7 +42,12 @@ export async function runSwarm(
     lines.on("line", (line) => {
       try {
         const message = JSON.parse(line) as Record<string, unknown>;
-        if (message.kind === "result") result = message.result as SwarmResult;
+        if (message.kind === "tool_request") {
+          void (onTool ? onTool(message) : Promise.resolve({ papers: [], warning: "No retrieval host connected" }))
+            .catch(() => ({ papers: [], warning: "Literature retrieval unavailable" }))
+            .then((value) => { if (!child.stdin.destroyed) child.stdin.write(JSON.stringify({ id: message.id, result: value }) + "\n"); });
+        }
+        else if (message.kind === "result") result = message.result as SwarmResult;
         else if (message.kind === "error") error = String(message.message);
         else pending = pending.then(() => onEvent(message)).catch((cause) => {
           persistenceError = cause;
@@ -57,6 +64,6 @@ export async function runSwarm(
       });
     });
     child.stdin.on("error", () => { /* The close/error handlers report an early subprocess exit. */ });
-    child.stdin.end(JSON.stringify(input) + "\n");
+    child.stdin.write(JSON.stringify({ ...input, retrieval_bridge: Boolean(onTool) }) + "\n");
   });
 }

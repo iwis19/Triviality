@@ -9,9 +9,21 @@ challenge's **reusable Swarm Skill** path with a working executable workflow.
 `swarm-skills/math-research` is a WorkSwarm/JiuwenSwarm team skill, including
 roles, coordination rules, dependency declarations and `scripts/workflow.py`.
 The script calls the upstream `agent`, `parallel`, `phase` and `log` APIs.
-The coordinator, researchers, critic and writer exchange structured results;
-failed investigations are reassigned, critique can request revision or stop,
-and Lean errors trigger bounded repair.
+The coordinator, three researchers, challenger and writer exchange structured
+evidence. Researchers own separate branch contexts and publish to a persistent
+discovery bank. Challenger feedback drives bounded exploration, immediate
+abandonment of refuted foundations, and restarts after consecutive stagnant
+exchanges. The coordinator chooses new paper foundations from the literature
+bank, considering broader corpus samples after repeated failures. Lean errors
+return to research; they do not count as mathematical refutations.
+
+The executable protocol is documented in
+[workflow.md](../swarm-skills/math-research/workflow.md). Research proceeds in
+synchronized rounds with three concurrent model calls, not independent OS
+processes. Literature retrieval queries existing MongoDB papers and extracted
+paper knowledge, then expands with OpenAlex. It does not automatically download
+full papers. Findings, challenges and abandoned directions are persisted in
+`research_discoveries` and displayed alongside the literature bank in the dashboard.
 
 Two hosts can run the same script:
 
@@ -52,8 +64,8 @@ the pinned framework revision from GitHub. For an existing clean checkout:
 `python apps/research-swarm/setup_runtime.py --source /path/to/agent-core`.
 
 WorkSwarm is the fixed orchestration layer for every new episode. The dashboard
-assigns models independently to coordinator, researcher, counterexample researcher,
-critic, and proof writer. Selections are validated against
+assigns models independently to coordinator, three researchers, challenger,
+and proof writer. Selections are validated against
 `config/research-models.json`, persisted with the episode, and passed unchanged
 to the workflow. Retries/revisions preserve the assigned model. Credentials stay
 in the worker environment; no keys are included in jobs or frontend bundles.
@@ -80,12 +92,12 @@ Session IDs are recorded per call for replay; active sessions are terminated
 when a call finishes or fails. A process crash or uncertain create response can
 still leave a remote session requiring manual cleanup. Devin reports ACUs
 separately; `SWARM_TOKEN_BUDGET` cannot measure or cap Devin's token usage.
-The per-session ACU limit and shared 20-call limit bound these calls. No live
+The per-session ACU limit and shared 200-call limit bound these calls. No live
 provider or Devin session has been validated without credentials.
 
 The standalone CLI uses the same named-model catalog as the frontend. Supply
 `role_models` in the demo input JSON with all five role IDs mapped to catalog
-IDs, for example `"critic": "gemini/gemini-2.5-pro"`. Without assignments,
+IDs, for example `"challenger": "gemini/gemini-2.5-pro"`. Without assignments,
 all roles use the catalog default. There are no separate custom endpoint or
 research/proof model environment settings. Model transports require token
 usage; Devin instead reports ACU usage.
@@ -136,11 +148,12 @@ pnpm --filter web dev
 
 Open the dashboard, click **New research**, assign a model to each role,
 and click **Use example**. Submit the filled goal and exact Lean target. The episode page displays
-live role activity, reports, critique revisions, repair decisions, the research
-graph and the checked proof. OpenAlex failure is recorded and degrades to
+live role activity, both banks, branch restarts, challenger feedback, repair
+decisions, the research graph and the checked proof. OpenAlex failure degrades to
 uncited mathematical reasoning; model access and Lean have separate failure
-states. The proof-attempt budget is clamped to 1–6; other calls are bounded
-separately.
+states. Configure exploration rounds (1–20), stagnation threshold (1–6), and
+proof attempts (1–6). Token and wall-clock ceilings may end work before all
+requested rounds; only a checked proof ends exploration successfully.
 
 ## Run as a native WorkSwarm skill
 
@@ -167,10 +180,10 @@ in that host. Native token budgets/permissions remain host-owned.
 
 | Requirement | Concrete implementation |
 |---|---|
-| Role specialization | Coordinator, constructive/skeptical researchers, critic, proof writer |
-| Communication | Both reports go to critic; critique and colleague evidence return to researcher; reviewed evidence goes to writer |
-| Parallel collaboration | Upstream `parallel()` runs two independent investigations |
-| Dynamic adaptation | Reassignment after failure; revise/stop/formalize decision; checker-driven repair |
+| Role specialization | Coordinator, three independent researchers, challenger, proof writer |
+| Communication | Shared discoveries, sourced claims, challenge evidence and resolution tests feed subsequent research |
+| Parallel collaboration | Upstream `parallel()` runs three independent investigations per exploration round |
+| Dynamic adaptation | Refutation/stagnation thresholds, fresh contexts, alternative paper selection and checker-driven feedback |
 | Tools and verification | OpenAlex retrieval and real Lean invocation with axiom audit |
 | Complete scenario | Checked-in theorem demo; terminal artifacts and browser progress |
 | Failure handling | Bounded retries, model timeouts, missing-literature degradation, missing-checker candidate |
@@ -197,7 +210,7 @@ pnpm --filter web typecheck
 - `formalized`: a model-generated statement passed Lean; translation review
   remains necessary. The episode is not labelled verified.
 - `candidate`: no checked proof within the attempt limit, or Lean unavailable.
-- `blocked`: investigators/critic could not support proceeding.
+- `blocked`: the coordinator could not establish an exploration plan.
 
 The verifier accepts a conservative subset of Std proofs. It is not an OS
 sandbox; isolate it before public multi-tenant deployment. Token accounting

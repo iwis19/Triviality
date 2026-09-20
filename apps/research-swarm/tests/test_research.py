@@ -44,17 +44,24 @@ class FixtureBackend(engine.AgentBackend):
         self.max_active = max(self.active, self.max_active)
         await asyncio.sleep(0.01)
         self.active -= 1
-        if self.fail_researcher and "Assignment: skeptical route" in prompt and "Investigate your assigned" in prompt:
+        if self.fail_researcher and prompt.startswith("Investigate your independent") and json.loads(prompt.split("Branch context: ")[1])["assignment"] == "skeptical route":
             raise RuntimeError("Simulated researcher outage")
         fields = schema_json["properties"]
         if "tasks" in fields:
-            data = {"tasks": ["constructive route", "skeptical route"], "formal_statement": TARGET, "rationale": "Independent approaches"}
+            data = {"tasks": ["constructive route", "skeptical route", "induction route"], "formal_statement": TARGET, "rationale": "Independent approaches"}
         elif "approach" in fields:
             data = {"approach": "Monotonicity", "evidence": "Addition preserves natural-number order.",
-                    "risks": "Check domain and direction.", "next_step": "Apply omega."}
-        elif "action" in fields:
-            data = {"action": "stop" if self.stop else "formalize" if "Recheck" in prompt else "revise",
-                    "selected": 0, "feedback": "Address the natural-number domain explicitly.", "target_aligned": not self.stop}
+                    "risks": "Check domain and direction.", "next_step": "Apply omega.", "source_ids": [],
+                    "discovery_ids": [], "search_query": "natural number order", "candidate_complete": True}
+        elif "resolution_test" in fields:
+            ready = not self.stop and '"previous_report": null' not in prompt
+            data = {"claim": "Order preservation", "feedback": "Address the natural-number domain explicitly.",
+                    "evidence": "A concrete natural-number argument is required.", "resolution_test": "Check zero and the inductive step.",
+                    "foundation_refuted": self.stop, "made_progress": ready, "target_aligned": not self.stop,
+                    "ready_for_proof": ready, "unresolved": [] if ready else ["Domain argument missing"], "alternative_query": "order induction"}
+        elif "assignment" in fields:
+            data = {"assignment": "fresh induction approach", "paper_id": "none", "rationale": "Avoid the failed foundation",
+                    "avoided_failure": "Do not reuse unsupported assumptions"}
         else:
             self.proofs += 1
             data = {"proof": "by\n  rfl" if self.bad_first_proof and self.proofs == 1 else "by\n  omega",
@@ -70,7 +77,7 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
         args = {"statement": "Adding the same natural number preserves order.", "lean_statement": TARGET, "proof_attempts": 2, **extra}
         events = []
         result = await engine.run_workflow(str(WORKFLOW), args=args, backend=backend,
-            cap=2, progress_sink=events.append, budget=engine.BudgetLedger(total=5000))
+            cap=3, progress_sink=events.append, budget=engine.BudgetLedger(total=5000))
         return result, events
 
     async def test_reports_critique_and_revision_are_consumed(self):
@@ -79,25 +86,27 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
             result, events = await self.run_flow(backend)
         self.assertEqual(result["status"], "candidate")
         self.assertFalse(result["proof"]["verified"])
-        self.assertEqual(backend.max_active, 2)
-        self.assertTrue(any("Colleague" in p or "colleague" in p for p in backend.prompts))
+        self.assertEqual(backend.max_active, 3)
+        self.assertTrue(any('"shared_discoveries": [{"id"' in p for p in backend.prompts))
         writer = next(p for p in backend.prompts if p.startswith("Write a Lean"))
         self.assertIn("Addition preserves natural-number order", writer)
         self.assertIn("Address the natural-number domain", writer)
-        self.assertTrue(any(e.message and '"kind": "replan"' in e.message for e in events))
+        self.assertTrue(any(e.message and '"kind": "discovery"' in e.message for e in events))
 
     async def test_critic_can_stop_proof_work(self):
         backend = FixtureBackend(stop=True)
         result, _ = await self.run_flow(backend)
-        self.assertEqual(result["status"], "blocked")
+        self.assertEqual(result["status"], "candidate")
         self.assertEqual(backend.proofs, 0)
+        self.assertTrue(any(d["kind"] == "abandoned" for d in result["discoveries"]))
+        self.assertTrue(all(b["generation"] > 0 for b in result["branches"]))
 
     async def test_failed_researcher_is_reassigned(self):
         backend = FixtureBackend(fail_researcher=True)
         with patch.dict(os.environ, {"SWARM_LEAN_BIN": "nonexistent-lean-for-test"}):
             result, events = await self.run_flow(backend)
         self.assertTrue(all(result["reports"]))
-        self.assertTrue(any(p.startswith("Recover this failed") for p in backend.prompts))
+        self.assertTrue(any(p.startswith("Assign a fresh") for p in backend.prompts))
         self.assertTrue(any(e.message and '"kind": "reassignment"' in e.message for e in events))
 
     async def test_journal_resume_reuses_completed_agents(self):
@@ -108,8 +117,50 @@ class WorkflowTests(unittest.IsolatedAsyncioTestCase):
             await engine.run_workflow(str(WORKFLOW), args=args, backend=first, journal_path=journal, run_id="resume-test")
             second = FixtureBackend(stop=True)
             result = await engine.run_workflow(str(WORKFLOW), args=args, backend=second, resume=journal, run_id="resume-test")
-            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(result["status"], "candidate")
             self.assertEqual(second.prompts, [])
+
+    async def test_iteration_limit_and_stagnation_restart(self):
+        backend = FixtureBackend()
+        original = backend.run
+        async def stuck(prompt, opts, schema_json, **kwargs):
+            response = await original(prompt, opts, schema_json, **kwargs)
+            if "resolution_test" in schema_json["properties"]:
+                response.structured.update(made_progress=False, ready_for_proof=False, unresolved=["Unanswered gap"])
+            return response
+        backend.run = stuck
+        result, _ = await self.run_flow(backend, exploration_rounds=3, stagnation_threshold=2)
+        self.assertEqual(backend.proofs, 0)
+        self.assertEqual(len([p for p in backend.prompts if p.startswith("Investigate your independent")]), 9)
+        self.assertEqual([b["generation"] for b in result["branches"]], [1, 1, 1])
+        restarted = [json.loads(p.split("Branch context: ")[1]) for p in backend.prompts if p.startswith("Investigate your independent")][-3:]
+        self.assertTrue(all(c["own_previous_report"] is None and c["challenge"] is None for c in restarted))
+        self.assertTrue(all(c["failure_memory"] for c in restarted))
+        self.assertTrue(any(d["kind"] == "finding" and d["status"] == "abandoned" for d in result["discoveries"]))
+
+    async def test_success_stops_early_and_preserves_parallel_findings(self):
+        backend = FixtureBackend()
+        passed = subprocess.CompletedProcess([], 0, "'triviality_target' does not depend on any axioms", "")
+        with patch("subprocess.run", return_value=passed):
+            result, _ = await self.run_flow(backend, exploration_rounds=10)
+        self.assertEqual(result["status"], "verified")
+        self.assertEqual(len([p for p in backend.prompts if p.startswith("Investigate your independent")]), 6)
+        self.assertEqual(len([d for d in result["discoveries"] if d["kind"] == "finding"]), 6)
+        self.assertEqual(result["proof"]["statement"], TARGET)
+
+    async def test_model_generated_target_needs_review_with_successful_checker(self):
+        passed = subprocess.CompletedProcess([], 0, "'triviality_target' does not depend on any axioms", "")
+        with patch("subprocess.run", return_value=passed):
+            result, _ = await self.run_flow(FixtureBackend(), lean_statement="")
+        self.assertEqual(result["status"], "formalized")
+
+    async def test_checker_failure_is_feedback_not_foundation_refutation(self):
+        failed = subprocess.CompletedProcess([], 1, "error: tactic failed", "")
+        with patch("subprocess.run", return_value=failed):
+            result, _ = await self.run_flow(FixtureBackend(), exploration_rounds=3, proof_attempts=1)
+        self.assertEqual(result["status"], "candidate")
+        self.assertTrue(all(b["generation"] == 0 for b in result["branches"]))
+        self.assertTrue(any(b["report"] for b in result["branches"]))
 
     @unittest.skipUnless(REAL_LEAN_AVAILABLE, "Real Lean toolchain not installed")
     async def test_real_lean_failure_repair_and_exact_target(self):
@@ -210,6 +261,8 @@ class BridgeTests(unittest.TestCase):
                 self.assertEqual(fixture.proofs, 2)
             self.assertTrue(any(e["kind"] == "usage" for e in output["events"]))
             self.assertTrue(any(e.get("event", {}).get("kind") == "agent_completed" for e in output["events"]))
+            self.assertGreater(len(output["searches"]), 0)
+            self.assertTrue(any(p["id"] == "fixture-paper" for p in output["result"]["literature"]))
         finally:
             server.shutdown()
             server.server_close()

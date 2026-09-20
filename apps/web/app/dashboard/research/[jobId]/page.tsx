@@ -50,13 +50,27 @@ export default function ResearchEpisodePage() {
             <div className="w-full max-w-xs shrink-0"><div className="mb-2 flex justify-between text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40"><span>{job.stage}</span><span>{job.progress}%</span></div><div className="h-1.5 overflow-hidden rounded-full bg-black/8"><div className="h-full rounded-full bg-black transition-all duration-500" style={{ width: `${job.progress}%` }} /></div></div>
           </div>
 
-          {job.roleModels && <section className="mt-6 rounded-xl border border-black/10 bg-white p-5"><h2 className="text-sm font-semibold">Models</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{modelCatalog.roles.map((role) => <div key={role.id}><dt className="text-xs text-black/45">{role.label}</dt><dd className="mt-1"><ModelLabel id={job.roleModels?.[role.id] ?? ""} fallbackLabel={job.roleModels?.[role.id] ?? "Model unavailable"} /></dd></div>)}</dl></section>}
+          {job.roleModels && <section className="mt-6 rounded-xl border border-black/10 bg-white p-5"><h2 className="text-sm font-semibold">Models</h2><dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{Object.entries(job.roleModels).map(([roleId, modelId]) => <div key={roleId}><dt className="text-xs text-black/45">{modelCatalog.roles.find((role) => role.id === roleId)?.label ?? roleId.replaceAll("_", " ")}</dt><dd className="mt-1"><ModelLabel id={modelId} fallbackLabel={modelId} /></dd></div>)}</dl></section>}
           {job.status === "running" ? <RunningEpisode /> : job.status === "failed" ? <FailedEpisode job={job} /> : <CompletedEpisode job={job} tab={tab} setTab={setTab} />}
-          {(job.orchestrator === "workswarm" || job.provider === "huawei") && <TeamTrace job={job} />}
+          {(job.orchestrator === "workswarm" || job.provider === "huawei") && <><ExplorationBanks job={job} /><TeamTrace job={job} /></>}
         </section>
       </div>
     </main>
   );
+}
+
+function ExplorationBanks({ job }: { job: ResearchJob }) {
+  return <section className="mt-8 space-y-5">
+    <h2 className="text-lg font-semibold">Exploration · {job.explorationRounds ?? 4} rounds maximum</h2>
+    <div className="grid gap-4 md:grid-cols-3">{(job.branches ?? []).filter(Boolean).map((branch) => <article key={branch.id} className="rounded-xl border border-black/10 bg-white p-5">
+      <h3 className="text-sm font-semibold">Researcher {branch.id} · direction {branch.generation + 1}</h3><p className="mt-2 text-xs text-black/50">{branch.status} · {branch.stagnation}/{job.stagnationThreshold ?? 2} stagnant exchanges</p><p className="mt-3 whitespace-pre-wrap text-sm leading-6">{branch.assignment}</p>
+    </article>)}</div>
+    <details className="rounded-xl border border-black/10 bg-white p-5"><summary className="cursor-pointer text-sm font-semibold">Literature bank · {job.literature.length} sources retrieved for this episode</summary><div className="mt-4"><ResearchLiteratureTabs jobId={job.id} papers={job.literature} /></div></details>
+    <details open className="rounded-xl border border-black/10 bg-white p-5"><summary className="cursor-pointer text-sm font-semibold">Discovery bank · {job.discoveries?.length ?? 0} findings and challenges</summary>
+      <p className="mt-3 text-xs text-black/50">Reviewed findings are model assessments. Only verification entries marked verified have passed Lean.</p>
+      <div className="mt-4 space-y-3">{(job.discoveries ?? []).map((entry) => <details key={entry.id} className="rounded-lg border border-black/10 p-4"><summary className="cursor-pointer text-sm">Researcher {entry.branch} · round {entry.round} · {entry.kind} · {entry.status}</summary><p className="mt-3 whitespace-pre-wrap text-sm leading-6">{entry.content}</p>{entry.evidence && <p className="mt-3 whitespace-pre-wrap text-sm">Evidence: {entry.evidence}</p>}{entry.resolution_test && <p className="mt-3 whitespace-pre-wrap text-sm">Resolution test: {entry.resolution_test}</p>}{entry.reason && <p className="mt-3 whitespace-pre-wrap text-xs">{entry.reason}</p>}{entry.source_ids?.length ? <p className="mt-3 text-xs">Sources: {entry.source_ids.map((id) => job.literature.find((paper) => paper.id === id)?.title ?? id).join("; ")}</p> : null}</details>)}</div>
+    </details>
+  </section>;
 }
 
 function TeamTrace({ job }: { job: ResearchJob }) {
@@ -65,7 +79,7 @@ function TeamTrace({ job }: { job: ResearchJob }) {
     if (event.type !== "research.swarm.event" || progress?.kind !== "log" || !progress.message?.startsWith("TRIVIALITY_EVENT ")) return [];
     try { return [{ id: event.id, ...JSON.parse(progress.message.slice(17)) } as { id: string; kind: string; feedback?: string; summary?: string; reason?: string }]; }
     catch { return []; }
-  }).filter((event) => ["replan", "repair", "reassignment", "delivery"].includes(event.kind));
+  }).filter((event) => ["round", "restart", "replan", "repair", "reassignment", "delivery"].includes(event.kind));
   return <details className="mt-10 rounded-2xl border border-black/10 bg-white p-6">
     <summary className="cursor-pointer text-sm font-semibold">Research team collaboration <span className="ml-2 font-normal text-black/45">{job.attempts.length} attempts</span></summary>
     <p className="mt-3 text-sm text-black/55">Research findings, critique, and proof handoffs.</p>

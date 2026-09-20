@@ -1,70 +1,58 @@
 ---
 name: triviality-math-research
-version: 1.0.0
+version: 2.0.0
 author: Triviality
-description: |
-  Collaboratively investigate a mathematical claim, challenge assumptions, and
-  attempt a fixed Lean theorem. Use for bounded research with competing proof
-  directions and independent critique. Not a guarantee of solving open problems.
+description: Explore competing mathematical approaches with three independent researchers, a shared discovery bank, substantive challenges and bounded restarts.
 kind: team-skill
 roles:
   - id: coordinator
-    purpose: Decompose the goal and recover failed investigations
+    purpose: Assign distinct approaches and restart abandoned branches
     skills: []
     tools: []
-  - id: researcher
-    purpose: Investigate constructive and counterexample directions independently
+  - id: researcher_1
+    purpose: Own the first independent investigation
     skills: []
     tools: []
-  - id: critic
-    purpose: Review shared evidence, identify gaps, and request revision or stop
+  - id: researcher_2
+    purpose: Own the second independent investigation
     skills: []
     tools: []
-  - id: proof-writer
-    purpose: Write and repair a proof of the fixed formal statement
+  - id: researcher_3
+    purpose: Own the third independent investigation
+    skills: []
+    tools: []
+  - id: challenger
+    purpose: Test claims with substantive evidence and resolution criteria
+    skills: []
+    tools: []
+  - id: proof_writer
+    purpose: Write and repair the mathematical proof and Lean formalization
     skills: []
     tools: []
 ---
 
-# Triviality mathematical research team
+# Triviality exploration team
 
-Read [workflow.md](workflow.md), [bind.md](bind.md), and
-[dependencies.yaml](dependencies.yaml). Role instructions are in [roles](roles/).
+Read [workflow.md](workflow.md), [bind.md](bind.md), and [dependencies.yaml](dependencies.yaml).
+Run scripts/workflow.py with WorkSwarm's swarmflow tool, preserving its sibling
+exploration.py and lean_check.py. Use the executable workflow, not a rewritten approximation.
 
-Run the checked-in `scripts/workflow.py` using WorkSwarm's `swarmflow` tool.
-Pass a JSON args object with `statement` (the natural-language goal), optional
-`lean_statement` (binders followed by `: proposition`, no theorem name or `:=`),
-`proof_attempts` (1–6), and optional `literature` records. Optional
-`role_models` assigns a model to each role. Omit it to inherit the native
-WorkSwarm teammate model; the embedded host defaults to the catalog default.
+Arguments: statement; optional lean_statement (binders then colon then proposition,
+no theorem name or :=); exploration_rounds (1–20); stagnation_threshold (1–6);
+proof_attempts (1–6); optional literature records with stable IDs; optional role_models
+mapping the six role IDs above to models. The embedded host uses catalog IDs; native
+hosts use their own model IDs and budgets. Without an embedded retrieval host,
+only supplied literature is searchable.
 
-Use the actual script, not a rewritten approximation or independent role chats.
-The script uses native `agent`, `parallel`, `phase`, and `log` primitives and
-passes each colleague's findings into the next decision. It calls the bundled
-Lean checker as a local tool, so preserve `scripts/lean_check.py` beside it.
-
-Example args:
+Example:
 
 ```json
-{
-  "statement": "Prove that adding the same natural number preserves an inequality. Check the assumptions independently.",
-  "lean_statement": "(a b c : Nat) (h : a ≤ b) : a + c ≤ b + c",
-  "proof_attempts": 2,
-  "literature": []
-}
+{"statement":"Prove that addition preserves natural-number order.",
+ "lean_statement":"(a b c : Nat) (h : a ≤ b) : a + c ≤ b + c",
+ "exploration_rounds":4,"stagnation_threshold":2,"proof_attempts":2,"literature":[]}
 ```
 
-Return the workflow result verbatim alongside a short explanation. Preserve
-`blocked`, `candidate`, `formalized`, and `verified` distinctions. A generated
-statement that passes Lean is `formalized`; only an unchanged user-supplied
-formal target can yield `verified`. All claims remain conditional on the
-formal statement's assumptions and its correspondence to the user's intent.
-
-Missing Lean is a supported degraded mode: return findings and an unverified
-candidate. Missing model access prevents live collaboration. Never label a
-fixture test as a live model run.
-
-The embedded Triviality host always uses WorkSwarm. Its optional `role_models`
-argument maps `coordinator`, `researcher`, `challenger`, `critic`, and
-`proof_writer` to IDs from `config/research-models.json`. In a native host,
-use model IDs recognized by that host instead of Triviality catalog aliases.
+Return findings, both banks, branch states and checker evidence. Preserve candidate,
+blocked, formalized and verified distinctions. Only an unchanged supplied target
+passing Lean may be verified; a generated target requires translation review.
+Model assessments of refutation or readiness never establish mathematical truth.

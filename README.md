@@ -14,9 +14,14 @@ described below.
 
 ## WorkSwarm research team
 
-The **WorkSwarm** orchestration layer runs a reusable Swarm Skill with parallel
-investigations, shared findings, independent critique, adaptive revision, and
-Lean proof repair. See [setup, demo, and challenge mapping](docs/openjiuwen-challenge.md).
+The **WorkSwarm** orchestration layer runs three independent research branches
+in parallel exploration rounds, with a searchable literature bank, persistent
+discovery bank, substantive challenger feedback, and fresh starts after refutation
+or stagnation. A coordinator selects alternative foundations; a proof writer
+formalizes reviewed candidates and Lean feedback returns to research. Configure
+exploration rounds, stagnation threshold and proof attempts separately in the
+dashboard. See [the exploration protocol](swarm-skills/math-research/workflow.md)
+and [setup, demo, and challenge mapping](docs/openjiuwen-challenge.md).
 The skill lives in [swarm-skills/math-research](swarm-skills/math-research/SKILL.md).
 After setup, `pnpm swarm:demo` runs a live terminal demo and `pnpm swarm:test`
 runs deterministic collaboration tests with real Lean checks when installed.

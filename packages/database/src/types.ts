@@ -36,6 +36,9 @@ export interface ResearchEpisodeDocument extends BaseDocument {
   roleModels?: Record<string, string>;
   mode?: string;
   budget?: number;
+  explorationRounds?: number;
+  stagnationThreshold?: number;
+  branches?: unknown[];
   leanStatement?: string;
   atlasProblemId?: string; // set when the episode targets a catalogued open problem
   stage?: string;
@@ -49,6 +52,11 @@ export interface ResearchHypothesisDocument extends BaseDocument { episodeId: st
 export interface ResearchAttemptDocument extends BaseDocument { episodeId: string; hypothesisId: string; proofStrategyId?: string; strategy: string; status: AttemptStatus; input?: unknown; proofState?: string; error?: string; startedAt?: Date; completedAt?: Date; }
 export interface ResearchResultDocument extends BaseDocument { episodeId: string; hypothesisId?: string; attemptId?: string; title: string; summary: string; status: ResultStatus; evidence?: unknown; }
 export interface ResearchEventDocument extends BaseDocument { episodeId: string; type: string; payload: Record<string, unknown>; }
+export interface ResearchDiscoveryDocument extends BaseDocument {
+  episodeId: string; discoveryId: string; branch: number; generation: number; round: number;
+  kind: string; status: string; content: string; source_ids?: string[]; discovery_ids?: string[];
+  evidence?: string; resolution_test?: string; reason?: string; claim?: string; log?: string;
+}
 
 export interface PaperDocument extends BaseDocument { externalId: string; title: string; abstract?: string; doi?: string; authors?: string[]; subjects: string[]; publishedAt?: Date; citedByCount: number; relevanceScore?: number; landingUrl?: string; openAccessUrl?: string; rawMetadata?: unknown; }
 export interface TheoremDocument extends BaseDocument { paperId?: string; name: string; statement: string; assumptions?: unknown; }
