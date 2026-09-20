@@ -1,8 +1,5 @@
-import { config as loadEnv } from "dotenv";
+import "./environment.js";
 import { resolve } from "node:path";
-
-loadEnv({ path: resolve(process.cwd(), ".env") });
-loadEnv({ path: resolve(process.cwd(), "../../.env") });
 
 export const config = {
   mongodbUri: process.env.MONGODB_URI ?? "mongodb://localhost:27017",

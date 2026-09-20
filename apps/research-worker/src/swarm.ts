@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
-import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+import { loadWorkerEnvironment, repositoryRoot } from "./environment.js";
 
-export const repositoryRoot = fileURLToPath(new URL("../../../", import.meta.url));
+export { repositoryRoot };
 
 export type SwarmProof = {
   verified: boolean; checker: string; axioms: string[]; log: string;
@@ -22,11 +22,12 @@ export async function runSwarm(
   onEvent: (event: Record<string, unknown>) => Promise<void>,
   onTool?: (request: Record<string, unknown>) => Promise<unknown>,
 ): Promise<SwarmResult> {
-  const python = process.env.SWARM_PYTHON || resolve(repositoryRoot,
+  const environment = loadWorkerEnvironment();
+  const python = environment.SWARM_PYTHON || resolve(repositoryRoot,
     process.platform === "win32" ? ".venv/Scripts/python.exe" : ".venv/bin/python");
   return new Promise((accept, reject) => {
     const child = spawn(python, [resolve(repositoryRoot, "apps/research-swarm/runner.py")], {
-      cwd: repositoryRoot, env: { ...process.env, PYTHONUNBUFFERED: "1" },
+      cwd: repositoryRoot, env: { ...environment, PYTHONUNBUFFERED: "1" },
       stdio: ["pipe", "pipe", "pipe"], windowsHide: true,
     });
     let result: SwarmResult | undefined;
@@ -36,7 +37,7 @@ export async function runSwarm(
     const timeout = setTimeout(() => {
       error = "Research team exceeded SWARM_TIMEOUT_MS";
       child.kill();
-    }, Number(process.env.SWARM_TIMEOUT_MS || 900000));
+    }, Number(environment.SWARM_TIMEOUT_MS || 900000));
     child.on("error", (cause) => { clearTimeout(timeout); reject(cause); });
     child.stderr.on("data", (chunk: Buffer) => { error = (error + chunk.toString()).slice(-4000); });
     const lines = createInterface({ input: child.stdout });

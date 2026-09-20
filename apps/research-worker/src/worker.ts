@@ -1,4 +1,4 @@
-import "dotenv/config";
+import "./environment.js";
 import { createHash, randomUUID } from "node:crypto";
 import { Redis } from "ioredis";
 import { getCollections, getMongoClient, proofDocument, recordClaimVersion, publishEpisode } from "@triviality/database";
