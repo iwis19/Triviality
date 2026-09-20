@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { trihexagonalDemo } from "@/lib/trihexagonal-demo";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
@@ -15,6 +17,7 @@ import "./explore.css";
 const Graph3D = lazy(() => import("./Graph3D"));
 
 export default function ExplorerApp({ intro = false }: { intro?: boolean }) {
+  const router = useRouter();
   const [areas, setAreas] = useState<Area[]>([]);
   const [problems, setProblems] = useState<Problem[]>([]);
   const [graph, setGraph] = useState<Graph | null>(null);
@@ -50,7 +53,19 @@ export default function ExplorerApp({ intro = false }: { intro?: boolean }) {
   useEffect(() => {
     let cancelled = false;
     Promise.all([publicApi.areas(), publicApi.problems(), publicApi.graph([...LAYERS])])
-      .then(([a, p, g]) => { if (!cancelled) { setAreas(a); setProblems(p); setGraph(g); setError(null); } })
+      .then(([a, p, g]) => { if (!cancelled) { const area = a.find(area => area.slug === "combinatorics" || area.name === trihexagonalDemo.area);
+        const demo: Problem = {
+          id: trihexagonalDemo.id, slug: trihexagonalDemo.slug, title: trihexagonalDemo.title,
+          statement: trihexagonalDemo.statement, definitions: "", assumptions: "", attribution: "",
+          status: "disproved", formal_target: "", areas: area ? [{ slug: area.slug, name: area.name }] : [],
+          sources: [], record_type: "problem", record_id: trihexagonalDemo.id, version: 1,
+          evidence_label: "Published counterexample", policy_version: "1", published_at: "",
+        };
+        setAreas(a); setProblems([demo, ...p.filter(problem => problem.id !== demo.id)]);
+        setGraph({ ...g, nodes: [{ id: demo.id, slug: demo.slug, type: "problem", label: demo.title,
+          areas: demo.areas.map(area => area.slug), evidence_label: demo.evidence_label }, ...g.nodes.filter(node => node.id !== demo.id)],
+          links: [...g.links.filter(link => link.source !== demo.id && link.target !== demo.id),
+            ...(area ? [{ source: area.id, target: demo.id, layer: "atlas" as const, kind: "contains" }] : [])] }); setError(null); } })
       .catch((e: Error) => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
   }, [refreshKey]);
@@ -65,11 +80,15 @@ export default function ExplorerApp({ intro = false }: { intro?: boolean }) {
   }, [problemSlug, refreshKey]);
 
   const chooseProblem = useCallback((slug: string) => {
+    if (slug === trihexagonalDemo.slug) {
+      router.push(`/dashboard?problem=${trihexagonalDemo.slug}`);
+      return;
+    }
     setDetailError(null);
     setProblemSlug(slug);
     setSelected(graph?.nodes.find(n => n.type === "problem" && n.slug === slug) ?? null);
     setMenuOpen(false);
-  }, [graph]);
+  }, [graph, router]);
 
   const chooseArea = useCallback((slug: string) => {
     setAreaFilter(slug);

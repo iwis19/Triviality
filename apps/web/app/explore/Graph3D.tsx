@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph3D, { type ForceGraphMethods } from "react-force-graph-3d";
 import * as THREE from "three";
 import type { GraphLink, GraphNode } from "./api";
+import { trihexagonalDemo } from "@/lib/trihexagonal-demo";
 import { LAYER_COLORS, nodeColor, nodeSize } from "./palette";
 
 // Positions visualize relationships, not mathematical distance.
@@ -216,6 +217,22 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
     return () => { window.clearTimeout(timer); stopCamera(); };
   }, [focusNodeId, selectedId, frameRadialLayout, stopInitialCamera, stopCamera]);
 
+  const placeDemoAtTop = useCallback(() => {
+    const fg = ref.current;
+    const node = data.nodes.find(node => node.id === trihexagonalDemo.id);
+    if (!fg || !node || focusNodeId || selectedId) return;
+    const camera = fg.camera();
+    camera.updateMatrixWorld();
+    const target = (fg.controls() as { target: THREE.Vector3 }).target;
+    // Use the final camera's screen-up direction, so rotation cannot hide the node.
+    const depth = target.clone().project(camera).z;
+    const position = new THREE.Vector3(0, 0.86, depth).unproject(camera);
+    node.x = node.fx = position.x;
+    node.y = node.fy = position.y;
+    node.z = node.fz = position.z;
+    fg.refresh();
+  }, [data, focusNodeId, selectedId]);
+
   const settleCamera = useCallback(() => {
     const fg = ref.current;
     if (!fg || !entranceReady || data.nodes.length === 0 || initialCameraState.current !== "idle" || selectedId || focusNodeId) return;
@@ -230,8 +247,8 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
       .add(target);
     const position = target.clone().lerp(rotatedPosition, 0.68);
     fg.cameraPosition(startPosition, startTarget, 0);
-    moveCamera(position, target, rotatedPosition, () => { initialCameraState.current = "done"; });
-  }, [entranceReady, data.nodes.length, selectedId, focusNodeId, moveCamera]);
+    moveCamera(position, target, rotatedPosition, () => { initialCameraState.current = "done"; placeDemoAtTop(); });
+  }, [entranceReady, data.nodes.length, selectedId, focusNodeId, moveCamera, placeDemoAtTop]);
 
   useEffect(() => {
     if (!entranceReady) {
@@ -269,8 +286,8 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
   }, [resources]);
 
   const nodeObject = useCallback((n: FGNode) => {
-    const mesh = new THREE.Mesh(resources.geometries[n.type], materialFor(nodeColor(n), false));
-    mesh.scale.setScalar(nodeSize(n));
+    const mesh = new THREE.Mesh(resources.geometries[n.id === trihexagonalDemo.id ? "area" : n.type], materialFor(nodeColor(n), false));
+    mesh.scale.setScalar(nodeSize(n) * (n.id === trihexagonalDemo.id ? 3 : 1));
     resources.meshes.set(n.id, mesh);
     return mesh;
   }, [resources, materialFor]);
@@ -282,7 +299,7 @@ export default function Graph3D({ nodes, links, focusNodeId, selectedId, highlig
       const mesh = resources.meshes.get(n.id);
       if (!mesh) continue;
       mesh.material = materialFor(nodeColor(n), highlightIds.size > 0 && !highlightIds.has(n.id) && n.id !== selectedId);
-      mesh.scale.setScalar(nodeSize(n) * (n.id === selectedId ? 1.5 : 1));
+      mesh.scale.setScalar(nodeSize(n) * (n.id === trihexagonalDemo.id ? 3 : 1) * (n.id === selectedId ? 1.5 : 1));
     }
   }, [data, highlightIds, selectedId, resources, materialFor]);
 

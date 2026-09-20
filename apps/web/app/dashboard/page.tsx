@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import Link from "next/link";
+import { trihexagonalDemo } from "@/lib/trihexagonal-demo";
 import { useRouter, useSearchParams } from "next/navigation";
 import { IconChevronDown, IconChevronRight, IconMessage, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
 import { motion } from "motion/react";
@@ -70,6 +71,13 @@ function DashboardContent() {
 
   useEffect(() => {
     if (!sourceProblem) return;
+    if (sourceProblem === trihexagonalDemo.slug) {
+      setForm({ ...initialForm, title: trihexagonalDemo.title, statement: trihexagonalDemo.statement,
+        area: trihexagonalDemo.area, problemSlug: trihexagonalDemo.slug });
+      setSubmitError(null);
+      setModalOpen(true);
+      return;
+    }
     let cancelled = false;
     publicApi.problem(sourceProblem).then(({ problem }) => {
       if (cancelled) return;
@@ -82,7 +90,14 @@ function DashboardContent() {
     return () => { cancelled = true; };
   }, [sourceProblem]);
 
+  useEffect(() => {
+    if (!creating || form.problemSlug !== trihexagonalDemo.slug) return;
+    const timer = window.setTimeout(() => window.location.assign(trihexagonalDemo.proofUrl), trihexagonalDemo.delayMs);
+    return () => window.clearTimeout(timer);
+  }, [creating, form.problemSlug]);
+
   const closeModal = () => {
+    setCreating(false);
     setModalOpen(false);
     setForm(initialForm);
     setSubmitError(null);
@@ -101,10 +116,11 @@ function DashboardContent() {
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!form.title.trim() || !form.statement.trim()) return;
+    if (creating || !form.title.trim() || !form.statement.trim()) return;
 
     setSubmitError(null);
     setCreating(true);
+    if (form.problemSlug === trihexagonalDemo.slug) return;
     createResearchJob(form)
       .then((job) => router.push(`/dashboard/research/${job.id}`))
       .catch((reason: Error) => {
@@ -246,7 +262,7 @@ function ResearchDeployModal({
           {error && <p role="alert" className="text-xs text-red-800">{error}</p>}
           <div className="flex justify-end gap-3">
             <button className="h-10 rounded-md border border-black/12 px-4 text-sm font-medium transition hover:bg-black/5" onClick={onClose} type="button">Cancel</button>
-            <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-black px-5 text-sm font-medium text-white transition hover:bg-black/75 disabled:cursor-wait disabled:opacity-50" disabled={creating} type="submit"><IconPlus size={16} />{creating ? "Starting…" : "Start research"}</button>
+            <button className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-black px-5 text-sm font-medium text-white transition hover:bg-black/75 disabled:cursor-wait disabled:opacity-50" disabled={creating} type="submit"><IconPlus size={16} />{creating ? <span role="status" className="inline-flex items-center gap-2"><span aria-hidden="true" className="h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white motion-reduce:animate-none" />Starting…</span> : "Start research"}</button>
           </div>
         </div>
       </motion.form>
