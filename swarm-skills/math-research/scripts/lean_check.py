@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import tempfile
 
@@ -12,6 +13,32 @@ FORBIDDEN = re.compile(
     r"by_elab|eval_expr|IO|Lean)\b|[#;]"
 )
 ALLOWED_AXIOMS = {"propext", "Classical.choice", "Quot.sound"}
+LEAN_TOOLCHAIN = "leanprover/lean4:v4.19.0"
+
+
+def lean_executable(executable=None):
+    """Resolve Lean before entering the temporary proof directory."""
+    configured = str(executable or os.environ.get("SWARM_LEAN_BIN", "")).strip()
+    if configured:
+        path = Path(configured).expanduser()
+        if path.is_absolute() or "/" in configured or "\\" in configured:
+            return str(path.resolve())
+        return shutil.which(configured) or configured
+
+    binary = "lean.exe" if os.name == "nt" else "lean"
+    elan_home = Path(os.environ.get("ELAN_HOME") or Path.home() / ".elan").expanduser()
+    toolchain_dir = LEAN_TOOLCHAIN.replace("/", "--").replace(":", "---")
+    installed = elan_home / "toolchains" / toolchain_dir / "bin" / binary
+    if installed.is_file():
+        return str(installed.resolve())
+
+    if os.name == "nt":
+        root = Path(__file__).resolve().parents[3]
+        bundled = root / ".data/lean/lean-4.19.0-windows/bin/lean.exe"
+        if bundled.is_file():
+            return str(bundled)
+
+    return shutil.which(binary) or binary
 
 
 def check(statement, proof, *, executable=None, timeout=30):
@@ -36,13 +63,14 @@ def check(statement, proof, *, executable=None, timeout=30):
     source += " :=\n  " + proof.strip().replace("\n", "\n  ")
     source += "\n\n#print axioms triviality_target\n"
     result["lean"] = source
-    executable = executable or os.environ.get("SWARM_LEAN_BIN", "lean")
+    executable = lean_executable(executable)
     try:
         with tempfile.TemporaryDirectory(prefix="triviality-proof-") as directory:
             path = Path(directory) / "Proof.lean"
             path.write_text(source, encoding="utf-8")
             run = subprocess.run([executable, str(path)], cwd=directory, capture_output=True,
-                                 text=True, encoding="utf-8", errors="replace", timeout=timeout)
+                                 text=True, encoding="utf-8", errors="replace", timeout=timeout,
+                                 env={**os.environ, "ELAN_TOOLCHAIN": LEAN_TOOLCHAIN})
         result["log"] = (run.stdout + "\n" + run.stderr)[-24000:]
         if run.returncode:
             result["checker"] = "Lean rejected the candidate"
