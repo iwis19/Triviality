@@ -192,8 +192,9 @@ export default function Home() {
           />
         </div>
 
-        <div className="absolute bottom-8 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3 text-[9px] uppercase tracking-[0.3em] text-black/45">
+        <div className="absolute bottom-8 left-1/2 flex -translate-x-1/2 flex-col items-center gap-3 text-[10px] uppercase tracking-[0.3em] text-black/45">
           <span className="h-8 w-px bg-black/35" />
+          <span>Explore questions · test ideas · verify proofs</span>
         </div>
       </section>
 

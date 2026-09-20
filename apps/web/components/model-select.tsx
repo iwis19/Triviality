@@ -39,9 +39,9 @@ function ProviderLogo({ provider }: { provider: string }) {
   </span>;
 }
 
-function ModelLabel({ id }: { id: string }) {
+export function ModelLabel({ id, fallbackLabel = "Choose a model" }: { id: string; fallbackLabel?: string }) {
   const model = modelCatalog.models.find((item) => item.id === id);
-  if (!model) return <span>Choose a model</span>;
+  if (!model) return <span>{fallbackLabel}</span>;
   const name = model.label.split(/\s+[·/]\s+/).slice(1).join(" ") || model.label;
   return <span className="flex min-w-0 items-center gap-3">
     <ProviderLogo key={model.provider} provider={model.provider} />
