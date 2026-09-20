@@ -1,10 +1,10 @@
 import type { GraphNode, Layer } from "./api";
 
 export const LAYER_COLORS: Record<Layer, string> = {
-  atlas: "#7c8fa6",
-  lineage: "#f2b134",
-  dependency: "#4fc3f7",
-  association: "#b39ddb",
+  atlas: "#9699b8",
+  lineage: "#b7a17f",
+  dependency: "#86a8af",
+  association: "#ad94b0",
 };
 
 export const EVIDENCE_COLORS: Record<string, string> = {
@@ -21,14 +21,14 @@ export const EVIDENCE_COLORS: Record<string, string> = {
 export function nodeColor(n: GraphNode): string {
   switch (n.type) {
     case "area":
-      return n.depth === 0 ? "#18181b" : "#71717a";
+      return n.depth === 0 ? "#4f46e5" : "#8b5cf6";
     case "problem":
-      return "#a18b66";
+      return "#f59e0b";
     case "idea":
       if (n.scheduling_status === "archived") return "#4b5563";
       return EVIDENCE_COLORS[n.evidence_status ?? "untested"] ?? "#9ca3af";
     case "claim":
-      return n.formalization_status === "complete" ? "#2ecc71" : "#c084fc";
+      return n.formalization_status === "complete" ? "#2ecc71" : "#d946ef";
   }
 }
 

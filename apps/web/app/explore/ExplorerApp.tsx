@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowUpRight, Search, X, Menu } from "lucide-react";
 import { TrivialityLogo } from "@/components/triviality-logo";
@@ -212,7 +215,7 @@ function DetailPanel({
     return (
       <div className="detail">
         <h2>{a?.name}</h2>
-        <p>{a?.description}</p>
+        <MathContent>{a?.description}</MathContent>
         <p>
           <small>{a?.problem_count} problems classified here</small>
         </p>
@@ -237,17 +240,17 @@ function DetailPanel({
           </small>
         </p>
         <h4>Approach</h4>
-        <p>{idea.approach}</p>
+        <MathContent>{idea.approach}</MathContent>
         {idea.mechanism && (
           <>
             <h4>Mechanism</h4>
-            <p>{idea.mechanism}</p>
+            <MathContent>{idea.mechanism}</MathContent>
           </>
         )}
         {idea.next_experiment && (
           <>
             <h4>Next experiment</h4>
-            <p>{idea.next_experiment}</p>
+            <MathContent>{idea.next_experiment}</MathContent>
           </>
         )}
         {idea.parent_ids.length > 0 && (
@@ -264,7 +267,7 @@ function DetailPanel({
         {claims.map((c) => (
           <div key={c.id} className="card">
             <span className="label small">{c.evidence_label}</span>
-            <p>{c.statement}</p>
+            <MathContent>{c.statement}</MathContent>
             {c.lean_declaration && <pre>{c.lean_declaration}</pre>}
             <small>
               claim v{c.claim_version} · formalization {c.formalization_status}
@@ -278,7 +281,7 @@ function DetailPanel({
             <p>
               <b>{e.check_type}</b> → {e.result} {e.certified ? "(independently certified)" : "(worker-reported)"}
             </p>
-            <p>{e.summary}</p>
+            <MathContent>{e.summary}</MathContent>
             {e.verifier && (
               <small>
                 verifier {e.verifier} {e.verifier_version}
@@ -303,7 +306,7 @@ function DetailPanel({
       <div className="detail">
         <span className="label">{c.evidence_label}</span>
         <h2>Claim</h2>
-        <p>{c.statement}</p>
+        <MathContent>{c.statement}</MathContent>
         {c.lean_declaration && <pre>{c.lean_declaration}</pre>}
         <p>
           <small>
@@ -324,17 +327,17 @@ function DetailPanel({
       <div className="detail">
         <span className="label">{p.evidence_label}</span>
         <h2>{p.title}</h2>
-        <p>{p.statement}</p>
+        <MathContent>{p.statement}</MathContent>
         {p.definitions && (
           <>
             <h4>Definitions</h4>
-            <p>{p.definitions}</p>
+            <MathContent>{p.definitions}</MathContent>
           </>
         )}
         {p.assumptions && (
           <>
             <h4>Assumptions</h4>
-            <p>{p.assumptions}</p>
+            <MathContent>{p.assumptions}</MathContent>
           </>
         )}
         {p.formal_target && (
@@ -405,4 +408,14 @@ function DetailPanel({
     );
   }
   return null;
+}
+
+function MathContent({ children }: { children: string | undefined }) {
+  return (
+    <div className="math-content">
+      <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+        {children ?? ""}
+      </ReactMarkdown>
+    </div>
+  );
 }

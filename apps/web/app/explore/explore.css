@@ -60,3 +60,21 @@
 @media (max-width:1100px) { .mlx .body,.mlx .body.has-detail { grid-template-columns:240px minmax(0,1fr); } .mlx .right { position:absolute; right:0; top:0; bottom:0; width:min(360px,100%); z-index:5; box-shadow:-12px 0 40px #00000008; } }
 @media (max-width:700px) { .mlx .atlas-header { height:112px; padding:14px 18px 48px; gap:14px; position:relative; } .mlx .atlas-header .atlas-search { position:absolute; left:20px; right:20px; bottom:5px; width:auto; } .mlx .workspace-link { margin-left:auto; padding:10px 12px; font-size:9px; } .mlx .menu-toggle { display:block; } .mlx .body,.mlx .body.has-detail { grid-template-columns:minmax(0,1fr); } .mlx .left { display:none; } .mlx .left.is-open { display:flex; position:absolute; z-index:4; top:0; bottom:0; left:0; width:min(300px,85%); box-shadow:12px 0 40px #00000008; } .mlx .right { width:min(360px,100%); } }
 @media (prefers-reduced-motion:reduce) { .mlx .right { animation:none; } .atlas-intro { display:none; } }
+
+.mlx .math-content { min-width:0; overflow-wrap:anywhere; line-height:1.8; }
+.mlx .math-content .katex { font-size:1.05em; }
+.mlx .math-content .katex-display { max-width:100%; overflow-x:auto; overflow-y:hidden; padding:4px 0; }
+.mlx .math-content ul,.mlx .math-content ol { padding-left:20px; margin:10px 0; }
+.mlx .math-content ul { list-style:disc; }
+.mlx .math-content ol { list-style:decimal; }
+
+/* Give the canvas real space beside details so camera framing stays accurate. */
+@media (min-width:701px) and (max-width:1100px) {
+  .mlx .body.has-detail { grid-template-columns:minmax(0,1fr) 340px; }
+  .mlx .body.has-detail .left { display:none; }
+  .mlx .body.has-detail .right { position:static; width:auto; box-shadow:none; }
+}
+@media (max-width:700px) {
+  .mlx .body.has-detail { grid-template-rows:minmax(180px,1fr) minmax(0,45%); }
+  .mlx .body.has-detail .right { position:static; width:100%; border-left:0; border-top:1px solid var(--border); }
+}
