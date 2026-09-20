@@ -1,0 +1,923 @@
+{
+  "portfolio_id": "8dc064a431a84cae9363bec2172c4b6e",
+  "problems": [
+    {
+      "id": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "title": "Erdős problem #10",
+      "statement": "Is there some $k$ such that every integer is the sum of a prime and at most $k$ powers of $2$?",
+      "assumptions": "",
+      "formal_target": "",
+      "campaign_id": "19b260b1d9794404ab56f9644319ef22",
+      "state": "completed"
+    },
+    {
+      "id": "410f43835fbe4b9caa91947e52cfda9b",
+      "title": "Erdős problem #14",
+      "statement": "Let $A ⊆ N$. Let $B ⊆ N$ be the set of integers which are representable in exactly one way as the sum of two elements from $A$. Is it true that for all $\\epsilon > 0$ and large $N$, $|\\{1,\\ldots,N\\} \\setminus B| \\gg_\\epsilon N^{1/2 - \\epsilon}$?",
+      "assumptions": "",
+      "formal_target": "",
+      "campaign_id": "7cf8f1a4d1d049b0b81d55df429b5b0b",
+      "state": "completed"
+    },
+    {
+      "id": "ab74d2eaae604293aacac586f24581c9",
+      "title": "Erdős problem #9",
+      "statement": "Is the upper density of the set of odd numbers that cannot be expressed as a prime plus two powers of 2 positive?",
+      "assumptions": "",
+      "formal_target": "",
+      "campaign_id": "eaa0030a626b4c9d94087e8ebb05d76e",
+      "state": "completed"
+    },
+    {
+      "id": "d230555bd54846cf9d44a1cbe19d89eb",
+      "title": "Erdős problem #3",
+      "statement": "If $A \\subset N$ has $\\sum_{n \\in A}\\frac 1 n = \\infty$, then must $A$ contain arbitrarily long arithmetic progressions?",
+      "assumptions": "",
+      "formal_target": "",
+      "campaign_id": "3ac3258367f34b8bbbee7299709ec6ee",
+      "state": "completed"
+    },
+    {
+      "id": "e59e79e139174f0e973f5f7b25dd3610",
+      "title": "Erdős problem #11",
+      "statement": "Is every odd $n > 1$ the sum of a squarefree number and a power of 2?",
+      "assumptions": "",
+      "formal_target": "",
+      "campaign_id": "1ba1c3e7c2f7471e94d63e3ff75d913d",
+      "state": "completed"
+    }
+  ],
+  "claims": [
+    {
+      "id": "a1cf555a6eac4be094f0204910cce467",
+      "origin_campaign_id": "19b260b1d9794404ab56f9644319ef22",
+      "statement": "[mock] 1 + 1 = 2",
+      "scope": "",
+      "lean_declaration": "theorem shared_mock_lemma : 1 + 1 = 2",
+      "state": "untested",
+      "version": 1,
+      "evidence": [
+        {
+          "id": "6bb977f88bf1435096938b6f87e13149",
+          "check_type": "lean_attempt",
+          "result": "inconclusive",
+          "certified": false,
+          "summary": "[mock] Shared lemma candidate.",
+          "coverage": "",
+          "artifact_id": "748d510904d046c8aea80c46351e4698",
+          "assumptions": []
+        },
+        {
+          "id": "64b949c11d0c4dd5adb7ae1ec8e3f0c2",
+          "check_type": "lean_check",
+          "result": "inconclusive",
+          "certified": false,
+          "summary": "Lean toolchain or lab project not available",
+          "coverage": "",
+          "artifact_id": "748d510904d046c8aea80c46351e4698",
+          "assumptions": []
+        }
+      ],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    },
+    {
+      "id": "abd82855f190426d95311fbeaf1fe7e5",
+      "origin_campaign_id": "7cf8f1a4d1d049b0b81d55df429b5b0b",
+      "statement": "[mock] key lemma for density increment",
+      "scope": "",
+      "lean_declaration": "",
+      "state": "untested",
+      "version": 1,
+      "evidence": [],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    },
+    {
+      "id": "16a39ab15a7d4091832f695f5bdbf331",
+      "origin_campaign_id": "7cf8f1a4d1d049b0b81d55df429b5b0b",
+      "statement": "[mock] key lemma for computational search for small cases",
+      "scope": "",
+      "lean_declaration": "",
+      "state": "untested",
+      "version": 1,
+      "evidence": [],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    },
+    {
+      "id": "8b4d52f3d0424009b19d584cc4b7b4d7",
+      "origin_campaign_id": "7cf8f1a4d1d049b0b81d55df429b5b0b",
+      "statement": "[mock] key lemma for structural reduction",
+      "scope": "",
+      "lean_declaration": "",
+      "state": "untested",
+      "version": 1,
+      "evidence": [],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    },
+    {
+      "id": "ad2af13448e841e7883aff68e3ac7929",
+      "origin_campaign_id": "eaa0030a626b4c9d94087e8ebb05d76e",
+      "statement": "[mock] key lemma for probabilistic construction",
+      "scope": "",
+      "lean_declaration": "",
+      "state": "untested",
+      "version": 1,
+      "evidence": [],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    },
+    {
+      "id": "e85e5cdb3fcb4c11adf7f53bfe2d3740",
+      "origin_campaign_id": "eaa0030a626b4c9d94087e8ebb05d76e",
+      "statement": "[mock] key lemma for spectral/fourier bound",
+      "scope": "",
+      "lean_declaration": "",
+      "state": "untested",
+      "version": 1,
+      "evidence": [],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    },
+    {
+      "id": "47304fcb8ac74c7fb114e7db067cb78e",
+      "origin_campaign_id": "eaa0030a626b4c9d94087e8ebb05d76e",
+      "statement": "[mock] key lemma for density increment",
+      "scope": "",
+      "lean_declaration": "",
+      "state": "untested",
+      "version": 1,
+      "evidence": [],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    },
+    {
+      "id": "9ffcc171808d46c780956bad611e3a40",
+      "origin_campaign_id": "3ac3258367f34b8bbbee7299709ec6ee",
+      "statement": "[mock] key lemma for probabilistic construction",
+      "scope": "",
+      "lean_declaration": "",
+      "state": "untested",
+      "version": 1,
+      "evidence": [],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    },
+    {
+      "id": "36d6f679491447519d5cb8ec4265a09c",
+      "origin_campaign_id": "3ac3258367f34b8bbbee7299709ec6ee",
+      "statement": "[mock] key lemma for density increment",
+      "scope": "",
+      "lean_declaration": "",
+      "state": "untested",
+      "version": 1,
+      "evidence": [],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    },
+    {
+      "id": "5d783196079d4417989af32b30963431",
+      "origin_campaign_id": "3ac3258367f34b8bbbee7299709ec6ee",
+      "statement": "[mock] key lemma for spectral/fourier bound",
+      "scope": "",
+      "lean_declaration": "",
+      "state": "untested",
+      "version": 1,
+      "evidence": [],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    },
+    {
+      "id": "5193a1ccc76741b19e9bbec7e90b348c",
+      "origin_campaign_id": "1ba1c3e7c2f7471e94d63e3ff75d913d",
+      "statement": "[mock] key lemma for structural reduction",
+      "scope": "",
+      "lean_declaration": "",
+      "state": "untested",
+      "version": 1,
+      "evidence": [],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    },
+    {
+      "id": "607224eebb3048c9a55844293fe1f6ed",
+      "origin_campaign_id": "1ba1c3e7c2f7471e94d63e3ff75d913d",
+      "statement": "[mock] key lemma for spectral/fourier bound",
+      "scope": "",
+      "lean_declaration": "",
+      "state": "untested",
+      "version": 1,
+      "evidence": [],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    },
+    {
+      "id": "7da26b1a53d040d4b2630e286c4f3347",
+      "origin_campaign_id": "1ba1c3e7c2f7471e94d63e3ff75d913d",
+      "statement": "[mock] key lemma for density increment",
+      "scope": "",
+      "lean_declaration": "",
+      "state": "untested",
+      "version": 1,
+      "evidence": [],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    },
+    {
+      "id": "66a452fa70d2462383f406e76d7f8788",
+      "origin_campaign_id": "3ac3258367f34b8bbbee7299709ec6ee",
+      "statement": "[mock] 1 + 1 = 2",
+      "scope": "",
+      "lean_declaration": "theorem shared_mock_lemma : 1 + 1 = 2",
+      "state": "untested",
+      "version": 1,
+      "evidence": [
+        {
+          "id": "def27985bb964c56bf1ff177881ce6aa",
+          "check_type": "lean_attempt",
+          "result": "inconclusive",
+          "certified": false,
+          "summary": "[mock] Shared lemma candidate.",
+          "coverage": "",
+          "artifact_id": "3d33e78ec3fd4b15976f8f407010db7e",
+          "assumptions": []
+        },
+        {
+          "id": "287fc2027ff9410489b72497c02e0a08",
+          "check_type": "lean_check",
+          "result": "inconclusive",
+          "certified": false,
+          "summary": "Lean toolchain or lab project not available",
+          "coverage": "",
+          "artifact_id": "3d33e78ec3fd4b15976f8f407010db7e",
+          "assumptions": []
+        }
+      ],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    },
+    {
+      "id": "ed0f0cc6065e4387bac02a24120c72a3",
+      "origin_campaign_id": "19b260b1d9794404ab56f9644319ef22",
+      "statement": "[mock] 1 + 1 = 2",
+      "scope": "",
+      "lean_declaration": "theorem shared_mock_lemma : 1 + 1 = 2",
+      "state": "untested",
+      "version": 1,
+      "evidence": [],
+      "dependency_gaps": {
+        "unresolved": [],
+        "cycles": [],
+        "refuted": []
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": "885d739eb5cf47439e06fc42870a997c",
+      "claim": "16a39ab15a7d4091832f695f5bdbf331",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "b3d6a3e270e64c26b6a467e831c383c1",
+      "claim": "16a39ab15a7d4091832f695f5bdbf331",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "cb579b0420c046d4bf5b9d4d88e6701a",
+      "claim": "16a39ab15a7d4091832f695f5bdbf331",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "04754927767947e7bb38e988f904645f",
+      "claim": "36d6f679491447519d5cb8ec4265a09c",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "2d35434d88fe43989d13eb4741bac01e",
+      "claim": "36d6f679491447519d5cb8ec4265a09c",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "6184906eb823454cab8b7c8c2580ac2d",
+      "claim": "36d6f679491447519d5cb8ec4265a09c",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "aa6e0ba56f4f4ecb93b51523a29b27d5",
+      "claim": "47304fcb8ac74c7fb114e7db067cb78e",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "561378d69db740fda9e92b3f7515840a",
+      "claim": "47304fcb8ac74c7fb114e7db067cb78e",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "33c23de6cb9649a3adca497a293faf93",
+      "claim": "47304fcb8ac74c7fb114e7db067cb78e",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "kind": "applies_to",
+      "status": "adopted",
+      "reason": "[mock] Retain as a research route, not a proof.",
+      "assumptions": []
+    },
+    {
+      "id": "b2bcc3506a294877986b9bcb27cbc1bb",
+      "claim": "5193a1ccc76741b19e9bbec7e90b348c",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "08b793648b8f450b9838510e0f9d2deb",
+      "claim": "5193a1ccc76741b19e9bbec7e90b348c",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "kind": "applies_to",
+      "status": "adopted",
+      "reason": "[mock] Retain as a research route, not a proof.",
+      "assumptions": []
+    },
+    {
+      "id": "59c03b7492f34cc9a1019a21d2ae33de",
+      "claim": "5193a1ccc76741b19e9bbec7e90b348c",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "644fc5edcfc448a8852c7ca12ff4547b",
+      "claim": "5d783196079d4417989af32b30963431",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "f48ae5fcd20345e28594c75d4a7180e7",
+      "claim": "5d783196079d4417989af32b30963431",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "35970d02a64243969595e69c4eb97ce2",
+      "claim": "5d783196079d4417989af32b30963431",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "kind": "applies_to",
+      "status": "adopted",
+      "reason": "[mock] Retain as a research route, not a proof.",
+      "assumptions": []
+    },
+    {
+      "id": "fad0ade4b18146eeb8664c9b3f49872c",
+      "claim": "607224eebb3048c9a55844293fe1f6ed",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "03d270b89c3b4bf6beec674ff1378d68",
+      "claim": "607224eebb3048c9a55844293fe1f6ed",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "kind": "applies_to",
+      "status": "adopted",
+      "reason": "[mock] Retain as a research route, not a proof.",
+      "assumptions": []
+    },
+    {
+      "id": "fb8f343580ef407f94662a147a6d04b2",
+      "claim": "607224eebb3048c9a55844293fe1f6ed",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "736b102f6ce748d2894f74ad5f602758",
+      "claim": "66a452fa70d2462383f406e76d7f8788",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "[mock] Candidate shared route; untested.",
+      "assumptions": []
+    },
+    {
+      "id": "3ecbb2360f2b42dda0e0e62ac4e85154",
+      "claim": "66a452fa70d2462383f406e76d7f8788",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "kind": "applies_to",
+      "status": "adopted",
+      "reason": "[mock] Retain as a research route, not a proof.",
+      "assumptions": []
+    },
+    {
+      "id": "b1f40f730e754490b130985179b487e9",
+      "claim": "66a452fa70d2462383f406e76d7f8788",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "[mock] Candidate shared route; untested.",
+      "assumptions": []
+    },
+    {
+      "id": "db360d29a94f4a71bfd49a7167357819",
+      "claim": "66a452fa70d2462383f406e76d7f8788",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "[mock] Candidate shared route; untested.",
+      "assumptions": []
+    },
+    {
+      "id": "d99edcda9bdf4850b5a0432b313da2cc",
+      "claim": "66a452fa70d2462383f406e76d7f8788",
+      "target": "e59e79e139174f0e973f5f7b25dd3610",
+      "kind": "applies_to",
+      "status": "adopted",
+      "reason": "[mock] Retain as a research route, not a proof.",
+      "assumptions": []
+    },
+    {
+      "id": "1842d30858924a238c2ea62ad4d33207",
+      "claim": "7da26b1a53d040d4b2630e286c4f3347",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "adopted",
+      "reason": "[mock] Retain as a research route, not a proof.",
+      "assumptions": []
+    },
+    {
+      "id": "9597b5318c2b47b88df3b8ed6b4ea919",
+      "claim": "7da26b1a53d040d4b2630e286c4f3347",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "d5ee5caed7e54c0981ab32f0b85d0c57",
+      "claim": "7da26b1a53d040d4b2630e286c4f3347",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "92fbfd79330d44aaa6ca21404c3ff97c",
+      "claim": "8b4d52f3d0424009b19d584cc4b7b4d7",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "c6d5669662f44c80aa2e20ad51e01143",
+      "claim": "8b4d52f3d0424009b19d584cc4b7b4d7",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "3adf36f09b0f4d7782ba898b5a83bb11",
+      "claim": "8b4d52f3d0424009b19d584cc4b7b4d7",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "kind": "applies_to",
+      "status": "adopted",
+      "reason": "[mock] Retain as a research route, not a proof.",
+      "assumptions": []
+    },
+    {
+      "id": "e50e2ddf0f98415e8af5780cbc0b1f79",
+      "claim": "9ffcc171808d46c780956bad611e3a40",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "7f6e7ee1285441329f30ced0d5d322d9",
+      "claim": "9ffcc171808d46c780956bad611e3a40",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "fb1c8ddd641941759611538b040e9cba",
+      "claim": "9ffcc171808d46c780956bad611e3a40",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "32fb92c220fe4446922c12ed42378bd0",
+      "claim": "a1cf555a6eac4be094f0204910cce467",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "adopted",
+      "reason": "[mock] Retain as a research route, not a proof.",
+      "assumptions": []
+    },
+    {
+      "id": "31414a03f1b848f38ae5514e04fab064",
+      "claim": "a1cf555a6eac4be094f0204910cce467",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "[mock] Candidate shared route; untested.",
+      "assumptions": []
+    },
+    {
+      "id": "8e9139ee748e4ed9aafa5b85793edca9",
+      "claim": "a1cf555a6eac4be094f0204910cce467",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "kind": "applies_to",
+      "status": "adopted",
+      "reason": "[mock] Retain as a research route, not a proof.",
+      "assumptions": []
+    },
+    {
+      "id": "f8ef228879c1434885ee4585749c8c2c",
+      "claim": "a1cf555a6eac4be094f0204910cce467",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "[mock] Candidate shared route; untested.",
+      "assumptions": []
+    },
+    {
+      "id": "20f9acdbb3164c6dba7a47957dcdfb6d",
+      "claim": "a1cf555a6eac4be094f0204910cce467",
+      "target": "e59e79e139174f0e973f5f7b25dd3610",
+      "kind": "applies_to",
+      "status": "adopted",
+      "reason": "[mock] Retain as a research route, not a proof.",
+      "assumptions": []
+    },
+    {
+      "id": "29267d38e9e3452286fdf2ffe59b3633",
+      "claim": "abd82855f190426d95311fbeaf1fe7e5",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "adopted",
+      "reason": "[mock] Retain as a research route, not a proof.",
+      "assumptions": []
+    },
+    {
+      "id": "3dc9bda5c95a46bcbe45a6c381c10b0a",
+      "claim": "abd82855f190426d95311fbeaf1fe7e5",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "kind": "applies_to",
+      "status": "adopted",
+      "reason": "[mock] Retain as a research route, not a proof.",
+      "assumptions": []
+    },
+    {
+      "id": "48c38f0d16f540ef9269fb572356df0e",
+      "claim": "abd82855f190426d95311fbeaf1fe7e5",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "69d3b579336546cb9062dca98c18d9ba",
+      "claim": "ad2af13448e841e7883aff68e3ac7929",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "fb9d2de031134b9d87af6233382bfd15",
+      "claim": "ad2af13448e841e7883aff68e3ac7929",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "b8c998ab5e254832b58a87d6b75f2eb8",
+      "claim": "ad2af13448e841e7883aff68e3ac7929",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "a685ea1ff1a647b084cbd1d845d39f39",
+      "claim": "e85e5cdb3fcb4c11adf7f53bfe2d3740",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "3d8bf4e6dfd541cc81c4247de0658280",
+      "claim": "e85e5cdb3fcb4c11adf7f53bfe2d3740",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "kind": "applies_to",
+      "status": "adopted",
+      "reason": "[mock] Retain as a research route, not a proof.",
+      "assumptions": []
+    },
+    {
+      "id": "5395f6f04e874c8686b0b61a94448e24",
+      "claim": "e85e5cdb3fcb4c11adf7f53bfe2d3740",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "Shared subject or statement terms; applicability untested.",
+      "assumptions": []
+    },
+    {
+      "id": "55ac24094bbe4f39994e41b4ec0df61d",
+      "claim": "ed0f0cc6065e4387bac02a24120c72a3",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "[mock] Candidate shared route; untested.",
+      "assumptions": []
+    },
+    {
+      "id": "9f70a38627fe400f8cd9c2a1667dad3d",
+      "claim": "ed0f0cc6065e4387bac02a24120c72a3",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "[mock] Candidate shared route; untested.",
+      "assumptions": []
+    },
+    {
+      "id": "4de848fa780c4f97ac9686098aab8d65",
+      "claim": "ed0f0cc6065e4387bac02a24120c72a3",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "[mock] Candidate shared route; untested.",
+      "assumptions": []
+    },
+    {
+      "id": "f498d37131504cdba25adab13831b4b4",
+      "claim": "ed0f0cc6065e4387bac02a24120c72a3",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "[mock] Candidate shared route; untested.",
+      "assumptions": []
+    },
+    {
+      "id": "b255914ab0d04036afb2a7f739e678f4",
+      "claim": "ed0f0cc6065e4387bac02a24120c72a3",
+      "target": "e59e79e139174f0e973f5f7b25dd3610",
+      "kind": "applies_to",
+      "status": "proposed",
+      "reason": "[mock] Candidate shared route; untested.",
+      "assumptions": []
+    }
+  ],
+  "failed_directions": [
+    {
+      "id": "9e2403873c414d7eb3212cc4df2245b7",
+      "problem_id": "ab74d2eaae604293aacac586f24581c9",
+      "title": "Probabilistic construction approach",
+      "approach": "Attempt a probabilistic construction argument for the stated problem.",
+      "state": "unresolved_conflict",
+      "evidence": [
+        {
+          "summary": "[mock] numerical_experiment finished with result refutes",
+          "result": "refutes",
+          "certified": false
+        }
+      ]
+    },
+    {
+      "id": "86a9343ef85d493eb3325f91ea47453a",
+      "problem_id": "d230555bd54846cf9d44a1cbe19d89eb",
+      "title": "Probabilistic construction approach",
+      "approach": "Attempt a probabilistic construction argument for the stated problem.",
+      "state": "unresolved_conflict",
+      "evidence": [
+        {
+          "summary": "[mock] numerical_experiment finished with result refutes",
+          "result": "refutes",
+          "certified": false
+        }
+      ]
+    }
+  ],
+  "total_claims": 15,
+  "bottlenecks": [
+    {
+      "attempt_id": "599dd2b5671a4fefa7f22cfcff3fb1b8",
+      "campaign_id": "3ac3258367f34b8bbbee7299709ec6ee",
+      "role": "connection_reviewer",
+      "focus_claim_id": "8b4d52f3d0424009b19d584cc4b7b4d7",
+      "gaps": [
+        "mock provider: no real research"
+      ]
+    },
+    {
+      "attempt_id": "86b03b7beb65435ca19933a5a5de7547",
+      "campaign_id": "1ba1c3e7c2f7471e94d63e3ff75d913d",
+      "role": "connection_reviewer",
+      "focus_claim_id": "a1cf555a6eac4be094f0204910cce467",
+      "gaps": [
+        "mock provider: no real research"
+      ]
+    },
+    {
+      "attempt_id": "4ae40e085dda4db6be33c850c0634058",
+      "campaign_id": "eaa0030a626b4c9d94087e8ebb05d76e",
+      "role": "connection_reviewer",
+      "focus_claim_id": "abd82855f190426d95311fbeaf1fe7e5",
+      "gaps": [
+        "mock provider: no real research"
+      ]
+    },
+    {
+      "attempt_id": "6790d616297143ab8eeda10fc0bc867b",
+      "campaign_id": "7cf8f1a4d1d049b0b81d55df429b5b0b",
+      "role": "connection_reviewer",
+      "focus_claim_id": "5193a1ccc76741b19e9bbec7e90b348c",
+      "gaps": [
+        "mock provider: no real research"
+      ]
+    },
+    {
+      "attempt_id": "db0376d3b58048b9b3654ee78a30f270",
+      "campaign_id": "1ba1c3e7c2f7471e94d63e3ff75d913d",
+      "role": "experimenter",
+      "focus_claim_id": null,
+      "gaps": [
+        "mock provider: no real research"
+      ]
+    },
+    {
+      "attempt_id": "0bdb12436fe741d784572be3c32c8fe0",
+      "campaign_id": "19b260b1d9794404ab56f9644319ef22",
+      "role": "critic",
+      "focus_claim_id": null,
+      "gaps": [
+        "mock provider: no real research"
+      ]
+    },
+    {
+      "attempt_id": "74d625285ad14eac872912399fe9fae2",
+      "campaign_id": "eaa0030a626b4c9d94087e8ebb05d76e",
+      "role": "lemma_prover",
+      "focus_claim_id": "a1cf555a6eac4be094f0204910cce467",
+      "gaps": [
+        "mock provider: no real research"
+      ]
+    },
+    {
+      "attempt_id": "57e52d00c3f641b8b70c17de3d2bf294",
+      "campaign_id": "3ac3258367f34b8bbbee7299709ec6ee",
+      "role": "connection_reviewer",
+      "focus_claim_id": "47304fcb8ac74c7fb114e7db067cb78e",
+      "gaps": [
+        "mock provider: no real research"
+      ]
+    },
+    {
+      "attempt_id": "2e08421ed3d24973b4ccfe016569c5ec",
+      "campaign_id": "3ac3258367f34b8bbbee7299709ec6ee",
+      "role": "experimenter",
+      "focus_claim_id": null,
+      "gaps": [
+        "mock provider: no real research"
+      ]
+    },
+    {
+      "attempt_id": "f34e2f422ed342f4a47e1ee71aa1f0f2",
+      "campaign_id": "1ba1c3e7c2f7471e94d63e3ff75d913d",
+      "role": "connection_reviewer",
+      "focus_claim_id": "66a452fa70d2462383f406e76d7f8788",
+      "gaps": [
+        "mock provider: no real research"
+      ]
+    },
+    {
+      "attempt_id": "cc4ffdde9cfb4ddaad1341ef2bb72067",
+      "campaign_id": "19b260b1d9794404ab56f9644319ef22",
+      "role": "connection_reviewer",
+      "focus_claim_id": "a1cf555a6eac4be094f0204910cce467",
+      "gaps": [
+        "mock provider: no real research"
+      ]
+    },
+    {
+      "attempt_id": "0200c85abcef43a782f21e197389bb56",
+      "campaign_id": "3ac3258367f34b8bbbee7299709ec6ee",
+      "role": "lemma_prover",
+      "focus_claim_id": "66a452fa70d2462383f406e76d7f8788",
+      "gaps": [
+        "mock provider: no real research"
+      ]
+    }
+  ],
+  "omitted_claims": 0,
+  "rule": "Adopted means useful to investigate. Only certified claim evidence is proof."
+}

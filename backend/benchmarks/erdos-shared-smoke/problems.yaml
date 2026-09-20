@@ -1,0 +1,99 @@
+- number: '3'
+  prize: $5000
+  informal_status:
+    state: open
+    last_update: '2025-08-31'
+  formal_status:
+    state: unformalized
+  status:
+    state: open
+    last_update: '2025-08-31'
+  oeis:
+  - A003002
+  - A003003
+  - A003004
+  - A003005
+  formalized:
+    state: 'yes'
+    last_update: '2025-08-31'
+  tags:
+  - number theory
+  - additive combinatorics
+  - arithmetic progressions
+- number: '9'
+  prize: 'no'
+  informal_status:
+    state: open
+    last_update: '2025-08-31'
+  formal_status:
+    state: unformalized
+  status:
+    state: open
+    last_update: '2025-08-31'
+  oeis:
+  - A006286
+  formalized:
+    state: 'yes'
+    last_update: '2025-08-31'
+  tags:
+  - number theory
+  - additive basis
+  - primes
+- number: '10'
+  prize: 'no'
+  informal_status:
+    state: open
+    last_update: '2025-08-31'
+  formal_status:
+    state: unformalized
+  status:
+    state: open
+    last_update: '2025-08-31'
+  oeis:
+  - A387053
+  formalized:
+    state: 'yes'
+    last_update: '2025-08-31'
+  tags:
+  - number theory
+  - additive basis
+  - primes
+- number: '11'
+  prize: 'no'
+  informal_status:
+    state: open
+    last_update: '2026-03-14'
+  formal_status:
+    state: unformalized
+  status:
+    state: open
+    last_update: '2026-03-14'
+  oeis:
+  - A001220
+  - A377587
+  formalized:
+    state: 'yes'
+    last_update: '2025-08-31'
+  tags:
+  - number theory
+  - additive basis
+- number: '14'
+  prize: 'no'
+  informal_status:
+    state: open
+    last_update: '2025-08-31'
+  formal_status:
+    state: unformalized
+  status:
+    state: open
+    last_update: '2025-08-31'
+  oeis:
+  - A143824
+  - possible
+  formalized:
+    state: 'yes'
+    last_update: '2025-11-02'
+  tags:
+  - number theory
+  - sidon sets
+  - additive combinatorics

@@ -1,0 +1,26 @@
+{
+  "name": "Erdos shared-research benchmark (mock)",
+  "numbers": [
+    3,
+    9,
+    10,
+    11,
+    14
+  ],
+  "worker_provider": "mock",
+  "purpose": "Research-loop and graph smoke benchmark; not a mathematical solve-rate result.",
+  "selection": "Related additive number theory problems, including additive bases, progressions and Sidon sets.",
+  "retrieved_at": "2026-09-19T18:18:13.585224+00:00",
+  "status_repository": "https://github.com/teorth/erdosproblems",
+  "status_commit": "f4b9f3bd3126a843fc2564972282948ec30d5c23",
+  "formal_repository": "https://github.com/google-deepmind/formal-conjectures",
+  "formal_commit": "b86fdb9a8f2f83d2bb2b4281586705896c0c8208",
+  "source_license": "Apache-2.0 (both source repositories)",
+  "files_sha256": {
+    "3.lean": "cb2c2eaaf141dc93472165d7d31b3d58b4e939fb0cae874a3dac4c55483b2bb8",
+    "9.lean": "198b89355f7d3ed755a9b1e31bc50a7afa4d337053d6e041b63d533c9e7d8393",
+    "10.lean": "e4353d651f5ff15abdd8b66fd120005c273d5eb9fd0b6c06feb92da1af257009",
+    "11.lean": "3c6654b2bb0fe6e8cdedcbf44f8182aefe75137cbb9df66998b5d10c49260efe",
+    "14.lean": "d1dbe458775eff9abd9b23afc81bedccddaadc3ed9694538b2bd425a04301a35"
+  }
+}

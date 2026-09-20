@@ -1,0 +1,1187 @@
+{
+  "nodes": [
+    {
+      "id": "2b0f1045643443ec82f747f9f6f9f54d",
+      "type": "area",
+      "label": "Number theory",
+      "slug": "number-theory",
+      "depth": 0,
+      "parent_id": null
+    },
+    {
+      "id": "f12844d240a4481e8d6a194ae63f6abd",
+      "type": "area",
+      "label": "Number theory (general)",
+      "slug": "number-theory-general",
+      "depth": 1,
+      "parent_id": "2b0f1045643443ec82f747f9f6f9f54d"
+    },
+    {
+      "id": "fa21815aa4bb49bbb8aea5f5f4a35d9c",
+      "type": "area",
+      "label": "Additive and combinatorial number theory",
+      "slug": "additive-number-theory",
+      "depth": 1,
+      "parent_id": "2b0f1045643443ec82f747f9f6f9f54d"
+    },
+    {
+      "id": "db1c752957c943768b31a7b9be812498",
+      "type": "area",
+      "label": "Distribution of primes",
+      "slug": "prime-distribution",
+      "depth": 1,
+      "parent_id": "2b0f1045643443ec82f747f9f6f9f54d"
+    },
+    {
+      "id": "d230555bd54846cf9d44a1cbe19d89eb",
+      "type": "problem",
+      "label": "Erdős problem #3",
+      "slug": "erdos-3",
+      "status": "reported_open",
+      "evidence_label": "Reported open by cited sources",
+      "areas": [
+        "number-theory",
+        "number-theory-general",
+        "additive-number-theory"
+      ]
+    },
+    {
+      "id": "ab74d2eaae604293aacac586f24581c9",
+      "type": "problem",
+      "label": "Erdős problem #9",
+      "slug": "erdos-9",
+      "status": "reported_open",
+      "evidence_label": "Reported open by cited sources",
+      "areas": [
+        "number-theory",
+        "prime-distribution",
+        "number-theory-general",
+        "additive-number-theory"
+      ]
+    },
+    {
+      "id": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "type": "problem",
+      "label": "Erdős problem #10",
+      "slug": "erdos-10",
+      "status": "reported_open",
+      "evidence_label": "Reported open by cited sources",
+      "areas": [
+        "number-theory",
+        "prime-distribution",
+        "number-theory-general",
+        "additive-number-theory"
+      ]
+    },
+    {
+      "id": "e59e79e139174f0e973f5f7b25dd3610",
+      "type": "problem",
+      "label": "Erdős problem #11",
+      "slug": "erdos-11",
+      "status": "reported_open",
+      "evidence_label": "Reported open by cited sources",
+      "areas": [
+        "number-theory",
+        "number-theory-general",
+        "additive-number-theory"
+      ]
+    },
+    {
+      "id": "410f43835fbe4b9caa91947e52cfda9b",
+      "type": "problem",
+      "label": "Erdős problem #14",
+      "slug": "erdos-14",
+      "status": "reported_open",
+      "evidence_label": "Reported open by cited sources",
+      "areas": [
+        "number-theory",
+        "number-theory-general",
+        "additive-number-theory"
+      ]
+    },
+    {
+      "id": "0d5a3672583f4444878184a211d68a58",
+      "type": "idea",
+      "label": "[mock] Shared finite-case lemma",
+      "problem_id": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "lean_formalization_in_progress",
+      "scheduling_status": "active",
+      "formalization_status": "in_progress",
+      "evidence_label": "Lean formalization in progress",
+      "score": 0.0,
+      "method_tags": [
+        "shared-reduction"
+      ]
+    },
+    {
+      "id": "2be8404934a5442bb13234f4e9d323dd",
+      "type": "idea",
+      "label": "Density increment approach",
+      "problem_id": "410f43835fbe4b9caa91947e52cfda9b",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "empirically_supported",
+      "scheduling_status": "active",
+      "formalization_status": "absent",
+      "evidence_label": "Empirical support only — not a proof",
+      "score": 0.0,
+      "method_tags": [
+        "additive-combinatorics",
+        "density-increment"
+      ]
+    },
+    {
+      "id": "a8c91f95f64340f9b63e2e81713a3c5b",
+      "type": "idea",
+      "label": "Computational search for small cases approach",
+      "problem_id": "410f43835fbe4b9caa91947e52cfda9b",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "empirically_supported",
+      "scheduling_status": "active",
+      "formalization_status": "absent",
+      "evidence_label": "Empirical support only — not a proof",
+      "score": 0.0,
+      "method_tags": [
+        "computation",
+        "counterexample-search"
+      ]
+    },
+    {
+      "id": "d30ef1f5f7584ec7bab3e24c1238c9be",
+      "type": "idea",
+      "label": "Structural reduction approach",
+      "problem_id": "410f43835fbe4b9caa91947e52cfda9b",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "empirically_supported",
+      "scheduling_status": "active",
+      "formalization_status": "absent",
+      "evidence_label": "Empirical support only — not a proof",
+      "score": 0.0,
+      "method_tags": [
+        "reduction",
+        "structure-theory"
+      ]
+    },
+    {
+      "id": "9e2403873c414d7eb3212cc4df2245b7",
+      "type": "idea",
+      "label": "Probabilistic construction approach",
+      "problem_id": "ab74d2eaae604293aacac586f24581c9",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "unresolved_conflict",
+      "scheduling_status": "active",
+      "formalization_status": "absent",
+      "evidence_label": "Reported refutation — awaiting independent check",
+      "score": 0.0,
+      "method_tags": [
+        "probabilistic-method",
+        "construction"
+      ]
+    },
+    {
+      "id": "4932d1cdb15f43c9b6f05e8b2995f89e",
+      "type": "idea",
+      "label": "Spectral/Fourier bound approach",
+      "problem_id": "ab74d2eaae604293aacac586f24581c9",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "untested",
+      "scheduling_status": "active",
+      "formalization_status": "absent",
+      "evidence_label": "Untested hypothesis",
+      "score": 0.0,
+      "method_tags": [
+        "fourier-analysis",
+        "spectral"
+      ]
+    },
+    {
+      "id": "3dca0fe324b343a4ad43575fdae571a0",
+      "type": "idea",
+      "label": "Density increment approach",
+      "problem_id": "ab74d2eaae604293aacac586f24581c9",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "empirically_supported",
+      "scheduling_status": "active",
+      "formalization_status": "absent",
+      "evidence_label": "Empirical support only — not a proof",
+      "score": 0.0,
+      "method_tags": [
+        "additive-combinatorics",
+        "density-increment"
+      ]
+    },
+    {
+      "id": "86a9343ef85d493eb3325f91ea47453a",
+      "type": "idea",
+      "label": "Probabilistic construction approach",
+      "problem_id": "d230555bd54846cf9d44a1cbe19d89eb",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "unresolved_conflict",
+      "scheduling_status": "active",
+      "formalization_status": "absent",
+      "evidence_label": "Reported refutation — awaiting independent check",
+      "score": 0.0,
+      "method_tags": [
+        "probabilistic-method",
+        "construction"
+      ]
+    },
+    {
+      "id": "cd0592833146443cba5702189ec2bcc1",
+      "type": "idea",
+      "label": "Density increment approach",
+      "problem_id": "d230555bd54846cf9d44a1cbe19d89eb",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "empirically_supported",
+      "scheduling_status": "active",
+      "formalization_status": "absent",
+      "evidence_label": "Empirical support only — not a proof",
+      "score": 0.0,
+      "method_tags": [
+        "additive-combinatorics",
+        "density-increment"
+      ]
+    },
+    {
+      "id": "bce8b94b22ec4bbc8b5bf5984f42f3ff",
+      "type": "idea",
+      "label": "Spectral/Fourier bound approach",
+      "problem_id": "d230555bd54846cf9d44a1cbe19d89eb",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "untested",
+      "scheduling_status": "active",
+      "formalization_status": "absent",
+      "evidence_label": "Untested hypothesis",
+      "score": 0.0,
+      "method_tags": [
+        "fourier-analysis",
+        "spectral"
+      ]
+    },
+    {
+      "id": "efb5561d66cc4226b39e76953af83c65",
+      "type": "idea",
+      "label": "Structural reduction approach",
+      "problem_id": "e59e79e139174f0e973f5f7b25dd3610",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "empirically_supported",
+      "scheduling_status": "active",
+      "formalization_status": "absent",
+      "evidence_label": "Empirical support only — not a proof",
+      "score": 0.0,
+      "method_tags": [
+        "reduction",
+        "structure-theory"
+      ]
+    },
+    {
+      "id": "3c6c7493935548e181166342cb691a7b",
+      "type": "idea",
+      "label": "Spectral/Fourier bound approach",
+      "problem_id": "e59e79e139174f0e973f5f7b25dd3610",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "untested",
+      "scheduling_status": "active",
+      "formalization_status": "absent",
+      "evidence_label": "Untested hypothesis",
+      "score": 0.0,
+      "method_tags": [
+        "fourier-analysis",
+        "spectral"
+      ]
+    },
+    {
+      "id": "ca3aae79e93245b3967fe104983effbe",
+      "type": "idea",
+      "label": "Density increment approach",
+      "problem_id": "e59e79e139174f0e973f5f7b25dd3610",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "empirically_supported",
+      "scheduling_status": "active",
+      "formalization_status": "absent",
+      "evidence_label": "Empirical support only — not a proof",
+      "score": 0.0,
+      "method_tags": [
+        "additive-combinatorics",
+        "density-increment"
+      ]
+    },
+    {
+      "id": "fc438716cab241ce80f9ceab7b9d4854",
+      "type": "idea",
+      "label": "[mock] Shared finite-case lemma",
+      "problem_id": "d230555bd54846cf9d44a1cbe19d89eb",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "lean_formalization_in_progress",
+      "scheduling_status": "active",
+      "formalization_status": "in_progress",
+      "evidence_label": "Lean formalization in progress",
+      "score": 0.0,
+      "method_tags": [
+        "shared-reduction"
+      ]
+    },
+    {
+      "id": "5ae2e72422054077a57c819b65b3d560",
+      "type": "idea",
+      "label": "[mock] Shared finite-case lemma",
+      "problem_id": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "generation": 0,
+      "depth": 0,
+      "evidence_status": "empirically_supported",
+      "scheduling_status": "active",
+      "formalization_status": "absent",
+      "evidence_label": "Empirical support only — not a proof",
+      "score": 0.0,
+      "method_tags": [
+        "shared-reduction"
+      ]
+    },
+    {
+      "id": "a1cf555a6eac4be094f0204910cce467",
+      "type": "claim",
+      "label": "[mock] 1 + 1 = 2",
+      "idea_id": "0d5a3672583f4444878184a211d68a58",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "target_proposed"
+    },
+    {
+      "id": "abd82855f190426d95311fbeaf1fe7e5",
+      "type": "claim",
+      "label": "[mock] key lemma for density increment",
+      "idea_id": "2be8404934a5442bb13234f4e9d323dd",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "absent"
+    },
+    {
+      "id": "16a39ab15a7d4091832f695f5bdbf331",
+      "type": "claim",
+      "label": "[mock] key lemma for computational search for small cases",
+      "idea_id": "a8c91f95f64340f9b63e2e81713a3c5b",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "absent"
+    },
+    {
+      "id": "8b4d52f3d0424009b19d584cc4b7b4d7",
+      "type": "claim",
+      "label": "[mock] key lemma for structural reduction",
+      "idea_id": "d30ef1f5f7584ec7bab3e24c1238c9be",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "absent"
+    },
+    {
+      "id": "ad2af13448e841e7883aff68e3ac7929",
+      "type": "claim",
+      "label": "[mock] key lemma for probabilistic construction",
+      "idea_id": "9e2403873c414d7eb3212cc4df2245b7",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "absent"
+    },
+    {
+      "id": "e85e5cdb3fcb4c11adf7f53bfe2d3740",
+      "type": "claim",
+      "label": "[mock] key lemma for spectral/fourier bound",
+      "idea_id": "4932d1cdb15f43c9b6f05e8b2995f89e",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "absent"
+    },
+    {
+      "id": "47304fcb8ac74c7fb114e7db067cb78e",
+      "type": "claim",
+      "label": "[mock] key lemma for density increment",
+      "idea_id": "3dca0fe324b343a4ad43575fdae571a0",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "absent"
+    },
+    {
+      "id": "9ffcc171808d46c780956bad611e3a40",
+      "type": "claim",
+      "label": "[mock] key lemma for probabilistic construction",
+      "idea_id": "86a9343ef85d493eb3325f91ea47453a",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "absent"
+    },
+    {
+      "id": "36d6f679491447519d5cb8ec4265a09c",
+      "type": "claim",
+      "label": "[mock] key lemma for density increment",
+      "idea_id": "cd0592833146443cba5702189ec2bcc1",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "absent"
+    },
+    {
+      "id": "5d783196079d4417989af32b30963431",
+      "type": "claim",
+      "label": "[mock] key lemma for spectral/fourier bound",
+      "idea_id": "bce8b94b22ec4bbc8b5bf5984f42f3ff",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "absent"
+    },
+    {
+      "id": "5193a1ccc76741b19e9bbec7e90b348c",
+      "type": "claim",
+      "label": "[mock] key lemma for structural reduction",
+      "idea_id": "efb5561d66cc4226b39e76953af83c65",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "absent"
+    },
+    {
+      "id": "607224eebb3048c9a55844293fe1f6ed",
+      "type": "claim",
+      "label": "[mock] key lemma for spectral/fourier bound",
+      "idea_id": "3c6c7493935548e181166342cb691a7b",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "absent"
+    },
+    {
+      "id": "7da26b1a53d040d4b2630e286c4f3347",
+      "type": "claim",
+      "label": "[mock] key lemma for density increment",
+      "idea_id": "ca3aae79e93245b3967fe104983effbe",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "absent"
+    },
+    {
+      "id": "66a452fa70d2462383f406e76d7f8788",
+      "type": "claim",
+      "label": "[mock] 1 + 1 = 2",
+      "idea_id": "fc438716cab241ce80f9ceab7b9d4854",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "target_proposed"
+    },
+    {
+      "id": "ed0f0cc6065e4387bac02a24120c72a3",
+      "type": "claim",
+      "label": "[mock] 1 + 1 = 2",
+      "idea_id": "5ae2e72422054077a57c819b65b3d560",
+      "evidence_label": "Untested hypothesis",
+      "formalization_status": "target_proposed"
+    }
+  ],
+  "links": [
+    {
+      "source": "f12844d240a4481e8d6a194ae63f6abd",
+      "target": "2b0f1045643443ec82f747f9f6f9f54d",
+      "layer": "atlas",
+      "kind": "subfield_of"
+    },
+    {
+      "source": "fa21815aa4bb49bbb8aea5f5f4a35d9c",
+      "target": "2b0f1045643443ec82f747f9f6f9f54d",
+      "layer": "atlas",
+      "kind": "subfield_of"
+    },
+    {
+      "source": "db1c752957c943768b31a7b9be812498",
+      "target": "2b0f1045643443ec82f747f9f6f9f54d",
+      "layer": "atlas",
+      "kind": "subfield_of"
+    },
+    {
+      "source": "d230555bd54846cf9d44a1cbe19d89eb",
+      "target": "2b0f1045643443ec82f747f9f6f9f54d",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "d230555bd54846cf9d44a1cbe19d89eb",
+      "target": "f12844d240a4481e8d6a194ae63f6abd",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "d230555bd54846cf9d44a1cbe19d89eb",
+      "target": "fa21815aa4bb49bbb8aea5f5f4a35d9c",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "ab74d2eaae604293aacac586f24581c9",
+      "target": "2b0f1045643443ec82f747f9f6f9f54d",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "ab74d2eaae604293aacac586f24581c9",
+      "target": "f12844d240a4481e8d6a194ae63f6abd",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "ab74d2eaae604293aacac586f24581c9",
+      "target": "fa21815aa4bb49bbb8aea5f5f4a35d9c",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "ab74d2eaae604293aacac586f24581c9",
+      "target": "db1c752957c943768b31a7b9be812498",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "target": "2b0f1045643443ec82f747f9f6f9f54d",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "target": "f12844d240a4481e8d6a194ae63f6abd",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "target": "fa21815aa4bb49bbb8aea5f5f4a35d9c",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "target": "db1c752957c943768b31a7b9be812498",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "e59e79e139174f0e973f5f7b25dd3610",
+      "target": "2b0f1045643443ec82f747f9f6f9f54d",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "e59e79e139174f0e973f5f7b25dd3610",
+      "target": "f12844d240a4481e8d6a194ae63f6abd",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "e59e79e139174f0e973f5f7b25dd3610",
+      "target": "fa21815aa4bb49bbb8aea5f5f4a35d9c",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "410f43835fbe4b9caa91947e52cfda9b",
+      "target": "2b0f1045643443ec82f747f9f6f9f54d",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "410f43835fbe4b9caa91947e52cfda9b",
+      "target": "f12844d240a4481e8d6a194ae63f6abd",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "410f43835fbe4b9caa91947e52cfda9b",
+      "target": "fa21815aa4bb49bbb8aea5f5f4a35d9c",
+      "layer": "atlas",
+      "kind": "classified_in",
+      "status": "checked"
+    },
+    {
+      "source": "0d5a3672583f4444878184a211d68a58",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "0d5a3672583f4444878184a211d68a58",
+      "target": "a1cf555a6eac4be094f0204910cce467",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "a1cf555a6eac4be094f0204910cce467",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "adopted"
+    },
+    {
+      "source": "a1cf555a6eac4be094f0204910cce467",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "a1cf555a6eac4be094f0204910cce467",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "adopted"
+    },
+    {
+      "source": "a1cf555a6eac4be094f0204910cce467",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "a1cf555a6eac4be094f0204910cce467",
+      "target": "e59e79e139174f0e973f5f7b25dd3610",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "adopted"
+    },
+    {
+      "source": "2be8404934a5442bb13234f4e9d323dd",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "2be8404934a5442bb13234f4e9d323dd",
+      "target": "abd82855f190426d95311fbeaf1fe7e5",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "a8c91f95f64340f9b63e2e81713a3c5b",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "a8c91f95f64340f9b63e2e81713a3c5b",
+      "target": "16a39ab15a7d4091832f695f5bdbf331",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "d30ef1f5f7584ec7bab3e24c1238c9be",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "d30ef1f5f7584ec7bab3e24c1238c9be",
+      "target": "8b4d52f3d0424009b19d584cc4b7b4d7",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "9e2403873c414d7eb3212cc4df2245b7",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "9e2403873c414d7eb3212cc4df2245b7",
+      "target": "ad2af13448e841e7883aff68e3ac7929",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "4932d1cdb15f43c9b6f05e8b2995f89e",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "4932d1cdb15f43c9b6f05e8b2995f89e",
+      "target": "e85e5cdb3fcb4c11adf7f53bfe2d3740",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "3dca0fe324b343a4ad43575fdae571a0",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "3dca0fe324b343a4ad43575fdae571a0",
+      "target": "47304fcb8ac74c7fb114e7db067cb78e",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "abd82855f190426d95311fbeaf1fe7e5",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "adopted"
+    },
+    {
+      "source": "abd82855f190426d95311fbeaf1fe7e5",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "adopted"
+    },
+    {
+      "source": "abd82855f190426d95311fbeaf1fe7e5",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "16a39ab15a7d4091832f695f5bdbf331",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "16a39ab15a7d4091832f695f5bdbf331",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "16a39ab15a7d4091832f695f5bdbf331",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "8b4d52f3d0424009b19d584cc4b7b4d7",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "8b4d52f3d0424009b19d584cc4b7b4d7",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "8b4d52f3d0424009b19d584cc4b7b4d7",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "adopted"
+    },
+    {
+      "source": "ad2af13448e841e7883aff68e3ac7929",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "ad2af13448e841e7883aff68e3ac7929",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "ad2af13448e841e7883aff68e3ac7929",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "e85e5cdb3fcb4c11adf7f53bfe2d3740",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "e85e5cdb3fcb4c11adf7f53bfe2d3740",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "adopted"
+    },
+    {
+      "source": "e85e5cdb3fcb4c11adf7f53bfe2d3740",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "47304fcb8ac74c7fb114e7db067cb78e",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "47304fcb8ac74c7fb114e7db067cb78e",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "47304fcb8ac74c7fb114e7db067cb78e",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "adopted"
+    },
+    {
+      "source": "86a9343ef85d493eb3325f91ea47453a",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "86a9343ef85d493eb3325f91ea47453a",
+      "target": "9ffcc171808d46c780956bad611e3a40",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "cd0592833146443cba5702189ec2bcc1",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "cd0592833146443cba5702189ec2bcc1",
+      "target": "36d6f679491447519d5cb8ec4265a09c",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "bce8b94b22ec4bbc8b5bf5984f42f3ff",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "bce8b94b22ec4bbc8b5bf5984f42f3ff",
+      "target": "5d783196079d4417989af32b30963431",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "efb5561d66cc4226b39e76953af83c65",
+      "target": "e59e79e139174f0e973f5f7b25dd3610",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "efb5561d66cc4226b39e76953af83c65",
+      "target": "5193a1ccc76741b19e9bbec7e90b348c",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "3c6c7493935548e181166342cb691a7b",
+      "target": "e59e79e139174f0e973f5f7b25dd3610",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "3c6c7493935548e181166342cb691a7b",
+      "target": "607224eebb3048c9a55844293fe1f6ed",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "ca3aae79e93245b3967fe104983effbe",
+      "target": "e59e79e139174f0e973f5f7b25dd3610",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "ca3aae79e93245b3967fe104983effbe",
+      "target": "7da26b1a53d040d4b2630e286c4f3347",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "fc438716cab241ce80f9ceab7b9d4854",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "fc438716cab241ce80f9ceab7b9d4854",
+      "target": "66a452fa70d2462383f406e76d7f8788",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "66a452fa70d2462383f406e76d7f8788",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "66a452fa70d2462383f406e76d7f8788",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "adopted"
+    },
+    {
+      "source": "66a452fa70d2462383f406e76d7f8788",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "66a452fa70d2462383f406e76d7f8788",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "66a452fa70d2462383f406e76d7f8788",
+      "target": "e59e79e139174f0e973f5f7b25dd3610",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "adopted"
+    },
+    {
+      "source": "9ffcc171808d46c780956bad611e3a40",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "9ffcc171808d46c780956bad611e3a40",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "9ffcc171808d46c780956bad611e3a40",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "36d6f679491447519d5cb8ec4265a09c",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "36d6f679491447519d5cb8ec4265a09c",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "36d6f679491447519d5cb8ec4265a09c",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "5d783196079d4417989af32b30963431",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "5d783196079d4417989af32b30963431",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "5d783196079d4417989af32b30963431",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "adopted"
+    },
+    {
+      "source": "5193a1ccc76741b19e9bbec7e90b348c",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "5193a1ccc76741b19e9bbec7e90b348c",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "adopted"
+    },
+    {
+      "source": "5193a1ccc76741b19e9bbec7e90b348c",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "607224eebb3048c9a55844293fe1f6ed",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "607224eebb3048c9a55844293fe1f6ed",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "adopted"
+    },
+    {
+      "source": "607224eebb3048c9a55844293fe1f6ed",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "7da26b1a53d040d4b2630e286c4f3347",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "7da26b1a53d040d4b2630e286c4f3347",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "adopted"
+    },
+    {
+      "source": "7da26b1a53d040d4b2630e286c4f3347",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "5ae2e72422054077a57c819b65b3d560",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "lineage",
+      "kind": "proposed_for",
+      "status": "checked"
+    },
+    {
+      "source": "5ae2e72422054077a57c819b65b3d560",
+      "target": "ed0f0cc6065e4387bac02a24120c72a3",
+      "layer": "dependency",
+      "kind": "addresses",
+      "status": "checked"
+    },
+    {
+      "source": "ed0f0cc6065e4387bac02a24120c72a3",
+      "target": "16dedb83351f45a5aae1c27b4e1f5cfd",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "ed0f0cc6065e4387bac02a24120c72a3",
+      "target": "410f43835fbe4b9caa91947e52cfda9b",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "ed0f0cc6065e4387bac02a24120c72a3",
+      "target": "ab74d2eaae604293aacac586f24581c9",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "ed0f0cc6065e4387bac02a24120c72a3",
+      "target": "d230555bd54846cf9d44a1cbe19d89eb",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    },
+    {
+      "source": "ed0f0cc6065e4387bac02a24120c72a3",
+      "target": "e59e79e139174f0e973f5f7b25dd3610",
+      "layer": "association",
+      "kind": "applies_to",
+      "status": "proposed"
+    }
+  ],
+  "layers": [
+    "association",
+    "atlas",
+    "dependency",
+    "lineage"
+  ]
+}

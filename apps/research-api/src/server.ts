@@ -245,6 +245,17 @@ app.post("/research/jobs", async (request: FastifyRequest<{ Body: CreateJobBody 
   return reply.code(202).send(await serializeJob(episodeId));
 });
 
+// Imported proof content lives in the VM database, outside source and builds.
+// Production requests reach this through the authenticated backend gateway.
+app.get("/research/saved-chats/:chatId", async (request: FastifyRequest<{ Params: { chatId: string } }>, reply) => {
+  const { chatId } = request.params;
+  if (!/^episode_[a-f0-9]{16}$/.test(chatId)) return reply.code(400).send({ error: "Invalid chat ID" });
+  const db = await getDatabase();
+  const saved = await db.collection<{ _id: string; paper: Record<string, unknown> }>("saved_research_chats").findOne({ _id: chatId });
+  if (!saved) return reply.code(404).send({ error: "Saved research unavailable" });
+  return reply.header("Cache-Control", "private, no-store").send(saved.paper);
+});
+
 app.get("/research/jobs", async () => {
   const collections = await getCollections();
   const episodes = await collections.researchEpisodes.find({ demoDeadlineAt: { $exists: false } }).sort({ createdAt: -1 }).toArray();

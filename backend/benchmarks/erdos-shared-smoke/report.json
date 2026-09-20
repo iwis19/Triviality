@@ -1,0 +1,118 @@
+{
+  "name": "Erdos shared-research benchmark (mock)",
+  "portfolio_id": "8dc064a431a84cae9363bec2172c4b6e",
+  "numbers": [
+    3,
+    9,
+    10,
+    11,
+    14
+  ],
+  "provider": "mock",
+  "real_model_sessions": 0,
+  "warning": "Ideas, adoption decisions and experiments are simulated fixtures, not research findings.",
+  "limitations": [
+    "The current mock connection reviewer always adopts reviewed links; this run does not measure rejection quality.",
+    "Mock shared lemmas are trivial fixtures, not lemmas about the Erdos problems.",
+    "Imported Lean files are source references, not independently verified solutions."
+  ],
+  "problem_titles": [
+    "Erdős problem #10",
+    "Erdős problem #11",
+    "Erdős problem #14",
+    "Erdős problem #3",
+    "Erdős problem #9"
+  ],
+  "import": {
+    "areas": 0,
+    "problems": 0,
+    "sources": 0,
+    "duplicates": 0,
+    "refreshed": 0,
+    "parsed": 5,
+    "without_statement": 0,
+    "published": 0
+  },
+  "scheduler_ticks_this_invocation": 1,
+  "sessions_used": 40,
+  "session_budget": 40,
+  "roles": {
+    "synthesizer": 3,
+    "experimenter": 14,
+    "connection_reviewer": 16,
+    "critic": 1,
+    "hypothesis_generator": 4,
+    "lemma_prover": 2
+  },
+  "attempt_states": {
+    "completed": 40
+  },
+  "campaigns": [
+    {
+      "id": "19b260b1d9794404ab56f9644319ef22",
+      "problem_title": "Erdős problem #10",
+      "state": "completed",
+      "research_outcome": "unresolved",
+      "sessions_used": 8,
+      "session_budget": 8
+    },
+    {
+      "id": "7cf8f1a4d1d049b0b81d55df429b5b0b",
+      "problem_title": "Erdős problem #14",
+      "state": "completed",
+      "research_outcome": "unresolved",
+      "sessions_used": 8,
+      "session_budget": 8
+    },
+    {
+      "id": "eaa0030a626b4c9d94087e8ebb05d76e",
+      "problem_title": "Erdős problem #9",
+      "state": "completed",
+      "research_outcome": "unresolved",
+      "sessions_used": 8,
+      "session_budget": 8
+    },
+    {
+      "id": "3ac3258367f34b8bbbee7299709ec6ee",
+      "problem_title": "Erdős problem #3",
+      "state": "completed",
+      "research_outcome": "unresolved",
+      "sessions_used": 8,
+      "session_budget": 8
+    },
+    {
+      "id": "1ba1c3e7c2f7471e94d63e3ff75d913d",
+      "problem_title": "Erdős problem #11",
+      "state": "completed",
+      "research_outcome": "unresolved",
+      "sessions_used": 8,
+      "session_budget": 8
+    }
+  ],
+  "claim_count": 15,
+  "application_states": {
+    "proposed": 37,
+    "adopted": 14
+  },
+  "cross_problem_application_states": {
+    "proposed": 35,
+    "adopted": 13
+  },
+  "graph_nodes": 39,
+  "graph_links": 101,
+  "node_types": {
+    "area": 4,
+    "problem": 5,
+    "idea": 15,
+    "claim": 15
+  },
+  "link_types": {
+    "subfield_of": 3,
+    "classified_in": 17,
+    "proposed_for": 15,
+    "addresses": 15,
+    "applies_to": 51
+  },
+  "verified_claims": 0,
+  "finished_at": "2026-09-19T18:24:12.123135+00:00"
+}
