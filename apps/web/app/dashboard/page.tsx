@@ -9,6 +9,7 @@ import { publicApi } from "../explore/api";
 import { DashboardSidebar } from "./dashboard-sidebar";
 import { DashboardTopbar } from "./dashboard-topbar";
 import { ModelSelect } from "@/components/model-select";
+import { ResearchStatusBadge } from "@/components/research-status-badge";
 import { createResearchJob, getResearchJobs, type ResearchJob, modelCatalog, defaultRoleModels, type RoleModels } from "@/lib/research-store";
 
 type ResearchForm = {
@@ -270,9 +271,10 @@ function EpisodeRow({ job }: { job: ResearchJob }) {
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium">{job.title}</span>
         <span className="mt-1 block truncate text-xs text-black/45">{job.statement}</span>
+        <span className="mt-2 block sm:hidden"><ResearchStatusBadge job={job} /></span>
       </span>
       <span className="hidden shrink-0 text-right sm:block">
-        <span className="block text-xs capitalize text-black/55">{job.status}</span>
+        <ResearchStatusBadge job={job} />
         <span className="mt-1 block text-[10px] text-black/35">{job.area}</span>
       </span>
       <IconChevronRight className="shrink-0 text-black/25 transition group-hover:translate-x-0.5 group-hover:text-black/50" size={17} />

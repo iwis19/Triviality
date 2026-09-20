@@ -12,6 +12,7 @@ import { DashboardTopbar } from "../../dashboard-topbar";
 import { ResearchGraph } from "@/components/research-graph";
 import { ResearchLiteratureTabs } from "@/components/research-literature-tabs";
 import { ModelLabel } from "@/components/model-select";
+import { ResearchStatusBadge } from "@/components/research-status-badge";
 import { getResearchJob, modelCatalog, type ResearchJob } from "@/lib/research-store";
 
 type ArtifactTab = "literature" | "lean" | "latex";
@@ -43,7 +44,7 @@ export default function ResearchEpisodePage() {
 
           <div className="border-b border-black/10 pb-10">
             <div className="min-w-0">
-              <div className="mb-4 flex flex-wrap items-center gap-3 text-[10px] font-medium uppercase tracking-[0.2em] text-black/45"><span className="rounded-full bg-black px-2.5 py-1 text-white">{job.status}</span></div>
+              <div className="mb-4 flex flex-wrap items-center gap-3"><ResearchStatusBadge job={job} /></div>
               <h1 className="max-w-4xl text-2xl font-semibold tracking-[-0.04em] sm:text-3xl">{job.title}</h1>
               <p className="mt-5 max-w-3xl text-base leading-7 text-black/55">{job.statement}</p>
             </div>
@@ -97,10 +98,11 @@ function FailedEpisode({ job }: { job: ResearchJob }) {
 
 function CompletedEpisode({ job, tab, setTab }: { job: ResearchJob; tab: ArtifactTab; setTab: (tab: ArtifactTab) => void }) {
   return <div className="space-y-14 pt-10">
-    <section className={`rounded-2xl border p-7 sm:p-9 ${job.proof?.status === "verified" ? "border-black bg-[#151515] text-white" : "border-black/15 bg-white"}`}>
+    <section className={`rounded-2xl border p-7 sm:p-9 ${job.proof?.status === "verified" ? "border-black bg-[#151515] text-white" : "border-yellow-300 bg-yellow-50 text-yellow-900"}`}>
       <div className="flex items-start gap-5"><span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-current/25">{job.proof?.status === "verified" ? <IconCheck size={28} stroke={2.5} /> : <IconFileDescription size={24} />}</span><div>
         <p className="text-[10px] font-semibold uppercase tracking-[0.2em] opacity-55">Episode result</p>
-        <h2 className="mt-2 text-3xl font-semibold tracking-tight">{job.proof?.status === "verified" ? "PASS · Lean proof checked" : "Research complete · Proof unverified"}</h2>
+        <h2 className="mt-2 text-3xl font-semibold tracking-tight">{job.proof?.status === "verified" ? "PASS · Lean proof checked" : "Unverified"}</h2>
+        {job.proof?.status !== "verified" && <p className="mt-3 text-sm leading-7">The research run finished, but no passed Lean verification is recorded. Treat the result as an unverified candidate.</p>}
         <p className="mt-3 max-w-3xl text-sm leading-7 opacity-70">{job.summary}</p>
         <a href="#proof-artifacts" onClick={() => setTab("latex")} className="mt-5 inline-block border-b border-current/40 pb-1 text-sm font-semibold">Read the written result ↓</a>
       </div></div>

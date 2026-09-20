@@ -13,6 +13,7 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { TrivialityLogo } from "@/components/triviality-logo";
+import { getResearchStatus, researchStatusPresentation } from "@/lib/research-status";
 import { deleteResearchJob, getResearchJobs, type ResearchJob } from "@/lib/research-store";
 
 const hiddenPublishedProofKey = "triviality:hidden-chat:trihexagonal-shell:v2";
@@ -206,10 +207,10 @@ function SidebarContent({
                   <Link
                     href={`/dashboard/research/${job.id}`}
                     onClick={onNavigate}
-                    title={job.title}
+                    title={`${job.title} · ${researchStatusPresentation[getResearchStatus(job)].label}`}
                     className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-2 text-sm transition ${pathname.endsWith(job.id) ? "bg-black/[0.07]" : ""}`}
                   >
-                    <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${job.status === "completed" ? "bg-emerald-500" : job.status === "failed" ? "bg-red-400" : "bg-amber-400"}`} />
+                    <span aria-label={researchStatusPresentation[getResearchStatus(job)].label} className={`h-1.5 w-1.5 shrink-0 rounded-full ${researchStatusPresentation[getResearchStatus(job)].dot}`} />
                     <span className="truncate">{job.title}</span>
                   </Link>
                   <button
