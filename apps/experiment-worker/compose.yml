@@ -1,0 +1,49 @@
+services:
+  experiments:
+    build: .
+    environment:
+      EXPERIMENT_API_KEY: ${EXPERIMENT_API_KEY:?Set EXPERIMENT_API_KEY}
+    volumes:
+      - experiments:/data
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 512m
+    cpus: 1.0
+    pids_limit: 32
+    restart: unless-stopped
+    networks: [isolated]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=2)"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+  gateway:
+    image: caddy:2-alpine
+    user: "10001:10001"
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    tmpfs:
+      - /data:uid=10001,gid=10001,size=8m
+      - /config:uid=10001,gid=10001,size=8m
+    read_only: true
+    cap_drop: [ALL]
+    # The upstream Caddy binary carries this file capability.
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    pids_limit: 32
+    restart: unless-stopped
+    depends_on:
+      experiments:
+        condition: service_healthy
+    networks: [default, isolated]
+networks:
+  isolated:
+    internal: true
+volumes:
+  experiments:

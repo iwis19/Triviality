@@ -49,6 +49,15 @@ The default discovery catalog covers 16 areas and requests up to 100 works per a
 
 ## Local research runtime
 
+An optional [Challenger experiment worker](docs/experiment-worker.md) runs bounded
+exact-arithmetic searches on a Vultr VM and feeds evidence back into the research
+workflow. See the guide for deployment, credentials, and local tests.
+
+Run `pnpm experiments:demo` for a self-contained execution demo. Deploy once with
+`pnpm experiments:setup root@YOUR_VM_IP`; subsequent demos automatically use
+Vultr. `pnpm experiments:worker` starts the research worker with its experiment
+connection, including the SSH tunnel.
+
 The research workspace is backed by two additional apps:
 
 - `apps/research-api` — creates research episodes, stores their state in MongoDB, and enqueues work in Redis.

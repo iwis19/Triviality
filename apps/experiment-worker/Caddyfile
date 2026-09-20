@@ -1,0 +1,14 @@
+{
+    admin off
+    auto_https off
+}
+:8090 {
+    request_body {
+        max_size 8KB
+    }
+    reverse_proxy experiments:8090 {
+        transport http {
+            response_header_timeout 10s
+        }
+    }
+}
