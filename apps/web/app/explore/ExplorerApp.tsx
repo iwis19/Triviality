@@ -35,7 +35,7 @@ export default function ExplorerApp({ intro = false }: { intro?: boolean }) {
 
   useEffect(() => {
     if (introState !== "holding") return;
-    const timer = window.setTimeout(() => setIntroState("fading"), 2000);
+    const timer = window.setTimeout(() => setIntroState("fading"), 250);
     return () => window.clearTimeout(timer);
   }, [introState]);
 

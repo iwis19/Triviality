@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 const FLAP_CHARS = " ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-const BOARD_ROWS = 6;
-const BOARD_COLS = 22;
+const BOARD_ROWS = 4;
+const BOARD_COLS = 18;
 
 const BASE_COL_DELAY = 30;
 const BASE_ROW_DELAY = 20;
@@ -36,7 +36,7 @@ const ACCENT_COLORS: AccentColor[] = [
 ];
 
 const CELL_TEXT_STYLE: React.CSSProperties = {
-  fontSize: "clamp(5px, 1.2vw, 15px)",
+  fontSize: "clamp(8.5px, 2.4vw, 30.5px)",
   lineHeight: 1,
 };
 
@@ -47,15 +47,20 @@ const FlapCell = React.memo(function FlapCell({
   delay,
   stepMs,
   flipDuration,
+  cellId,
+  onSettled,
 }: {
   target: string;
   delay: number;
   stepMs: number;
   flipDuration: number;
+  cellId: string;
+  onSettled: (id: string, value: string) => void;
 }) {
   const [current, setCurrent] = useState(" ");
   const [prev, setPrev] = useState(" ");
   const [flipId, setFlipId] = useState(0);
+  const [isFinal, setIsFinal] = useState(false);
   const [accent, setAccent] = useState<AccentColor | null>(null);
   const [prevAccent, setPrevAccent] = useState<AccentColor | null>(null);
   const curRef = useRef(" ");
@@ -80,7 +85,7 @@ const FlapCell = React.memo(function FlapCell({
 
     const scrambleCount =
       normalized === " "
-        ? 8 + Math.floor(Math.random() * 8)
+        ? 1
         : 25 + Math.floor(Math.random() * 15);
 
     const runStep = (i: number) => {
@@ -95,6 +100,7 @@ const FlapCell = React.memo(function FlapCell({
           ? ACCENT_COLORS[Math.floor(Math.random() * ACCENT_COLORS.length)]
           : null;
 
+      setIsFinal(isLast);
       setPrev(curRef.current);
       setPrevAccent(accentRef.current);
       curRef.current = ch;
@@ -210,6 +216,7 @@ const FlapCell = React.memo(function FlapCell({
         {flipId > 0 && (
           <motion.div
             key={`b${flipId}`}
+            onAnimationComplete={() => { if (isFinal) onSettled(cellId, current); }}
             className={cn(
               "absolute inset-x-0 bottom-0 z-10 h-1/2 origin-top overflow-hidden rounded-b-[3px] backface-hidden transform-3d",
               bottomBg,
@@ -251,7 +258,9 @@ const FlapCell = React.memo(function FlapCell({
   prevProps.target === nextProps.target &&
   prevProps.delay === nextProps.delay &&
   prevProps.stepMs === nextProps.stepMs &&
-  prevProps.flipDuration === nextProps.flipDuration,
+  prevProps.flipDuration === nextProps.flipDuration &&
+  prevProps.cellId === nextProps.cellId &&
+  prevProps.onSettled === nextProps.onSettled,
 );
 
 // ── Color Tile ────────────────────────────────────────────────────────
@@ -402,15 +411,35 @@ export function TextFlippingBoard({
     return grid;
   }, [rows, text]);
 
+  const letterIds = useMemo(() => board.flatMap((row, r) => row.flatMap((cell, c) =>
+    cell.type === "char" && cell.value.trim() ? [{ id: `${r}-${c}`, column: c, row: r }] : []
+  )).sort((a, b) => a.column - b.column || a.row - b.row).map(cell => cell.id), [board]);
+  const [clearingIndex, setClearingIndex] = useState(-1);
+  const completion = useRef({ pending: new Set<string>(), blanking: new Set<string>(), notified: false });
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    if (!onComplete) return;
-    const lastDelay = Math.max(0, ...board.flatMap((row, r) => row.map((cell, c) =>
-      cell.type === "char" && cell.value.trim() ? c * colDelay + r * rowDelay : 0
-    )));
-    // A nonblank cell takes at most 39 scramble steps, then its final flap settles.
-    const timer = setTimeout(onComplete, lastDelay + 39 * stepMs + flipDur * 1350 + 350);
-    return () => clearTimeout(timer);
-  }, [board, colDelay, rowDelay, stepMs, flipDur, onComplete]);
+    completion.current = { pending: new Set(letterIds), blanking: new Set(letterIds), notified: false };
+    return () => { if (holdTimer.current) clearTimeout(holdTimer.current); };
+  }, [letterIds]);
+
+  // Blanking flips overlap by about 100ms, sweeping from left to right.
+  // Wait for every final blank flap before triggering the fade.
+  const cellSettled = useCallback((id: string, value: string) => {
+    const state = completion.current;
+    if (value === " ") {
+      if (!state.blanking.delete(id)) return;
+      if (!state.blanking.size && !state.notified) {
+        state.notified = true;
+        onComplete?.();
+      }
+      return;
+    }
+    if (!state.pending.delete(id)) return;
+    if (!state.pending.size) {
+      holdTimer.current = setTimeout(() => setClearingIndex(letterIds.length - 1), 350);
+    }
+  }, [letterIds, onComplete]);
 
   return (
     <div
@@ -430,10 +459,12 @@ export function TextFlippingBoard({
             ) : (
               <FlapCell
                 key={`${r}-${c}`}
-                target={cell.value}
-                delay={c * colDelay + r * rowDelay}
+                cellId={`${r}-${c}`}
+                onSettled={cellSettled}
+                target={clearingIndex >= 0 && letterIds.indexOf(`${r}-${c}`) <= clearingIndex ? " " : cell.value}
+                delay={clearingIndex >= 0 ? Math.max(0, letterIds.indexOf(`${r}-${c}`)) * 140 : c * colDelay + r * rowDelay}
                 stepMs={stepMs}
-                flipDuration={flipDur}
+                flipDuration={clearingIndex >= 0 && letterIds.indexOf(`${r}-${c}`) <= clearingIndex ? 0.18 : flipDur}
               />
             ),
           ),

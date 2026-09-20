@@ -112,15 +112,12 @@ function ReaderNav() {
   return (
     <nav className="border-b border-black/[.07] bg-white" aria-label="Literature navigation">
       <div className="mx-auto flex h-[76px] max-w-[1440px] items-center justify-between px-5 sm:px-10 lg:px-16">
-        <TrivialityLogo className="scale-[0.92] origin-left" />
-        <div className="hidden items-center gap-8 text-[15px] text-black/75 md:flex">
-          <Link href="/">Home</Link>
-          <Link href="/dashboard">Research</Link>
-          <Link className="text-black" href="/dashboard/literature">Literature</Link>
-          <Link href="/dashboard/graph">Graph</Link>
+        <div className="flex items-center gap-4 sm:gap-8">
+          <TrivialityLogo className="scale-[0.92] origin-left" />
+          <Link className="text-sm text-black/75 sm:text-[15px]" href="/">Home</Link>
         </div>
         <div className="flex items-center gap-3">
-          <HoverBorderGradient as={Link} href="/dashboard" containerClassName="rounded-full" className="flex items-center gap-1 rounded-[inherit] bg-black px-5 py-2.5 text-sm font-medium text-white" duration={1.2}>Open workspace <IconArrowUpRight size={15} /></HoverBorderGradient>
+          <HoverBorderGradient as={Link} href="/dashboard" containerClassName="rounded-full" className="flex items-center gap-1 rounded-[inherit] bg-black px-5 py-2.5 text-sm font-medium text-white" duration={1.2}>Back to workspace <IconArrowUpRight size={15} /></HoverBorderGradient>
         </div>
       </div>
     </nav>
