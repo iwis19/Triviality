@@ -63,7 +63,7 @@ export function DashboardSidebar({ jobs: providedJobs, onDeleted }: { jobs?: Res
       deletingId={deletingId}
       showPublishedProof={showPublishedProof}
       onRemovePublishedProof={() => {
-        if (!window.confirm("Remove the trihexagonal shell proof from Chats? The published proof page will remain available.")) return;
+        if (!window.confirm("Remove the trihexagonal shell result from Research chats? The result page will remain available.")) return;
         window.localStorage.setItem(hiddenPublishedProofKey, "1");
         setShowPublishedProof(false);
       }}
@@ -178,7 +178,7 @@ function SidebarContent({
         )}
 
         <section className={areas.length > 0 ? "mt-7" : ""}>
-          <p className="px-2 text-[11px] font-medium text-black/45">Chats</p>
+          <p className="px-2 text-[11px] font-medium text-black/45">Research chats</p>
           <div className="mt-2 space-y-0.5">
             {showPublishedProof && <div className="group flex items-center rounded-lg hover:bg-black/5">
               <Link
@@ -191,7 +191,7 @@ function SidebarContent({
                 <span className="truncate">Trihexagonal shell counterexample</span>
               </Link>
               <button
-                aria-label="Remove Trihexagonal shell counterexample from Chats"
+                aria-label="Remove Trihexagonal shell counterexample from Research chats"
                 className="mr-1 rounded-md p-1.5 text-black/35 opacity-100 transition hover:bg-black/8 hover:text-red-700 focus:opacity-100 md:opacity-0 md:group-hover:opacity-100"
                 onClick={onRemovePublishedProof}
                 type="button"

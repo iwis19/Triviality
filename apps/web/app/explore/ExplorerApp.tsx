@@ -56,10 +56,10 @@ export default function ExplorerApp({ intro = false }: { intro?: boolean }) {
       .then(([a, p, g]) => { if (!cancelled) { const area = a.find(area => area.slug === "combinatorics" || area.name === trihexagonalDemo.area);
         const demo: Problem = {
           id: trihexagonalDemo.id, slug: trihexagonalDemo.slug, title: trihexagonalDemo.title,
-          statement: trihexagonalDemo.statement, definitions: "", assumptions: "", attribution: "",
+          statement: trihexagonalDemo.statement, definitions: "", assumptions: "", attribution: "Triviality research chat",
           status: "disproved", formal_target: "", areas: area ? [{ slug: area.slug, name: area.name }] : [],
           sources: [], record_type: "problem", record_id: trihexagonalDemo.id, version: 1,
-          evidence_label: "Published counterexample", policy_version: "1", published_at: "",
+          evidence_label: "Research chat · Counterexample", policy_version: "1", published_at: "",
         };
         setAreas(a); setProblems([demo, ...p.filter(problem => problem.id !== demo.id)]);
         setGraph({ ...g, nodes: [{ id: demo.id, slug: demo.slug, type: "problem", label: demo.title,

@@ -14,7 +14,7 @@ export default function TrihexagonalShellProofPage() {
     <main className="flex min-h-screen flex-col bg-[#f5f5f5] text-[#111] md:flex-row">
       <DashboardSidebar />
       <div className="min-w-0 flex-1">
-        <DashboardTopbar page="Research" />
+        <DashboardTopbar page="Research chats" />
         <LiteratureReader paper={trihexagonalShellProof} workspace />
       </div>
     </main>

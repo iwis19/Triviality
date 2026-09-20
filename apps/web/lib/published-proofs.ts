@@ -3,10 +3,10 @@ import type { LiteraturePaper } from "./literature";
 export const trihexagonalShellProof: LiteraturePaper = {
   id: "trihexagonal-shell",
   date: "September 20, 2026",
-  category: "Verified counterexample",
+  category: "Research chat · Counterexample",
   title: "Trihexagonal shell: a counterexample to the proposed bound",
   subtitle: "A connected 23-cell shell enclosing a connected 31-cell hole",
-  authors: "Submitted to Triviality",
+  authors: "Triviality research",
   source: "Lean 4 / Mathlib certificate",
   verification: {
     label: "Lean certificate builds successfully",
