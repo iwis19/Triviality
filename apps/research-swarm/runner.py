@@ -1,5 +1,6 @@
 """JSON-lines bridge from the Node worker to the real SwarmFlow runtime."""
 import asyncio
+import hashlib
 from dataclasses import asdict
 import json
 import os
@@ -23,7 +24,7 @@ class ModelBackend(engine.AgentBackend):
     The framework owns scheduling, retries, handoffs and the journal. This
     adapter owns provider transport and usage accounting, per AgentBackend.
     """
-    def __init__(self, max_calls=20, directory=None):
+    def __init__(self, max_calls=200, directory=None):
         super().__init__()
         self.directory = directory
         self.calls = 0
@@ -103,6 +104,11 @@ async def execute(args, backend=None, progress=None):
     catalog = json.loads((ROOT / "config/research-models.json").read_text(encoding="utf-8"))
     if args.get("role_models") is None:
         args = {**args, "role_models": {role["id"]: catalog["defaultModel"] for role in catalog["roles"]}}
+    legacy = args.get("role_models")
+    if isinstance(legacy, dict) and set(legacy) == {"coordinator", "researcher", "challenger", "critic", "proof_writer"}:
+        args = {**args, "role_models": {"coordinator": legacy["coordinator"], "researcher_1": legacy["researcher"],
+                "researcher_2": legacy["challenger"], "researcher_3": legacy["researcher"],
+                "challenger": legacy["critic"], "proof_writer": legacy["proof_writer"]}}
     episode_id = args.get("episode_id", "")
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,100}", episode_id):
         raise ValueError("Invalid episode_id")
@@ -115,6 +121,11 @@ async def execute(args, backend=None, progress=None):
     args_path.write_text(json.dumps(args, ensure_ascii=False, indent=2), encoding="utf-8")
     journal = directory / "journal.json"
     workflow = ROOT / "swarm-skills" / "math-research" / "scripts" / "workflow.py"
+    fingerprint = hashlib.sha256(b"".join(path.read_bytes() for path in sorted(workflow.parent.glob("*.py")))).hexdigest()
+    version_path = directory / "workflow.sha256"
+    if journal.exists() and (not version_path.exists() or version_path.read_text() != fingerprint):
+        raise ValueError("Workflow changed; create a new episode instead of replaying an incompatible journal")
+    version_path.write_text(fingerprint)
     if backend is None:
         backend = ModelBackend(directory=directory)
         selections = args.get("role_models")
@@ -127,11 +138,17 @@ async def execute(args, backend=None, progress=None):
                 if selection not in allowed:
                     raise ValueError("Unknown or unavailable role model")
                 backend.route(selection)  # Preflight every role before spending tokens.
-    result = await engine.run_workflow(str(workflow), args=args, backend=backend,
-        resume=str(journal), journal_path=str(journal), run_id=episode_id, cap=2,
-        budget=engine.BudgetLedger(total=int(os.environ.get("SWARM_TOKEN_BUDGET", "60000"))),
-        progress_sink=progress or (lambda event: emit("progress", event=asdict(event))),
-        log_sink=lambda message: emit("log", message=message))
+    if args.get("retrieval_bridge"):
+        from retrieval import Retrieval
+        sys.modules["triviality_retrieval"] = Retrieval(directory, emit)
+    try:
+        result = await engine.run_workflow(str(workflow), args=args, backend=backend,
+            resume=str(journal), journal_path=str(journal), run_id=episode_id, cap=3,
+            budget=engine.BudgetLedger(total=int(os.environ.get("SWARM_TOKEN_BUDGET", "60000"))),
+            progress_sink=progress or (lambda event: emit("progress", event=asdict(event))),
+            log_sink=lambda message: emit("log", message=message))
+    finally:
+        sys.modules.pop("triviality_retrieval", None)
     (directory / "result.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     if result.get("proof") and result["proof"].get("lean"):
         (directory / "Proof.lean").write_text(result["proof"]["lean"], encoding="utf-8")

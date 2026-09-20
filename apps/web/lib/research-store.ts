@@ -83,6 +83,10 @@ export interface ResearchProof {
 }
 
 export interface ResearchJob {
+  explorationRounds?: number;
+  stagnationThreshold?: number;
+  branches?: Array<{ id: number; generation: number; assignment: string; status: string; stagnation: number }>;
+  discoveries?: Array<{ id: string; discoveryId: string; branch: number; generation: number; round: number; kind: string; status: string; content: string; evidence?: string; resolution_test?: string; reason?: string; source_ids?: string[] }>;
   id: string;
   projectId?: string;
   problemId?: string;
@@ -129,7 +133,7 @@ export function getResearchJob(id: string): Promise<ResearchJob> {
   return request<ResearchJob>(`/${encodeURIComponent(id)}`);
 }
 
-export function createResearchJob(input: { title: string; statement: string; area: string; roleModels: RoleModels; mode: string; budget: number; leanStatement?: string }): Promise<ResearchJob> {
+export function createResearchJob(input: { title: string; statement: string; area: string; roleModels: RoleModels; mode: string; budget: number; explorationRounds?: number; stagnationThreshold?: number; leanStatement?: string }): Promise<ResearchJob> {
   return request<ResearchJob>("", { method: "POST", body: JSON.stringify(input) });
 }
 

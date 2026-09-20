@@ -24,6 +24,8 @@ type ResearchForm = {
   roleModels: RoleModels;
   mode: string;
   budget: number;
+  explorationRounds: number;
+  stagnationThreshold: number;
   leanStatement: string;
 };
 
@@ -34,6 +36,8 @@ const initialForm: ResearchForm = {
   roleModels: { ...defaultRoleModels },
   mode: "Diverse portfolio",
   budget: 2,
+  explorationRounds: 4,
+  stagnationThreshold: 2,
   leanStatement: "",
 };
 
@@ -146,6 +150,8 @@ function ResearchDeployModal({
               <FieldSelect label="Area" value={form.area} onChange={(value) => setForm((current) => ({ ...current, area: value }))} options={["Algebra", "Analysis", "Combinatorics", "Geometry", "Logic", "Number theory", "Topology"]} />
 
               <label className="grid gap-1.5 text-sm font-medium">Proof attempts (1-6)<input className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm font-normal outline-none" min={1} max={6} type="number" value={form.budget} onChange={(event) => setForm((current) => ({ ...current, budget: Number(event.target.value) }))} /></label>
+              <label className="grid gap-1.5 text-sm font-medium">Exploration rounds (1–20)<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm" min={1} max={20} type="number" value={form.explorationRounds} onChange={(event) => setForm((current) => ({ ...current, explorationRounds: Number(event.target.value) }))} /><span className="text-xs font-normal text-black/50">Three researchers explore each round. A checked proof ends the run early.</span></label>
+              <label className="grid gap-1.5 text-sm font-medium">Stagnation limit (1–6)<input required className="h-11 rounded-md border border-black/12 bg-white px-3.5 text-sm" min={1} max={6} type="number" value={form.stagnationThreshold} onChange={(event) => setForm((current) => ({ ...current, stagnationThreshold: Number(event.target.value) }))} /><span className="text-xs font-normal text-black/50">Unproductive exchanges before restarting a branch. A refuted foundation can restart immediately.</span></label>
             </div>
           </section>
         {<label className="grid gap-2 border-t border-black/10 px-6 py-4 text-sm font-medium">Exact Lean target (optional)<textarea className="min-h-16 rounded-md border border-black/12 p-3 font-mono text-xs" value={form.leanStatement} onChange={(event) => setForm((current) => ({ ...current, leanStatement: event.target.value }))} placeholder="(a b c : Nat) (h : a ≤ b) : a + c ≤ b + c" /><span className="text-xs font-normal text-black/50">Without a supplied target, a checked formalization still needs your review of the mathematical statement.</span></label>}
@@ -174,5 +180,5 @@ function providerFor(provider?: ResearchProvider) {
 
 function EpisodeRow({ job }: { job: ResearchJob }) {
   const modelCount = job.roleModels ? new Set(Object.values(job.roleModels)).size : 0;
-  return <Link className="block overflow-hidden rounded-sm border border-black/10 bg-white" href={`/dashboard/research/${job.id}`}><div className="hidden gap-3 sm:grid border-b border-black/10 bg-[#fafafa] px-4 py-2.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40 sm:grid-cols-[minmax(16rem,1fr)_12rem_10rem_2.5rem]"><span>Name</span><span>Research team</span><span>Status</span><span /></div><div className="grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(16rem,1fr)_12rem_10rem_2.5rem] sm:items-center"><div className="min-w-0"><p className="truncate text-sm font-semibold tracking-[-0.02em]">{job.title}</p><p className="mt-1 truncate text-[11px] text-black/45">{job.statement}</p></div><div className="flex items-center gap-2.5"><span className="text-xs">{job.orchestrator === "workswarm" || job.provider === "huawei" ? "WorkSwarm" : providerFor(job.provider).name}<span className="mt-1 block text-[10px] text-black/45">{job.roleModels ? `${modelCount} ${modelCount === 1 ? "model" : "models"} · 5 roles` : "Legacy research"}</span></span></div><div><span className={`inline-flex rounded-md px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] ${job.status === "completed" ? "bg-black text-white" : job.status === "failed" ? "bg-red-50 text-red-900" : "bg-black/7 text-black/55"}`}>{job.status}</span><p className="mt-1.5 text-[10px] text-black/40">{job.status === "running" ? `${job.progress}% · ${job.stage}` : job.area}</p></div><IconChevronRight className="text-black/30" size={16} /></div></Link>;
+  return <Link className="block overflow-hidden rounded-sm border border-black/10 bg-white" href={`/dashboard/research/${job.id}`}><div className="hidden gap-3 sm:grid border-b border-black/10 bg-[#fafafa] px-4 py-2.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40 sm:grid-cols-[minmax(16rem,1fr)_12rem_10rem_2.5rem]"><span>Name</span><span>Research team</span><span>Status</span><span /></div><div className="grid gap-3 px-4 py-3.5 sm:grid-cols-[minmax(16rem,1fr)_12rem_10rem_2.5rem] sm:items-center"><div className="min-w-0"><p className="truncate text-sm font-semibold tracking-[-0.02em]">{job.title}</p><p className="mt-1 truncate text-[11px] text-black/45">{job.statement}</p></div><div className="flex items-center gap-2.5"><span className="text-xs">{job.orchestrator === "workswarm" || job.provider === "huawei" ? "WorkSwarm" : providerFor(job.provider).name}<span className="mt-1 block text-[10px] text-black/45">{job.roleModels ? `${modelCount} ${modelCount === 1 ? "model" : "models"} · ${Object.keys(job.roleModels).length} roles` : "Legacy research"}</span></span></div><div><span className={`inline-flex rounded-md px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.14em] ${job.status === "completed" ? "bg-black text-white" : job.status === "failed" ? "bg-red-50 text-red-900" : "bg-black/7 text-black/55"}`}>{job.status}</span><p className="mt-1.5 text-[10px] text-black/40">{job.status === "running" ? `${job.progress}% · ${job.stage}` : job.area}</p></div><IconChevronRight className="text-black/30" size={16} /></div></Link>;
 }

@@ -44,10 +44,15 @@ class RoutingTests(unittest.IsolatedAsyncioTestCase):
             captured.append((prompt, opts.get("model")))
             return await original(prompt, opts, schema, **kwargs)
         backend.run = capture
-        roles = {role: role + "-model" for role in ["coordinator", "researcher", "challenger", "critic", "proof_writer"]}
+        roles = {role: role + "-model" for role in ["coordinator", "researcher_1", "researcher_2", "researcher_3", "challenger", "proof_writer"]}
         with patch.dict(os.environ, {"SWARM_LEAN_BIN": "nonexistent-lean-for-test"}):
             await test_research.WorkflowTests().run_flow(backend, role_models=roles)
-        self.assertEqual([model for _, model in captured], ["coordinator-model", "researcher-model", "challenger-model", "critic-model", "researcher-model", "critic-model", "proof_writer-model"])
+        self.assertEqual({model for _, model in captured}, set(roles.values()))
+        for prompt, model in captured:
+            if prompt.startswith("Actively challenge"):
+                self.assertEqual(model, "challenger-model")
+            if prompt.startswith("Write a Lean"):
+                self.assertEqual(model, "proof_writer-model")
 
 
 class DevinTests(unittest.IsolatedAsyncioTestCase):

@@ -14,6 +14,8 @@ type CreateJobBody = {
   provider?: string; // Compatibility with the frontend before per-role selection.
   mode?: string;
   budget?: number;
+  explorationRounds?: number;
+  stagnationThreshold?: number;
   leanStatement?: string;
 };
 
@@ -51,7 +53,7 @@ async function serializeJob(episodeId: string) {
   const episode = await collections.researchEpisodes.findOne({ _id: episodeId });
   if (!episode) return null;
 
-  const [problem, hypotheses, attempts, results, papers, formalization, graphNodes, graphEdges, events] = await Promise.all([
+  const [problem, hypotheses, attempts, results, papers, formalization, graphNodes, graphEdges, events, discoveries] = await Promise.all([
     collections.researchProblems.findOne({ episodeId }),
     collections.researchHypotheses.find({ episodeId }).sort({ createdAt: 1 }).toArray(),
     collections.researchAttempts.find({ episodeId }).sort({ createdAt: 1 }).toArray(),
@@ -61,6 +63,7 @@ async function serializeJob(episodeId: string) {
     collections.graphNodes.find({ $or: [{ "metadata.episodeId": episodeId }, { "metadata.episodeIds": episodeId }] }).sort({ createdAt: 1 }).toArray(),
     collections.graphRelationships.find({ $or: [{ "metadata.episodeId": episodeId }, { "metadata.episodeIds": episodeId }] }).sort({ createdAt: 1 }).toArray(),
     collections.researchEvents.find({ episodeId }).sort({ createdAt: 1 }).toArray(),
+    collections.researchDiscoveries.find({ episodeId }).sort({ createdAt: 1 }).toArray(),
   ]);
 
   const graph = graphNodes.map((node) => {
@@ -115,6 +118,10 @@ async function serializeJob(episodeId: string) {
     mode: episode.mode ?? "Diverse portfolio",
     provider: episode.modelProvider ?? (episode.orchestrator ? undefined : "openai"),
     budget: episode.budget ?? 0,
+    explorationRounds: episode.explorationRounds ?? 4,
+    stagnationThreshold: episode.stagnationThreshold ?? 2,
+    branches: episode.branches ?? [],
+    discoveries: discoveries.map(({ _id, ...entry }) => ({ ...entry, id: _id })),
     leanStatement: episode.leanStatement,
     status: publicStatus(episode.status),
     stage: episode.stage ?? "Research queued",
@@ -199,11 +206,15 @@ app.post("/research/jobs", async (request: FastifyRequest<{ Body: CreateJobBody 
   catch (error) { return reply.code(400).send({ error: (error as Error).message }); }
   const mode = body.mode?.trim() || "Diverse portfolio";
   const budget = Math.max(1, Math.min(6, Number(body.budget ?? 2)));
+  const explorationRounds = body.explorationRounds ?? 4;
+  const stagnationThreshold = body.stagnationThreshold ?? 2;
+  if (!Number.isInteger(explorationRounds) || explorationRounds < 1 || explorationRounds > 20) return reply.code(400).send({ error: "explorationRounds must be an integer from 1 to 20" });
+  if (!Number.isInteger(stagnationThreshold) || stagnationThreshold < 1 || stagnationThreshold > 6) return reply.code(400).send({ error: "stagnationThreshold must be an integer from 1 to 6" });
   if (!Number.isFinite(budget) || !Number.isInteger(budget)) return reply.code(400).send({ error: "budget must be an integer" });
   if (body.leanStatement !== undefined && (typeof body.leanStatement !== "string" || body.leanStatement.length > 6000)) return reply.code(400).send({ error: "leanStatement must be a string of at most 6000 characters" });
   const collections = await getCollections();
   await collections.researchProjects.insertOne({ _id: projectId, name: title, description: statement, status: "ACTIVE", createdAt: now, updatedAt: now });
-  await collections.researchEpisodes.insertOne({ _id: episodeId, projectId, title, objective: statement, status: "ACTIVE", area, orchestrator: "workswarm", roleModels, mode, budget, leanStatement: body.leanStatement?.trim() || undefined, stage: "Queued for research worker", progress: 2, createdAt: now, updatedAt: now });
+  await collections.researchEpisodes.insertOne({ _id: episodeId, projectId, title, objective: statement, status: "ACTIVE", area, orchestrator: "workswarm", roleModels, mode, budget, explorationRounds, stagnationThreshold, branches: [], leanStatement: body.leanStatement?.trim() || undefined, stage: "Queued for research worker", progress: 2, createdAt: now, updatedAt: now });
   await collections.researchProblems.insertOne({ _id: problemId, episodeId, title, statement, assumptions: "", status: "ACTIVE", createdAt: now, updatedAt: now });
 
   try {

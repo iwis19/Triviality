@@ -5,7 +5,7 @@ import type {
   GraphNodeDocument, GraphRelationshipDocument, LemmaDocument, MathematicalStructureDocument, ObjectArtifactDocument,
   PaperDiscoveryDocument, PaperDocument, PaperEmbeddingDocument, PaperKnowledgeNodeDocument, PaperSourceDocument, ProofStrategyDocument, ResearchAttemptDocument,
   ResearchEpisodeDocument, ResearchHypothesisDocument, ResearchProblemDocument, ResearchProjectDocument, ResearchResultDocument,
-  ResearchEventDocument,
+  ResearchEventDocument, ResearchDiscoveryDocument,
   SourceDocument, TechniqueDocument, TheoremDocument,
 } from "./types.js";
 
@@ -36,6 +36,7 @@ export interface DatabaseCollections {
   researchAttempts: Collection<ResearchAttemptDocument>;
   researchResults: Collection<ResearchResultDocument>;
   researchEvents: Collection<ResearchEventDocument>;
+  researchDiscoveries: Collection<ResearchDiscoveryDocument>;
   papers: Collection<PaperDocument>;
   theorems: Collection<TheoremDocument>;
   lemmas: Collection<LemmaDocument>;
@@ -64,6 +65,7 @@ export async function getCollections(): Promise<DatabaseCollections> {
     researchProblems: db.collection("research_problems"), researchHypotheses: db.collection("research_hypotheses"),
     researchAttempts: db.collection("research_attempts"), researchResults: db.collection("research_results"),
     researchEvents: db.collection("research_events"),
+    researchDiscoveries: db.collection("research_discoveries"),
     papers: db.collection("papers"), theorems: db.collection("theorems"), lemmas: db.collection("lemmas"),
     definitions: db.collection("definitions"), conjectures: db.collection("conjectures"), techniques: db.collection("techniques"),
     proofStrategies: db.collection("proof_strategies"), mathematicalStructures: db.collection("mathematical_structures"),
