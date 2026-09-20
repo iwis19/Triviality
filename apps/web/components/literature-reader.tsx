@@ -2,9 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
-import rehypeKatex from "rehype-katex";
-import remarkMath from "remark-math";
+import { ResearchMarkdown } from "@/components/research-markdown";
 import { IconArrowLeft, IconArrowUpRight, IconCopy, IconCheck } from "@tabler/icons-react";
 import { TrivialityLogo } from "@/components/triviality-logo";
 import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
@@ -53,7 +51,7 @@ export function LiteratureReader({ paper, workspace = false }: { paper: Literatu
           <article className="min-w-0">
             <header className="mx-auto max-w-[820px]">
               {workspace ? <div className="mb-4 flex flex-wrap items-center gap-3 text-[10px] font-medium uppercase tracking-[0.2em] text-black/45"><span className="rounded-full bg-black px-2.5 py-1 text-white">completed</span></div> : <div className="flex items-center gap-3 text-sm font-medium text-black/60 sm:text-base"><time>{paper.date}</time><span className="text-black/20">·</span><span>{paper.category}</span></div>}
-              <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.04em] sm:text-4xl">{paper.title}</h1>
+              <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.04em] sm:text-4xl"><ResearchMarkdown inline>{paper.title}</ResearchMarkdown></h1>
               {workspace ? <p className="mt-5 max-w-3xl text-base leading-7 text-black/55">{paper.subtitle}</p> : <p className="mt-5 text-xs text-black/55"><span className="text-black/75">{paper.authors}</span>{paper.source ? ` · ${paper.source}` : ""}</p>}
               {paper.verification && <div className="mt-6 rounded-2xl border border-emerald-900/15 bg-emerald-50/60 px-5 py-4"><p className="text-sm font-semibold text-emerald-950">{paper.verification.label}</p><p className="mt-1 text-xs leading-5 text-emerald-950/65">{paper.verification.detail}</p></div>}
               {paper.artifacts && paper.artifacts.length > 0 && <div className="mt-5 flex flex-wrap gap-2">{paper.artifacts.map((artifact) => <a className="rounded-full border border-black/15 px-4 py-2 text-xs font-medium transition hover:border-black/35 hover:bg-black/[.025]" href={artifact.href} key={artifact.href}>{artifact.label}</a>)}</div>}
@@ -61,10 +59,8 @@ export function LiteratureReader({ paper, workspace = false }: { paper: Literatu
 
             <div className="mx-auto mt-12 max-w-[820px] text-left">
               {paper.sections.map((section) => (
-                <section className="literature-section scroll-mt-28" id={section.id} key={section.id}>
-                  <ReactMarkdown
-                    remarkPlugins={[remarkMath]}
-                    rehypePlugins={[rehypeKatex]}
+                <section className="literature-section literature-markdown scroll-mt-28" id={section.id} key={section.id}>
+                  <ResearchMarkdown
                     components={{
                       h1: ({ children }) => <h2 className="mt-14 text-2xl font-semibold tracking-[-0.05em] first:mt-0 sm:text-3xl">{children}</h2>,
                       h2: ({ children }) => <h2 className="mt-14 text-2xl font-semibold tracking-[-0.05em] first:mt-0 sm:text-3xl">{children}</h2>,
@@ -78,7 +74,7 @@ export function LiteratureReader({ paper, workspace = false }: { paper: Literatu
                       code: ({ children }) => <code className="rounded bg-black/[.05] px-1.5 py-0.5 font-mono text-[0.86em]">{children}</code>,
                       pre: ({ children }) => <pre className="mt-6 max-h-[38rem] overflow-auto rounded-xl border border-black/10 bg-[#f7f7f5] p-5 text-xs leading-6">{children}</pre>,
                     }}
-                  >{`## ${section.title}\n\n${section.markdown}`}</ReactMarkdown>
+                  >{`## ${section.title}\n\n${section.markdown}`}</ResearchMarkdown>
                 </section>
               ))}
             </div>

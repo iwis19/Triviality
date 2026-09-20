@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ResearchMarkdown } from "@/components/research-markdown";
 import { IconArrowUpRight, IconBook2 } from "@tabler/icons-react";
 import type { ResearchLiterature } from "@/lib/research-store";
 
@@ -27,7 +28,7 @@ export function ResearchLiteratureTabs({ jobId, papers }: { jobId: string; paper
             <span className="flex min-w-0 items-center gap-3">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-black/10 text-[10px] font-mono text-black/40">{String(index + 1).padStart(2, "0")}</span>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-semibold tracking-[-0.03em]">{paper.title}</span>
+                <span className="block truncate text-sm font-semibold tracking-[-0.03em]"><ResearchMarkdown inline>{paper.title}</ResearchMarkdown></span>
                 <span className="mt-1 block truncate text-[11px] text-black/45">{paper.authors}</span>
               </span>
             </span>

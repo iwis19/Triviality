@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
+import { ResearchMarkdown } from "@/components/research-markdown";
 import { useParams } from "next/navigation";
 import { IconArrowLeft, IconCheck, IconCode, IconFileDescription, IconLoader2 } from "@tabler/icons-react";
 import { DashboardSidebar } from "../../dashboard-sidebar";
@@ -14,6 +12,8 @@ import { ResearchLiteratureTabs } from "@/components/research-literature-tabs";
 import { ModelLabel } from "@/components/model-select";
 import { ResearchStatusBadge } from "@/components/research-status-badge";
 import { getResearchJob, modelCatalog, type ResearchJob } from "@/lib/research-store";
+
+import { latexArtifactMarkdown } from "@/lib/research-markdown";
 
 type ArtifactTab = "literature" | "lean" | "latex";
 
@@ -111,7 +111,7 @@ function CompletedEpisode({ job, tab, setTab }: { job: ResearchJob; tab: Artifac
 
     <ResearchGraph job={job} />
 
-    <details className="rounded-2xl border border-black/10 bg-white p-6"><summary className="cursor-pointer text-sm font-semibold">Research frontier <span className="ml-2 font-normal text-black/45">{job.hypotheses.length} investigations</span></summary><div className="mt-5 space-y-4">{job.hypotheses.map((hypothesis) => <details key={hypothesis.id} className="rounded-xl border border-black/10 p-5"><summary className="cursor-pointer text-sm font-semibold">{hypothesis.title}</summary><div className="mt-4 space-y-3 text-sm leading-7 text-black/65"><ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{hypothesis.statement}</ReactMarkdown></div><p className="mt-4 text-xs text-black/45">{hypothesis.status}</p></details>)}</div></details>
+    <details className="rounded-2xl border border-black/10 bg-white p-6"><summary className="cursor-pointer text-sm font-semibold">Research frontier <span className="ml-2 font-normal text-black/45">{job.hypotheses.length} investigations</span></summary><div className="mt-5 space-y-4">{job.hypotheses.map((hypothesis) => <details key={hypothesis.id} className="rounded-xl border border-black/10 p-5"><summary className="cursor-pointer text-sm font-semibold">{hypothesis.title}</summary><div className="mt-4 space-y-3 text-sm leading-7 text-black/65"><ResearchMarkdown>{hypothesis.statement}</ResearchMarkdown></div><p className="mt-4 text-xs text-black/45">{hypothesis.status}</p></details>)}</div></details>
 
 
 
@@ -123,6 +123,7 @@ function ProofArtifact({ job, tab }: { job: ResearchJob; tab: "lean" | "latex" }
   const [sourceVisible, setSourceVisible] = useState(false);
   if (!job.proof) return <div className="rounded-2xl border border-dashed border-black/15 bg-white p-8 text-sm leading-7 text-black/55"><h3 className="font-semibold text-black">No proof artifact was produced</h3><p className="mt-3">{job.summary}</p><p className="mt-3">The research findings and team handoffs below contain the available evidence.</p></div>;
   const proof = job.proof;
+  const exposition = proof.explanation?.trim() || latexArtifactMarkdown(proof.latex || "");
   const isLean = tab === "lean";
   const source = isLean ? proof.lean : proof.latex;
   const download = () => {
@@ -133,11 +134,11 @@ function ProofArtifact({ job, tab }: { job: ResearchJob; tab: "lean" | "latex" }
   return <div className="overflow-hidden rounded-2xl border border-black/10 bg-white">
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/10 px-6 py-4"><span className="flex items-center gap-2 text-xs font-semibold">{isLean ? <IconCode size={16} /> : <IconFileDescription size={16} />}{isLean ? "proof.lean" : "Written result · LaTeX mathematics"}</span><div className="flex gap-4 text-xs">{!isLean && <button onClick={() => setSourceVisible(!sourceVisible)} className="underline underline-offset-4">{sourceVisible ? "Read result" : "View .tex source"}</button>}<button disabled={!source} onClick={download} className="font-semibold disabled:opacity-40">Download {isLean ? ".lean" : ".tex"} ↓</button></div></div>
     {isLean || sourceVisible ? <pre className="max-h-[48rem] overflow-auto bg-[#101010] p-6 text-sm leading-7 text-white/80"><code>{source || "No source was saved for this episode."}</code></pre> : <article className="literature-markdown mx-auto max-w-3xl p-6 sm:p-10">
-      <h3 className="text-3xl font-semibold tracking-tight">{job.title}</h3>
+      <h3 className="text-3xl font-semibold tracking-tight"><ResearchMarkdown inline>{job.title}</ResearchMarkdown></h3>
       <p className="mt-6 text-[10px] font-semibold uppercase tracking-widest text-black/40">Research question</p>
-      <div className="mt-3 whitespace-pre-wrap text-sm leading-7"><ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{job.statement}</ReactMarkdown></div>
+      <div className="mt-3 whitespace-pre-wrap text-sm leading-7"><ResearchMarkdown>{job.statement}</ResearchMarkdown></div>
       <h4 className="mb-4 mt-8 text-lg font-semibold">Proof exposition</h4>
-      {proof.explanation?.trim() ? <div className="space-y-4 text-sm leading-8 text-black/75 [overflow-wrap:anywhere]"><ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>{proof.explanation}</ReactMarkdown></div> : <p className="text-sm leading-7 text-black/55">This episode did not save a written proof explanation. {proof.latex?.trim() ? "Use View .tex source to inspect the available document." : "Start a new episode to generate a written proof alongside the Lean artifact."}</p>}
+      {exposition.trim() ? <div className="space-y-4 text-sm leading-8 text-black/75 [overflow-wrap:anywhere]"><ResearchMarkdown>{exposition}</ResearchMarkdown></div> : <p className="text-sm leading-7 text-black/55">This episode did not save a written proof explanation. {proof.latex?.trim() ? "Use View .tex source to inspect the available document." : "Start a new episode to generate a written proof alongside the Lean artifact."}</p>}
       <details className="mt-8 border-t border-black/10 pt-5"><summary className="cursor-pointer text-xs font-semibold">Exact formal statement checked by Lean</summary><pre className="mt-3 overflow-auto whitespace-pre-wrap text-xs leading-6">{proof.statement}</pre></details>
     </article>}
   </div>;

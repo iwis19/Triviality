@@ -3,6 +3,18 @@
 @import "shadcn/tailwind.css";
 @import "katex/dist/katex.min.css";
 
+.literature-markdown {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.literature-markdown .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.25rem;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {

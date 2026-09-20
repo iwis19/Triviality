@@ -1,6 +1,4 @@
-import ReactMarkdown from "react-markdown";
-import rehypeKatex from "rehype-katex";
-import remarkMath from "remark-math";
+import { ResearchMarkdown } from "@/components/research-markdown";
 import type { ResearchLiterature } from "@/lib/research-store";
 
 export function ResearchLiteratureDocument({ paper }: { paper: ResearchLiterature }) {
@@ -15,9 +13,7 @@ export function ResearchLiteratureDocument({ paper }: { paper: ResearchLiteratur
       <section className="min-h-0 overflow-y-auto bg-white p-5 sm:p-9" aria-label="Rendered Markdown">
         <div className="mb-7 flex items-center justify-between border-b border-black/10 pb-4"><span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/40">Rendered output</span><span className="text-[9px] font-semibold uppercase tracking-[0.18em] text-black/35">Markdown + KaTeX</span></div>
         <div className="literature-markdown max-w-2xl">
-          <ReactMarkdown
-            remarkPlugins={[remarkMath]}
-            rehypePlugins={[rehypeKatex]}
+          <ResearchMarkdown
             components={{
               h1: ({ children }) => <h2 className="text-3xl font-semibold tracking-[-0.06em] sm:text-4xl">{children}</h2>,
               h2: ({ children }) => <h3 className="mt-10 text-xl font-semibold tracking-[-0.04em]">{children}</h3>,
@@ -27,7 +23,7 @@ export function ResearchLiteratureDocument({ paper }: { paper: ResearchLiteratur
               ul: ({ children }) => <ul className="mt-5 list-disc space-y-2 pl-5 text-[15px] leading-7 text-black/65">{children}</ul>,
               code: ({ children }) => <code className="rounded bg-black/[.05] px-1.5 py-0.5 font-mono text-[0.86em]">{children}</code>,
             }}
-          >{markdown}</ReactMarkdown>
+          >{markdown}</ResearchMarkdown>
         </div>
       </section>
     </div>
